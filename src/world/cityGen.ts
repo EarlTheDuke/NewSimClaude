@@ -44,10 +44,17 @@ function buildGrid(): { nodes: MapNode[]; roads: Road[] } {
 
 export interface CityOptions {
   residentCount?: number;
+  /**
+   * How many residents start jobless (jobId === ""). They live and spend but
+   * draw no wage until a business hires them. Default 0 keeps Phase 1 intact.
+   */
+  unemployed?: number;
 }
 
 export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
   const residentCount = options.residentCount ?? 12;
+  const unemployed = Math.max(0, Math.min(options.unemployed ?? 0, residentCount));
+  const employedCount = residentCount - unemployed;
   const world = new World();
   const { nodes, roads } = buildGrid();
   world.nodes = nodes;
@@ -85,15 +92,16 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
   const residents: Resident[] = [];
   for (let i = 0; i < residentCount; i++) {
     const home = homes[i % homes.length]!;
+    const employed = i < employedCount;
     const biz = businesses[i % businesses.length]!;
-    biz.employeeIds.push(`res_${i}`);
+    if (employed) biz.employeeIds.push(`res_${i}`);
     const homeNode = world.getNode(home.nodeId);
     residents.push({
       id: `res_${i}`,
       name: FIRST_NAMES[i % FIRST_NAMES.length]!,
       money: 500,
       homeId: home.id,
-      jobId: biz.id,
+      jobId: employed ? biz.id : "",
       needs: {
         hunger: 70 + rng.int(0, 20),
         energy: 80 + rng.int(0, 15),

@@ -1,5 +1,5 @@
 import "./style.css";
-import { createCity } from "./createCity";
+import { createCity, type BrainOption } from "./createCity";
 import { SPEED_OPTIONS, type SpeedMultiplier } from "./core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "./utils/serialization";
 import { CanvasRenderer, type Pick } from "./render/CanvasRenderer";
@@ -8,11 +8,17 @@ const SAVE_KEY = "cwlc.save.v1";
 const WIDTH = 640;
 const HEIGHT = 480;
 
-const { sim, world } = createCity({ seed: 1 });
+// The businesses run on the deterministic rule-based brain by default — fully
+// watchable, zero-config. To run them on Claude instead, swap in the provider:
+//   import { ClaudeDecisionProvider } from "./ai/ClaudeDecisionProvider";
+//   const brain: BrainOption = new ClaudeDecisionProvider(); // needs VITE_ANTHROPIC_API_KEY
+const brain: BrainOption = "rules";
+
+const { sim, world, agent } = createCity({ seed: 1, brain });
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>CityWithLifeClaude — Phase 1 (the city is alive)</h1>
+  <h1>CityWithLifeClaude — Phase 2 (the businesses think)</h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
@@ -22,6 +28,10 @@ app.innerHTML = `
     <canvas id="city" width="${WIDTH}" height="${HEIGHT}"></canvas>
     <div class="inspector" id="inspector"><p class="hint">Click a resident or building to inspect.</p></div>
   </div>
+  <div class="hud trace">
+    <h2>Decision trace <span class="hint" id="brainTag"></span></h2>
+    <div id="traceLog"><p class="hint">No decisions yet — businesses review once a day.</p></div>
+  </div>
 `;
 
 const clockEl = el<HTMLSpanElement>("#clock");
@@ -29,7 +39,10 @@ const dayEl = el<HTMLSpanElement>("#day");
 const statsEl = el<HTMLDivElement>("#stats");
 const controlsEl = el<HTMLDivElement>("#controls");
 const inspectorEl = el<HTMLDivElement>("#inspector");
+const traceLogEl = el<HTMLDivElement>("#traceLog");
 const canvas = el<HTMLCanvasElement>("#city");
+
+el<HTMLSpanElement>("#brainTag").textContent = agent ? `· ${brain === "rules" ? "rules" : "claude"} brain` : "· brain off";
 
 const renderer = new CanvasRenderer(canvas, world);
 let selected: Pick | undefined;
@@ -118,11 +131,34 @@ function renderInspector(): void {
     inspectorEl.innerHTML = `
       <h2>${b.name}</h2>
       <p class="tag">${b.kind}</p>
-      <p>cash: ${money(b.cash)} · inventory: ${b.inventory}</p>
+      <p>cash: ${money(b.cash)} · inventory: ${b.inventory} · price: ${money(b.price)}</p>
       <p>employees: ${b.employeeIds.length}</p>
       <p class="pnl">revenue ${money(b.pnl.revenue)} · wages ${money(b.pnl.wagesPaid)} · rent ${money(b.pnl.rentCollected)}</p>
     `;
   }
+}
+
+function renderTrace(): void {
+  if (!agent) return;
+  const entries = agent.decisions();
+  if (entries.length === 0) return;
+  const rows = entries
+    .slice(-8)
+    .reverse()
+    .map((e) => {
+      const biz = world.getBusiness(e.businessId);
+      const levers: string[] = [];
+      if (e.action.setPrice !== undefined) levers.push(`price→${money(e.action.setPrice)}`);
+      if (e.action.hire) levers.push(e.action.hire > 0 ? `+${e.action.hire} hire` : `${e.action.hire} layoff`);
+      if (e.action.produce) levers.push(`+${e.action.produce} stock`);
+      const act = levers.length > 0 ? levers.join(", ") : "hold";
+      const cost = e.usage?.costUsd !== undefined ? ` · $${e.usage.costUsd.toFixed(4)}` : "";
+      const lat = e.usage?.latencyMs !== undefined ? ` · ${Math.round(e.usage.latencyMs)}ms` : "";
+      const tag = e.fallback ? ' <span class="fallback">fallback</span>' : "";
+      return `<p class="trace-row"><b>Day ${e.day}</b> ${biz?.name ?? e.businessId}: ${act}${tag}<br><span class="hint">${e.reason}${cost}${lat}</span></p>`;
+    })
+    .join("");
+  traceLogEl.innerHTML = rows;
 }
 
 function renderFrame(): void {
@@ -135,6 +171,7 @@ function renderFrame(): void {
   syncControls();
   renderer.draw(selected);
   renderInspector();
+  renderTrace();
 }
 
 window.addEventListener("keydown", (e) => {

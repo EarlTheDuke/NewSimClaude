@@ -1,0 +1,195 @@
+import type { System, SystemContext } from "../core/types";
+import { TICKS_PER_DAY } from "../core/TimeSystem";
+import type { World } from "../world/World";
+import type { Business, ProfitAndLoss } from "../world/types";
+import type {
+  BusinessDecision,
+  BusinessObservation,
+  DecisionLimits,
+  DecisionLogEntry,
+  DecisionProvider,
+  DecisionRequest,
+} from "../ai/types";
+import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
+import { RuleBasedProvider } from "../ai/RuleBasedProvider";
+
+/** Cumulative readings captured at the previous review, to diff into day deltas. */
+interface Bookmark {
+  day: number;
+  cash: number;
+  pnl: ProfitAndLoss;
+}
+
+/**
+ * The agentic layer: once per sim-day, each opted-in business reviews its day
+ * and pulls levers through its {@link DecisionProvider}.
+ *
+ * Three guarantees hold no matter what the provider returns:
+ *  - **Clamped**: every action passes through {@link clampAction} before it
+ *    touches the world, so a model can never detonate the economy.
+ *  - **Fallible-safe**: if the provider throws or its promise rejects, the
+ *    rule-based provider covers invisibly (logged with `fallback: true`).
+ *  - **Traceable**: every applied action is recorded in the decision log with
+ *    its reason, provider, and (for Claude) token/latency/cost usage.
+ *
+ * Sync providers (rules, mock) apply the same tick and keep the run fully
+ * deterministic. Claude is async: the call fires at the day boundary and its
+ * result lands on a later tick — the lone, contained source of non-determinism.
+ */
+export class BusinessAgentSystem implements System {
+  readonly id = "business-agent";
+  private readonly fallback = new RuleBasedProvider();
+  private readonly limits: DecisionLimits;
+  private readonly log: DecisionLogEntry[] = [];
+  private readonly marks = new Map<string, Bookmark>();
+  /** Businesses with an in-flight async decision — don't double-fire. */
+  private readonly pending = new Set<string>();
+
+  constructor(
+    private readonly world: World,
+    private readonly provider: DecisionProvider,
+    private readonly agenticBusinessIds: readonly string[],
+    limits: DecisionLimits = DEFAULT_LIMITS,
+  ) {
+    this.limits = limits;
+  }
+
+  update(ctx: SystemContext): void {
+    // Review at each new day's first tick, after EconomySystem has settled the
+    // prior day's rent (this system is registered after EconomySystem).
+    if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
+    const { day } = ctx.time.time();
+    for (const id of this.agenticBusinessIds) {
+      const biz = this.world.getBusiness(id);
+      if (biz) this.review(biz, day);
+    }
+  }
+
+  /** The decision trace — newest last. Ephemeral (not part of the snapshot). */
+  decisions(): readonly DecisionLogEntry[] {
+    return this.log;
+  }
+
+  private review(biz: Business, day: number): void {
+    if (this.pending.has(biz.id)) return; // previous day's call hasn't landed
+    const req: DecisionRequest = { observation: this.observe(biz, day), limits: this.limits };
+    // Advance the bookmark now so tomorrow's deltas measure from this instant,
+    // regardless of when an async decision actually applies.
+    this.marks.set(biz.id, { day, cash: biz.cash, pnl: { ...biz.pnl } });
+
+    let result: BusinessDecision | Promise<BusinessDecision>;
+    try {
+      result = this.provider.decide(req);
+    } catch {
+      this.applyFallback(biz, req, day);
+      return;
+    }
+
+    if (isPromise(result)) {
+      this.pending.add(biz.id);
+      result
+        .then(
+          (decision) => this.apply(biz, decision, day, this.provider.id, false),
+          () => this.applyFallback(biz, req, day),
+        )
+        .finally(() => this.pending.delete(biz.id));
+    } else {
+      this.apply(biz, result, day, this.provider.id, false);
+    }
+  }
+
+  private applyFallback(biz: Business, req: DecisionRequest, day: number): void {
+    this.apply(biz, this.fallback.decide(req), day, this.fallback.id, true);
+  }
+
+  private apply(
+    biz: Business,
+    decision: BusinessDecision,
+    day: number,
+    providerId: string,
+    fallback: boolean,
+  ): void {
+    const clamped = clampAction(decision.action, biz.price, this.limits);
+    if (clamped.setPrice !== undefined) biz.price = clamped.setPrice;
+    if (clamped.produce !== undefined) biz.inventory += clamped.produce;
+    if (clamped.hire !== undefined && clamped.hire !== 0) this.applyHire(biz, clamped.hire);
+
+    this.log.push({
+      day,
+      businessId: biz.id,
+      providerId,
+      fallback,
+      action: clamped,
+      reason: decision.reason,
+      usage: decision.usage,
+    });
+  }
+
+  /** Move residents in/out of the jobless pool. Deterministic ordering. */
+  private applyHire(biz: Business, delta: number): void {
+    if (delta > 0) {
+      const pool = this.world.residents
+        .filter((r) => r.jobId === "")
+        .sort((a, b) => residentIndex(a.id) - residentIndex(b.id));
+      const hires = Math.min(delta, pool.length);
+      for (let i = 0; i < hires; i++) {
+        const r = pool[i]!;
+        r.jobId = biz.id;
+        biz.employeeIds.push(r.id);
+      }
+    } else {
+      const layoffs = Math.min(-delta, biz.employeeIds.length);
+      for (let i = 0; i < layoffs; i++) {
+        const id = biz.employeeIds.pop()!; // last hired, first out
+        const r = this.world.getResident(id);
+        if (r) r.jobId = "";
+      }
+    }
+  }
+
+  private observe(biz: Business, day: number): BusinessObservation {
+    const mark = this.marks.get(biz.id);
+    const prevPnl = mark?.pnl ?? { revenue: 0, wagesPaid: 0, rentCollected: 0 };
+    const prevCash = mark?.cash ?? biz.cash;
+
+    const dayRevenue = biz.pnl.revenue - prevPnl.revenue;
+    const dayWages = biz.pnl.wagesPaid - prevPnl.wagesPaid;
+    const dayProfit = biz.cash - prevCash; // cash identity for non-landlords
+    const dayRent = dayRevenue - dayWages - dayProfit;
+
+    return {
+      businessId: biz.id,
+      name: biz.name,
+      kind: biz.kind,
+      day,
+      cash: biz.cash,
+      inventory: biz.inventory,
+      price: biz.price,
+      employeeCount: biz.employeeIds.length,
+      wagePerTick: biz.wagePerTick,
+      dayRevenue,
+      dayWages,
+      dayRent,
+      dayProfit,
+      unemployedCount: this.world.residents.filter((r) => r.jobId === "").length,
+    };
+  }
+
+  serialize(): unknown {
+    return { marks: Array.from(this.marks.entries()) };
+  }
+
+  restore(state: unknown): void {
+    const s = state as { marks?: [string, Bookmark][] } | undefined;
+    this.marks.clear();
+    for (const [id, mark] of s?.marks ?? []) this.marks.set(id, mark);
+  }
+}
+
+function isPromise<T>(v: T | Promise<T>): v is Promise<T> {
+  return typeof (v as { then?: unknown }).then === "function";
+}
+
+function residentIndex(id: string): number {
+  return Number(id.split("_")[1] ?? 0);
+}

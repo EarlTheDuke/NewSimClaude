@@ -170,3 +170,23 @@ canvas#city {
   height: 100%;
   background: var(--accent);
 }
+
+.trace h2 {
+  font-size: 14px;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+.trace .trace-row {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.trace .fallback {
+  color: #d29922;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 11px;
+}

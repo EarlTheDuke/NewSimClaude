@@ -53,7 +53,11 @@ export class EconomySystem implements System {
     const venueId = this.venueForResident(resident);
     const venue = this.world.getBusiness(venueId);
     if (!venue) return;
-    const paid = this.world.transfer(resident.id, venue.id, SOCIAL_SPEND);
+    // Spend the venue's own price (its goods/leisure cost), so a business's
+    // price lever is economically live. Fall back to the flat default if a
+    // venue has no price set.
+    const cost = venue.price > 0 ? venue.price : SOCIAL_SPEND;
+    const paid = this.world.transfer(resident.id, venue.id, cost);
     resident.needs.social = 100; // company lifts the spirits even when broke
     if (paid > 0) {
       venue.pnl.revenue += paid;
