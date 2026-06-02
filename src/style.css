@@ -1,0 +1,172 @@
+:root {
+  color-scheme: dark;
+  --bg: #0e1116;
+  --panel: #161b22;
+  --border: #2a313c;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-active: #2ea043;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  max-width: 1040px;
+}
+
+h1 {
+  font-size: 18px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.hud {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.clock {
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+}
+
+.clock .day {
+  color: var(--muted);
+  font-size: 16px;
+  margin-left: 8px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+button {
+  background: #21262d;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button.active {
+  border-color: var(--accent-active);
+  color: var(--accent-active);
+}
+
+.stats {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.stage {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+canvas#city {
+  background: #11131a;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: crosshair;
+}
+
+.inspector {
+  flex: 1;
+  min-width: 240px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 13px;
+}
+
+.inspector h2 {
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+
+.inspector .hint {
+  color: var(--muted);
+}
+
+.inspector .tag {
+  display: inline-block;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 8px;
+  margin: 0 0 8px;
+  font-size: 11px;
+}
+
+.inspector p {
+  margin: 4px 0;
+  color: var(--muted);
+}
+
+.inspector .pnl {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.bar span {
+  width: 56px;
+  color: var(--text);
+}
+
+.bar b {
+  width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar .track {
+  flex: 1;
+  height: 8px;
+  background: #21262d;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar .track > div {
+  height: 100%;
+  background: var(--accent);
+}
