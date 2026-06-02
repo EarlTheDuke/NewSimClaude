@@ -1,5 +1,5 @@
 import "./style.css";
-import { createCity, type BrainOption } from "./createCity";
+import { createCity, type BrainOption, type ResidentBrainOption } from "./createCity";
 import { SPEED_OPTIONS, type SpeedMultiplier } from "./core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "./utils/serialization";
 import { CanvasRenderer, type Pick } from "./render/CanvasRenderer";
@@ -14,11 +14,23 @@ const HEIGHT = 480;
 //   const brain: BrainOption = new ClaudeDecisionProvider(); // needs VITE_ANTHROPIC_API_KEY
 const brain: BrainOption = "rules";
 
-const { sim, world, agent } = createCity({ seed: 1, brain });
+// The residents likewise run on deterministic rules by default. To hand one (or
+// all) of them to Claude, swap in the provider:
+//   import { ClaudeResidentProvider } from "./ai/ClaudeResidentProvider";
+//   const residentBrain: ResidentBrainOption = new ClaudeResidentProvider();
+const residentBrain: ResidentBrainOption = "rules";
+const agenticResidentIds = ["res_0", "res_1", "res_2", "res_3"];
+
+const { sim, world, agent, residentAgent } = createCity({
+  seed: 1,
+  brain,
+  residentBrain,
+  agenticResidentIds,
+});
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>CityWithLifeClaude — Phase 2 (the businesses think)</h1>
+  <h1>CityWithLifeClaude — Phase 3 (the residents decide)</h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
@@ -29,8 +41,12 @@ app.innerHTML = `
     <div class="inspector" id="inspector"><p class="hint">Click a resident or building to inspect.</p></div>
   </div>
   <div class="hud trace">
-    <h2>Decision trace <span class="hint" id="brainTag"></span></h2>
+    <h2>Business decisions <span class="hint" id="brainTag"></span></h2>
     <div id="traceLog"><p class="hint">No decisions yet — businesses review once a day.</p></div>
+  </div>
+  <div class="hud trace">
+    <h2>Resident decisions <span class="hint" id="resBrainTag"></span></h2>
+    <div id="resTraceLog"><p class="hint">No decisions yet — residents review their life once a day.</p></div>
   </div>
 `;
 
@@ -40,9 +56,13 @@ const statsEl = el<HTMLDivElement>("#stats");
 const controlsEl = el<HTMLDivElement>("#controls");
 const inspectorEl = el<HTMLDivElement>("#inspector");
 const traceLogEl = el<HTMLDivElement>("#traceLog");
+const resTraceLogEl = el<HTMLDivElement>("#resTraceLog");
 const canvas = el<HTMLCanvasElement>("#city");
 
 el<HTMLSpanElement>("#brainTag").textContent = agent ? `· ${brain === "rules" ? "rules" : "claude"} brain` : "· brain off";
+el<HTMLSpanElement>("#resBrainTag").textContent = residentAgent
+  ? `· ${residentBrain === "rules" ? "rules" : "claude"} brain · ${agenticResidentIds.length} agentic`
+  : "· brain off";
 
 const renderer = new CanvasRenderer(canvas, world);
 let selected: Pick | undefined;
@@ -116,11 +136,13 @@ function renderInspector(): void {
     const r = world.getResident(selected.id);
     if (!r) return;
     const job = world.getBusiness(r.jobId);
+    const home = world.getLocation(r.homeId);
     inspectorEl.innerHTML = `
       <h2>${r.name}</h2>
       <p class="tag">${r.activity}</p>
-      <p>${money(r.money)} · home: ${world.getLocation(r.homeId).name}</p>
-      <p>job: ${job?.name ?? "—"}</p>
+      <p>${money(r.money)} · ${r.hasVehicle ? "has vehicle" : "no vehicle"}</p>
+      <p>home: ${home.name} · rent ${money(home.rent ?? 0)}/day</p>
+      <p>job: ${job?.name ?? "—"}${r.jobId ? ` · wage ${r.wagePerTick.toFixed(2)}/tick` : ""}</p>
       ${bar("Hunger", r.needs.hunger)}
       ${bar("Energy", r.needs.energy)}
       ${bar("Social", r.needs.social)}
@@ -161,6 +183,31 @@ function renderTrace(): void {
   traceLogEl.innerHTML = rows;
 }
 
+function renderResidentTrace(): void {
+  if (!residentAgent) return;
+  const entries = residentAgent.decisions();
+  if (entries.length === 0) return;
+  const rows = entries
+    .slice(-8)
+    .reverse()
+    .map((e) => {
+      const a = e.action;
+      const moves: string[] = [];
+      if (a.switchJobTo) moves.push(`job→${world.getBusiness(a.switchJobTo)?.name ?? a.switchJobTo}`);
+      if (a.reHomeTo) moves.push(`home→${world.getLocation(a.reHomeTo).name}`);
+      if (a.buyVehicle) moves.push("buy vehicle");
+      if (a.sellVehicle) moves.push("sell vehicle");
+      if (a.negotiateRaise) moves.push("raise");
+      const act = moves.length > 0 ? moves.join(", ") : "hold";
+      const cost = e.usage?.costUsd !== undefined ? ` · $${e.usage.costUsd.toFixed(4)}` : "";
+      const lat = e.usage?.latencyMs !== undefined ? ` · ${Math.round(e.usage.latencyMs)}ms` : "";
+      const tag = e.fallback ? ' <span class="fallback">fallback</span>' : "";
+      return `<p class="trace-row"><b>Day ${e.day}</b> ${e.residentName}: ${act}${tag}<br><span class="hint">${e.reason}${cost}${lat}</span></p>`;
+    })
+    .join("");
+  resTraceLogEl.innerHTML = rows;
+}
+
 function renderFrame(): void {
   const t = sim.time.time();
   clockEl.textContent = sim.time.clockString();
@@ -172,6 +219,7 @@ function renderFrame(): void {
   renderer.draw(selected);
   renderInspector();
   renderTrace();
+  renderResidentTrace();
 }
 
 window.addEventListener("keydown", (e) => {

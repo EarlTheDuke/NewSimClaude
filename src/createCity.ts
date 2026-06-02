@@ -7,8 +7,11 @@ import { MovementSystem } from "./systems/MovementSystem";
 import { EconomySystem } from "./systems/EconomySystem";
 import { NeedsSystem } from "./systems/NeedsSystem";
 import { BusinessAgentSystem } from "./systems/BusinessAgentSystem";
+import { ResidentAgentSystem } from "./systems/ResidentAgentSystem";
 import { RuleBasedProvider } from "./ai/RuleBasedProvider";
+import { RuleBasedResidentProvider } from "./ai/RuleBasedResidentProvider";
 import type { DecisionLimits, DecisionProvider } from "./ai/types";
+import type { ResidentDecisionLimits, ResidentDecisionProvider } from "./ai/residentTypes";
 
 /**
  * Which mind, if any, runs the businesses:
@@ -18,13 +21,25 @@ import type { DecisionLimits, DecisionProvider } from "./ai/types";
  */
 export type BrainOption = "off" | "rules" | DecisionProvider;
 
+/**
+ * Which mind, if any, runs an opted-in resident's life decisions. Mirrors
+ * {@link BrainOption}: "off" is exactly Phase 1/2 (no resident agency).
+ */
+export type ResidentBrainOption = "off" | "rules" | ResidentDecisionProvider;
+
 export interface CitySimOptions extends CityOptions {
   seed?: number;
   brain?: BrainOption;
   /** Businesses the brain manages. Defaults to the diner and the goods store. */
   agenticBusinessIds?: string[];
-  /** Override the action safety limits (defaults to DEFAULT_LIMITS). */
+  /** Override the business action safety limits (defaults to DEFAULT_LIMITS). */
   limits?: DecisionLimits;
+  /** Which mind runs opted-in residents' life decisions. Default "off". */
+  residentBrain?: ResidentBrainOption;
+  /** Residents the resident brain manages. Defaults to none until set. */
+  agenticResidentIds?: string[];
+  /** Override the resident action safety limits. */
+  residentLimits?: ResidentDecisionLimits;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -41,6 +56,7 @@ export function createCity(options: CitySimOptions = {}): {
   sim: Simulation;
   world: World;
   agent?: BusinessAgentSystem;
+  residentAgent?: ResidentAgentSystem;
 } {
   const sim = new Simulation({ seed: options.seed ?? 1 });
   const world = buildCity(sim.rng, options);
@@ -63,7 +79,21 @@ export function createCity(options: CitySimOptions = {}): {
     sim.addSystem(agent);
   }
 
+  let residentAgent: ResidentAgentSystem | undefined;
+  const residentBrain = options.residentBrain ?? "off";
+  if (residentBrain !== "off") {
+    const provider: ResidentDecisionProvider =
+      residentBrain === "rules" ? new RuleBasedResidentProvider() : residentBrain;
+    residentAgent = new ResidentAgentSystem(
+      world,
+      provider,
+      options.agenticResidentIds ?? [],
+      options.residentLimits,
+    );
+    sim.addSystem(residentAgent);
+  }
+
   sim.addSystem(new NeedsSystem(world));
 
-  return { sim, world, agent };
+  return { sim, world, agent, residentAgent };
 }

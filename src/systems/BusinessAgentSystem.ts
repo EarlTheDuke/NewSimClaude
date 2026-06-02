@@ -135,6 +135,7 @@ export class BusinessAgentSystem implements System {
       for (let i = 0; i < hires; i++) {
         const r = pool[i]!;
         r.jobId = biz.id;
+        r.wagePerTick = biz.wagePerTick;
         biz.employeeIds.push(r.id);
       }
     } else {
@@ -142,7 +143,10 @@ export class BusinessAgentSystem implements System {
       for (let i = 0; i < layoffs; i++) {
         const id = biz.employeeIds.pop()!; // last hired, first out
         const r = this.world.getResident(id);
-        if (r) r.jobId = "";
+        if (r) {
+          r.jobId = "";
+          r.wagePerTick = 0;
+        }
       }
     }
   }

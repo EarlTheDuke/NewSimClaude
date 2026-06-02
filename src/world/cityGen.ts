@@ -7,6 +7,7 @@ import type {
   Business,
   Resident,
 } from "./types";
+import { RENT_PER_DAY } from "../systems/constants";
 
 /**
  * Builds the default small city, deterministically from the given RNG.
@@ -80,7 +81,10 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
   for (let c = 0; c <= 1; c++) for (let r = 0; r < ROWS; r++) homeNodes.push(nodeId(c, r));
   const homeCount = Math.min(homeNodes.length, Math.ceil(residentCount / 2));
   for (let i = 0; i < homeCount; i++) {
-    locations.push({ id: `loc_home_${i}`, name: `Home ${i + 1}`, type: "home", nodeId: homeNodes[i]! });
+    // Rents fan downward from the baseline (70, 66, 62, …) so re-homing always
+    // has a cheaper option to move toward, and totals stay safely positive.
+    const rent = Math.max(1, RENT_PER_DAY - i * 4);
+    locations.push({ id: `loc_home_${i}`, name: `Home ${i + 1}`, type: "home", nodeId: homeNodes[i]!, rent });
   }
   const homes = locations.filter((l) => l.type === "home");
 
@@ -102,6 +106,8 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
       money: 500,
       homeId: home.id,
       jobId: employed ? biz.id : "",
+      wagePerTick: employed ? biz.wagePerTick : 0,
+      hasVehicle: false,
       needs: {
         hunger: 70 + rng.int(0, 20),
         energy: 80 + rng.int(0, 15),

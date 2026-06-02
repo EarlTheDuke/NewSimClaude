@@ -1,7 +1,7 @@
 import type { System } from "../core/types";
 import type { World } from "../world/World";
 import type { Resident } from "../world/types";
-import { MOVE_SPEED } from "./constants";
+import { MOVE_SPEED, VEHICLE_SPEED_MULT } from "./constants";
 
 /**
  * Walks residents along the road network toward the destination the brain
@@ -33,7 +33,7 @@ export class MovementSystem implements System {
     }
     if (m.path.length === 0) return; // already at target node (or unreachable)
 
-    let budget = MOVE_SPEED;
+    let budget = MOVE_SPEED * (resident.hasVehicle ? VEHICLE_SPEED_MULT : 1);
     while (budget > 0 && m.path.length > 0) {
       const from = this.world.getNode(m.atNodeId);
       const next = this.world.getNode(m.path[0]!);

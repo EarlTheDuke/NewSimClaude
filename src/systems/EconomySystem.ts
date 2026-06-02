@@ -33,7 +33,7 @@ export class EconomySystem implements System {
     if (resident.activity !== "working") return;
     const employer = this.world.getBusiness(resident.jobId);
     if (!employer) return;
-    const paid = this.world.transfer(employer.id, resident.id, employer.wagePerTick);
+    const paid = this.world.transfer(employer.id, resident.id, resident.wagePerTick);
     employer.pnl.wagesPaid += paid;
   }
 
@@ -69,7 +69,8 @@ export class EconomySystem implements System {
     const landlord = this.world.getBusiness("biz_landlord");
     if (!landlord) return;
     for (const resident of this.world.residents) {
-      const paid = this.world.transfer(resident.id, landlord.id, RENT_PER_DAY);
+      const rent = this.world.getLocation(resident.homeId).rent ?? RENT_PER_DAY;
+      const paid = this.world.transfer(resident.id, landlord.id, rent);
       landlord.pnl.rentCollected += paid;
     }
     for (const biz of this.world.businesses) {

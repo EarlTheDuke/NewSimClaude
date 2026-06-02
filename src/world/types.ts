@@ -28,6 +28,8 @@ export interface Location {
   name: string;
   type: LocationType;
   nodeId: string;
+  /** Daily rent for a home (resident -> landlord). Absent/0 for workplaces. */
+  rent?: number;
 }
 
 export type BusinessKind = "diner" | "goods" | "landlord";
@@ -98,6 +100,10 @@ export interface Resident {
   money: number;
   homeId: string;
   jobId: string; // business id employing this resident
+  /** Wage this resident earns per tick while working. 0 when jobless. */
+  wagePerTick: number;
+  /** Owns a vehicle: commutes faster and can reach farther jobs. */
+  hasVehicle: boolean;
   needs: Needs;
   activity: Activity;
   /** Location the resident is currently heading to / occupying. */
