@@ -7,6 +7,7 @@ import { MovementSystem } from "./systems/MovementSystem";
 import { EconomySystem } from "./systems/EconomySystem";
 import { MarketSystem } from "./systems/MarketSystem";
 import { EventSystem, type EventSystemOptions } from "./systems/EventSystem";
+import { GodMode } from "./systems/GodMode";
 import { NeedsSystem } from "./systems/NeedsSystem";
 import { LifecycleSystem } from "./systems/LifecycleSystem";
 import { MacroSystem } from "./systems/MacroSystem";
@@ -69,6 +70,7 @@ export function createCity(options: CitySimOptions = {}): {
   agent?: BusinessAgentSystem;
   residentAgent?: ResidentAgentSystem;
   events?: EventSystem;
+  god: GodMode;
 } {
   const seed = options.seed ?? 1;
   const sim = new Simulation({ seed });
@@ -135,5 +137,10 @@ export function createCity(options: CitySimOptions = {}): {
   const macro = new MacroSystem(world, market);
   sim.addSystem(macro);
 
-  return { sim, world, market, macro, agent, residentAgent, events };
+  // God Mode is a controller, not a system: it never runs in the tick loop, so
+  // its mere presence is inert and a hands-off run is unchanged. It reads the
+  // sim clock to stamp interventions and mirrors forced disasters into `events`.
+  const god = new GodMode(world, market, sim.time, seed, events);
+
+  return { sim, world, market, macro, agent, residentAgent, events, god };
 }

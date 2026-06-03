@@ -5,6 +5,9 @@ import { snapshotToJSON, snapshotFromJSON } from "./utils/serialization";
 import { CanvasRenderer, type Pick, type DisasterMarker } from "./render/CanvasRenderer";
 import { ARCHETYPES } from "./world/archetypes";
 import type { ResourceKind } from "./world/types";
+import type { DisasterKind } from "./systems/disasters";
+import { GRANT_AMOUNT } from "./systems/constants";
+import { compareExperiments, formatComparison } from "./experiment/harness";
 
 const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
 
@@ -25,7 +28,7 @@ const brain: BrainOption = "rules";
 const residentBrain: ResidentBrainOption = "rules";
 const agenticResidentIds = ["res_0", "res_1", "res_2", "res_3"];
 
-const { sim, world, market, macro, agent, residentAgent, events } = createCity({
+const { sim, world, market, macro, agent, residentAgent, events, god } = createCity({
   seed: 1,
   brain,
   residentBrain,
@@ -35,7 +38,7 @@ const { sim, world, market, macro, agent, residentAgent, events } = createCity({
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>CityWithLifeClaude — Phase 6 (disasters &amp; drama)</h1>
+  <h1>CityWithLifeClaude — Phase 7 (god mode &amp; experiments)</h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
@@ -53,6 +56,16 @@ app.innerHTML = `
   <div class="hud trace">
     <h2>City events <span class="hint" id="eventsTag"></span></h2>
     <div id="eventsLog"><p class="hint">All quiet — disasters strike at the start of a day.</p></div>
+  </div>
+  <div class="hud god">
+    <h2>God Mode <span class="hint">· reach in and meddle (money-conserving)</span></h2>
+    <div class="controls" id="godControls"></div>
+    <div id="godLog"><p class="hint">No interventions yet — strike a disaster or bless the city.</p></div>
+  </div>
+  <div class="hud god">
+    <h2>Experiment harness <span class="hint">· headless A/B over shared seeds</span></h2>
+    <div class="controls" id="expControls"></div>
+    <pre class="exp-output" id="expOutput">Run the A/B to compare disasters on vs off across seeds 1–3 (40 days each).</pre>
   </div>
   <div class="hud trace">
     <h2>Business decisions <span class="hint" id="brainTag"></span></h2>
@@ -76,6 +89,10 @@ const traceLogEl = el<HTMLDivElement>("#traceLog");
 const resTraceLogEl = el<HTMLDivElement>("#resTraceLog");
 const eventsLogEl = el<HTMLDivElement>("#eventsLog");
 const eventsTagEl = el<HTMLSpanElement>("#eventsTag");
+const godControlsEl = el<HTMLDivElement>("#godControls");
+const godLogEl = el<HTMLDivElement>("#godLog");
+const expControlsEl = el<HTMLDivElement>("#expControls");
+const expOutputEl = el<HTMLPreElement>("#expOutput");
 const canvas = el<HTMLCanvasElement>("#city");
 
 eventsTagEl.textContent = events ? "· disasters on" : "· disasters off";
@@ -113,6 +130,42 @@ controlsEl.append(
     renderFrame();
   }),
 );
+
+// God Mode — every act is money-conserving; we redraw right away so the
+// intervention (glyph, needs, prices) shows on the next painted frame.
+const STRIKES: { label: string; kind: DisasterKind }[] = [
+  { label: "Fire", kind: "fire" },
+  { label: "Festival", kind: "festival" },
+  { label: "Illness", kind: "illness" },
+  { label: "Supply shock", kind: "supplyShock" },
+  { label: "Grant", kind: "grant" },
+];
+for (const s of STRIKES) {
+  godControlsEl.append(button(s.label, () => {
+    god.strike(s.kind);
+    renderFrame();
+  }));
+}
+godControlsEl.append(button("Heal all", () => { god.healAll(); renderFrame(); }));
+godControlsEl.append(button("Exhaust all", () => { god.exhaustAll(); renderFrame(); }));
+godControlsEl.append(button("Bail out poorest", () => { god.bailOutPoorest(GRANT_AMOUNT); renderFrame(); }));
+
+// Experiment harness — runs fresh headless cities, fully independent of the
+// live sim. Deferred a tick so the "running…" state paints before it blocks.
+expControlsEl.append(button("Run A/B (disasters on/off)", () => {
+  expOutputEl.textContent = "running…";
+  setTimeout(() => {
+    const shared = { brain, residentBrain, agenticResidentIds };
+    const results = compareExperiments(
+      [
+        { label: "off", options: { ...shared, disasters: false }, days: 40 },
+        { label: "on", options: { ...shared, disasters: true }, days: 40 },
+      ],
+      [1, 2, 3],
+    );
+    expOutputEl.textContent = formatComparison(results);
+  }, 0);
+}));
 
 canvas.addEventListener("click", (e) => {
   const rect = canvas.getBoundingClientRect();
@@ -289,6 +342,19 @@ function renderEvents(): void {
     .join("");
 }
 
+function renderGod(): void {
+  const acts = god.interventions();
+  if (acts.length === 0) return;
+  godLogEl.innerHTML = acts
+    .slice(-10)
+    .reverse()
+    .map(
+      (a) =>
+        `<p class="trace-row"><b>Day ${a.day}</b> <span class="evt act">${a.kind}</span> ${a.headline}</p>`,
+    )
+    .join("");
+}
+
 function renderMacro(): void {
   const history = macro.history();
   const latest = macro.latest();
@@ -331,6 +397,7 @@ function renderFrame(): void {
   renderInspector();
   renderMacro();
   renderEvents();
+  renderGod();
   renderTrace();
   renderResidentTrace();
 }

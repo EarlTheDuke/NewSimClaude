@@ -304,3 +304,31 @@ svg.spark {
 .evt-grant {
   background: #2ea043;
 }
+
+.evt.act {
+  background: #b18cf0;
+}
+
+.god h2 {
+  font-size: 14px;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+.god .controls {
+  margin: 0 0 12px;
+}
+
+.exp-output {
+  margin: 0;
+  padding: 12px;
+  background: #0e1116;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre;
+}

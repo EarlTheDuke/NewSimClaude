@@ -64,6 +64,16 @@ export class EventSystem implements System {
     if (this.log.length > DISASTER_LOG_SIZE) this.log.shift();
   }
 
+  /**
+   * God Mode hook: append an externally-produced disaster record (e.g. a forced
+   * {@link GodMode.strike}) so it shows up in the same events log + on-canvas
+   * glyph as an organic one. Respects the ring-buffer cap.
+   */
+  record(rec: DisasterRecord): void {
+    this.log.push({ ...rec });
+    if (this.log.length > DISASTER_LOG_SIZE) this.log.shift();
+  }
+
   /** All retained disaster records, oldest first. */
   events(): readonly DisasterRecord[] {
     return this.log;

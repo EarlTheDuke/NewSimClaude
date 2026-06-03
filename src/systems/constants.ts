@@ -82,3 +82,7 @@ export const DISASTER_DAILY_CHANCE = 0.18;
 export const DISASTER_LOG_SIZE = 50;
 /** A relief grant moves at most this much landlord cash to the neediest business ($). */
 export const GRANT_AMOUNT = 1500;
+
+// God Mode (Phase 7)
+/** How many recent divine-intervention records the God Mode log retains (ring buffer). */
+export const GODMODE_LOG_SIZE = 50;
