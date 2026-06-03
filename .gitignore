@@ -6,3 +6,7 @@ dist/
 .env.*
 coverage/
 *.log
+
+# Phase 9 playthrough runtime artifacts (the saved city + per-turn command)
+playthrough.save.json
+play.command.json

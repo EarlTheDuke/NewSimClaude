@@ -38,6 +38,7 @@ export const VEHICLE_RESALE = 500; // goods store -> resident when selling back
 export const RAISE_FRACTION = 0.08; // a granted raise lifts wage by this fraction
 export const MAX_WAGE_MULT = 2; // wage may not exceed this multiple of the job's base wage
 export const JOB_CHANGE_COOLDOWN_DAYS = 5; // min days between a resident's job switches
+export const RAISE_COOLDOWN_DAYS = 7; // min days between a resident's raise requests
 
 // Economy depth & markets (Phase 4)
 /** Starting B2B price for each tradeable resource ($/unit). */

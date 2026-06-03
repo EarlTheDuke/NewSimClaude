@@ -36,6 +36,8 @@ export class ResidentAgentSystem implements System {
   private readonly log: ResidentDecisionLogEntry[] = [];
   /** Day each resident last switched jobs, for the cooldown. */
   private readonly lastJobChangeDay = new Map<string, number>();
+  /** Day each resident last won a raise, for the raise cooldown. */
+  private readonly lastRaiseDay = new Map<string, number>();
   /** Residents with an in-flight async decision — don't double-fire. */
   private readonly pending = new Set<string>();
 
@@ -109,7 +111,7 @@ export class ResidentAgentSystem implements System {
     if (clamped.reHomeTo !== undefined) r.homeId = clamped.reHomeTo;
     if (clamped.buyVehicle) this.applyBuyVehicle(r);
     if (clamped.sellVehicle) this.applySellVehicle(r);
-    if (clamped.negotiateRaise) this.applyRaise(r, req.observation.jobBaseWage);
+    if (clamped.negotiateRaise) this.applyRaise(r, req.observation.jobBaseWage, day);
 
     this.log.push({
       day,
@@ -156,10 +158,11 @@ export class ResidentAgentSystem implements System {
     if (paid > 0) r.hasVehicle = false;
   }
 
-  private applyRaise(r: Resident, jobBaseWage: number): void {
+  private applyRaise(r: Resident, jobBaseWage: number, day: number): void {
     if (jobBaseWage <= 0) return;
     const cap = jobBaseWage * this.limits.maxWageMultiple;
     r.wagePerTick = Math.min(cap, r.wagePerTick * (1 + this.limits.raiseFraction));
+    this.lastRaiseDay.set(r.id, day);
   }
 
   private observe(r: Resident, day: number): ResidentObservation {
@@ -177,6 +180,8 @@ export class ResidentAgentSystem implements System {
 
     const last = this.lastJobChangeDay.get(r.id);
     const daysSinceJobChange = last === undefined ? this.limits.jobChangeCooldownDays : day - last;
+    const lastRaise = this.lastRaiseDay.get(r.id);
+    const daysSinceRaise = lastRaise === undefined ? this.limits.raiseCooldownDays : day - lastRaise;
 
     return {
       residentId: r.id,
@@ -194,19 +199,27 @@ export class ResidentAgentSystem implements System {
       rent: home.rent ?? 0,
       hasVehicle: r.hasVehicle,
       daysSinceJobChange,
+      daysSinceRaise,
       jobOptions,
       homeOptions,
     };
   }
 
   serialize(): unknown {
-    return { lastJobChangeDay: Array.from(this.lastJobChangeDay.entries()) };
+    return {
+      lastJobChangeDay: Array.from(this.lastJobChangeDay.entries()),
+      lastRaiseDay: Array.from(this.lastRaiseDay.entries()),
+    };
   }
 
   restore(state: unknown): void {
-    const s = state as { lastJobChangeDay?: [string, number][] } | undefined;
+    const s = state as
+      | { lastJobChangeDay?: [string, number][]; lastRaiseDay?: [string, number][] }
+      | undefined;
     this.lastJobChangeDay.clear();
     for (const [id, d] of s?.lastJobChangeDay ?? []) this.lastJobChangeDay.set(id, d);
+    this.lastRaiseDay.clear();
+    for (const [id, d] of s?.lastRaiseDay ?? []) this.lastRaiseDay.set(id, d);
   }
 }
 

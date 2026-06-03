@@ -24,6 +24,7 @@ function baseObs(over: Partial<ResidentObservation> = {}): ResidentObservation {
     rent: 70,
     hasVehicle: false,
     daysSinceJobChange: 10,
+    daysSinceRaise: 10,
     jobOptions: [
       { businessId: "biz_goods", name: "Maker Goods Co.", wagePerTick: 0.55, hiring: true },
       { businessId: "biz_landlord", name: "Keystone Housing", wagePerTick: 0.5, hiring: false },
@@ -74,6 +75,11 @@ describe("clampResidentAction", () => {
 
   it("drops a raise at the wage cap", () => {
     const o = baseObs({ wagePerTick: 1.0, jobBaseWage: 0.5 }); // already 2x base = cap
+    expect(clampResidentAction({ negotiateRaise: true }, o, DEFAULT_RESIDENT_LIMITS).negotiateRaise).toBeUndefined();
+  });
+
+  it("drops a raise while on raise cooldown", () => {
+    const o = baseObs({ daysSinceRaise: 2 }); // cooldown is 7
     expect(clampResidentAction({ negotiateRaise: true }, o, DEFAULT_RESIDENT_LIMITS).negotiateRaise).toBeUndefined();
   });
 
@@ -142,6 +148,21 @@ describe("ResidentAgentSystem", () => {
     sim.run(TICKS_PER_DAY);
 
     expect(world.getResident("res_0")!.wagePerTick).toBeCloseTo(base * 1.08, 6);
+  });
+
+  it("honours the raise cooldown: a daily ask lands only once in the window", () => {
+    const provider = new MockResidentProvider({ fixed: { action: { negotiateRaise: true }, reason: "again" } });
+    const { sim, world, residentAgent } = createCity({ seed: 1, residentBrain: provider, agenticResidentIds: ["res_0"] });
+    const base = world.getResident("res_0")!.wagePerTick;
+
+    // Six straight days of asking — only the day-1 raise is off cooldown (7d).
+    sim.run(TICKS_PER_DAY * 6);
+
+    expect(world.getResident("res_0")!.wagePerTick).toBeCloseTo(base * 1.08, 6);
+    const log = residentAgent!.decisions().filter((e) => e.residentId === "res_0");
+    expect(log).toHaveLength(6);
+    expect(log[0]!.action.negotiateRaise).toBe(true);
+    for (let i = 1; i < 6; i++) expect(log[i]!.action.negotiateRaise).toBeUndefined();
   });
 
   it("falls back to rules when the provider throws (sync)", () => {

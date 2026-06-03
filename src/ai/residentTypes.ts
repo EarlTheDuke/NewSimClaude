@@ -53,6 +53,8 @@ export interface ResidentObservation {
   hasVehicle: boolean;
   /** Days since this resident last switched jobs (large when never). */
   daysSinceJobChange: number;
+  /** Days since this resident last won a raise (large when never). */
+  daysSinceRaise: number;
   /** Jobs the resident could switch to (excludes the current job). */
   jobOptions: JobOption[];
   /** Homes the resident could move to (excludes the current home). */
@@ -83,6 +85,8 @@ export interface ResidentAction {
 export interface ResidentDecisionLimits {
   /** Min days between job switches. */
   jobChangeCooldownDays: number;
+  /** Min days between raise requests. */
+  raiseCooldownDays: number;
   /** A wage may not exceed this multiple of the job's base wage. */
   maxWageMultiple: number;
   /** Fraction a granted raise lifts the wage by. */

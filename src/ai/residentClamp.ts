@@ -1,6 +1,7 @@
 import {
   JOB_CHANGE_COOLDOWN_DAYS,
   MAX_WAGE_MULT,
+  RAISE_COOLDOWN_DAYS,
   RAISE_FRACTION,
   VEHICLE_COST,
   VEHICLE_RESALE,
@@ -14,6 +15,7 @@ import type {
 /** Default safety rails for resident life-moves. */
 export const DEFAULT_RESIDENT_LIMITS: ResidentDecisionLimits = {
   jobChangeCooldownDays: JOB_CHANGE_COOLDOWN_DAYS,
+  raiseCooldownDays: RAISE_COOLDOWN_DAYS,
   maxWageMultiple: MAX_WAGE_MULT,
   raiseFraction: RAISE_FRACTION,
   vehicleCost: VEHICLE_COST,
@@ -28,7 +30,7 @@ export const DEFAULT_RESIDENT_LIMITS: ResidentDecisionLimits = {
  *
  *  - a job switch must target a listed, hiring option, off cooldown;
  *  - a re-home must target a listed option the resident can afford the move to;
- *  - a raise needs a job and headroom under the wage cap;
+ *  - a raise needs a job, headroom under the wage cap, and to be off cooldown;
  *  - buy/sell vehicle must be affordable / actually owned.
  *
  * Of the structural moves (switchJob / reHome / buyVehicle / sellVehicle) at
@@ -76,10 +78,11 @@ export function clampResidentAction(
     }
   }
 
-  // --- Raise: non-structural; valid only with a job and headroom to grow. ---
+  // --- Raise: non-structural; needs a job, headroom to grow, and off cooldown. ---
   if (action.negotiateRaise && o.employed && o.jobBaseWage > 0) {
     const cap = o.jobBaseWage * limits.maxWageMultiple;
-    if (o.wagePerTick < cap) out.negotiateRaise = true;
+    const offCooldown = o.daysSinceRaise >= limits.raiseCooldownDays;
+    if (o.wagePerTick < cap && offCooldown) out.negotiateRaise = true;
   }
 
   return out;
