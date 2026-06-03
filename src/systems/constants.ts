@@ -105,3 +105,9 @@ export const GODMODE_LOG_SIZE = 50;
 export const LUXURY_COST = 150;
 /** Upper bound a resident may set as their savings-goal buffer. */
 export const MAX_SAVINGS_GOAL = 2000;
+
+// CEO benchmark (Phase 10d)
+/** Capital the benchmarked CEO's storefront is seeded with at scenario start ($). */
+export const BENCH_START_CAPITAL = 50_000;
+/** Fixed-length scenario horizon: how many turns (sim-days) a CEO run lasts. */
+export const BENCH_TURNS = 42;

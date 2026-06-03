@@ -44,6 +44,8 @@ export class BusinessAgentSystem implements System {
   private readonly marks = new Map<string, Bookmark>();
   /** Businesses with an in-flight async decision — don't double-fire. */
   private readonly pending = new Set<string>();
+  /** In-flight async decisions, so a stepping driver can drain them between turns. */
+  private inflight: Promise<void>[] = [];
 
   constructor(
     private readonly world: World,
@@ -70,6 +72,19 @@ export class BusinessAgentSystem implements System {
     return this.log;
   }
 
+  /**
+   * Await every async decision fired so far, so it has applied to the world.
+   * A no-op for sync providers (which apply inline). A turn-stepping driver
+   * calls this between turns so an async mind's (Claude's) move lands before
+   * the next day runs; in the normal tick loop nothing calls it and behaviour
+   * is unchanged. One review per business per day, so a single drain suffices.
+   */
+  async settle(): Promise<void> {
+    const inflight = this.inflight;
+    this.inflight = [];
+    await Promise.all(inflight);
+  }
+
   private review(biz: Business, day: number): void {
     if (this.pending.has(biz.id)) return; // previous day's call hasn't landed
     const req: DecisionRequest = { observation: this.observe(biz, day), limits: this.limits };
@@ -87,12 +102,13 @@ export class BusinessAgentSystem implements System {
 
     if (isPromise(result)) {
       this.pending.add(biz.id);
-      result
+      const settled = result
         .then(
           (decision) => this.apply(biz, decision, day, this.provider.id, false),
           () => this.applyFallback(biz, req, day),
         )
         .finally(() => this.pending.delete(biz.id));
+      this.inflight.push(settled);
     } else {
       this.apply(biz, result, day, this.provider.id, false);
     }
