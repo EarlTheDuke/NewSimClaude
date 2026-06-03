@@ -53,6 +53,22 @@ describe("Phase 1 city", () => {
     });
   });
 
+  describe("wage ladder is not inverted (P9-2)", () => {
+    it("storefronts out-earn the landlord, so a top earner has an upward job target", () => {
+      const { world } = createCity({ seed: 1 });
+      const wage = (id: string) => world.getBusiness(id)!.wagePerTick;
+      // switchJobTo targets the best-paying hiring job. The landlord used to sit
+      // atop the ladder, so a landlord worker (the city's best-paid) only ever
+      // saw a pay cut and never moved. The rebalance lifts the two cash-rich
+      // storefronts above it, turning that dead branch into a real raise.
+      expect(wage("biz_goods")).toBeGreaterThan(wage("biz_landlord"));
+      expect(wage("biz_diner")).toBeGreaterThan(wage("biz_landlord"));
+      // The landlord is no longer the single highest-paid employer.
+      const topWage = Math.max(...world.businesses.map((b) => b.wagePerTick));
+      expect(wage("biz_landlord")).toBeLessThan(topWage);
+    });
+  });
+
   describe("residents are alive, not stuck", () => {
     it("commute between distinct places over a day", () => {
       const { sim, world } = createCity({ seed: 1 });

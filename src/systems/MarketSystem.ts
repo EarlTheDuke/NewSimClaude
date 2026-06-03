@@ -8,6 +8,8 @@ import {
   PRICE_MIN_MULT,
   PRICE_MAX_MULT,
   PRICE_ADJUST_FRACTION,
+  PRICE_REVERT_FRACTION,
+  PRICE_REVERT_SNAP,
   LANDLORD_RESERVE,
   BUSINESS_RESERVE,
   PROFIT_DISTRIBUTION_CAP,
@@ -147,7 +149,11 @@ export class MarketSystem implements System {
   /**
    * Price tracks how hard each producer is being worked: brisk sales (high
    * utilization of its daily capacity) nudge the price up, a slow day nudges it
-   * down. Bounded so it can never run away in either direction.
+   * down. In the neutral band between those — neither over- nor under-worked —
+   * the price drifts gently back toward base (snapping once within a hair),
+   * giving base a restoring pull instead of leaving it frozen wherever an early
+   * transient landed (P9-9). Bounded so it can never run away in either
+   * direction.
    */
   private adjustPrices(sold: Record<ResourceKind, number>): void {
     for (const res of RESOURCES) {
@@ -156,8 +162,14 @@ export class MarketSystem implements System {
       const utilization = cap > 0 ? sold[res] / cap : 0;
       const base = BASE_RESOURCE_PRICE[res];
       let p = this.prices[res];
-      if (utilization > 0.6) p *= 1 + PRICE_ADJUST_FRACTION;
-      else if (utilization < 0.3) p *= 1 - PRICE_ADJUST_FRACTION;
+      if (utilization > 0.6) {
+        p *= 1 + PRICE_ADJUST_FRACTION;
+      } else if (utilization < 0.3) {
+        p *= 1 - PRICE_ADJUST_FRACTION;
+      } else {
+        p += (base - p) * PRICE_REVERT_FRACTION;
+        if (Math.abs(base - p) <= base * PRICE_REVERT_SNAP) p = base;
+      }
       this.prices[res] = clamp(p, base * PRICE_MIN_MULT, base * PRICE_MAX_MULT);
     }
   }

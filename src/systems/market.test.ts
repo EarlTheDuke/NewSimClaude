@@ -108,6 +108,20 @@ describe("MarketSystem (Phase 4 B2B layer)", () => {
       // The economy is not dead — wages keep flowing every day.
       expect(wagesAt150 - wagesAt100).toBeGreaterThan(0);
     });
+
+    it("mean-reverts every price to base, not to a drifted floor (P9-9)", () => {
+      // The restoring force (Phase 10f) makes base the unique attractor: with
+      // utilization in the neutral band the price drifts back toward base and
+      // snaps to it, instead of freezing wherever an early-ramp transient left
+      // it — the old bug that ran the city at a persistent low-grade deflation.
+      for (const seed of [1, 2, 7]) {
+        const { sim, market } = createCity({ seed });
+        sim.run(TICKS_PER_DAY * 120);
+        for (const r of RESOURCES) {
+          expect(market.priceBook()[r]).toBeCloseTo(BASE_RESOURCE_PRICE[r], 6);
+        }
+      }
+    });
   });
 
   describe("determinism & persistence", () => {

@@ -103,9 +103,9 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
 
   const pnl = () => ({ revenue: 0, wagesPaid: 0, rentCollected: 0 });
   businesses.push(
-    { id: "biz_diner", name: dinerLoc.name, kind: "diner", locationId: dinerLoc.id, cash: 4000, inventory: 40, price: 18, employeeIds: [], wagePerTick: 0.12, pnl: pnl(), resources: { food: 0 }, active: true },
-    { id: "biz_goods", name: goodsLoc.name, kind: "goods", locationId: goodsLoc.id, cash: 4000, inventory: 20, price: 34, employeeIds: [], wagePerTick: 0.14, pnl: pnl(), resources: { wares: 0 }, active: true },
-    { id: "biz_landlord", name: landlordLoc.name, kind: "landlord", locationId: landlordLoc.id, cash: 4000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.20, pnl: pnl(), resources: {}, active: true },
+    { id: "biz_diner", name: dinerLoc.name, kind: "diner", locationId: dinerLoc.id, cash: 4000, inventory: 40, price: 18, employeeIds: [], wagePerTick: 0.17, pnl: pnl(), resources: { food: 0 }, active: true },
+    { id: "biz_goods", name: goodsLoc.name, kind: "goods", locationId: goodsLoc.id, cash: 4000, inventory: 20, price: 34, employeeIds: [], wagePerTick: 0.20, pnl: pnl(), resources: { wares: 0 }, active: true },
+    { id: "biz_landlord", name: landlordLoc.name, kind: "landlord", locationId: landlordLoc.id, cash: 4000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.15, pnl: pnl(), resources: {}, active: true },
     { id: "biz_farm", name: farmLoc.name, kind: "farm", locationId: farmLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.08, pnl: pnl(), resources: { grain: 50 }, active: true },
     { id: "biz_mine", name: mineLoc.name, kind: "mine", locationId: mineLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.05, pnl: pnl(), resources: { materials: 24 }, active: true },
     { id: "biz_bakery", name: bakeryLoc.name, kind: "bakery", locationId: bakeryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { food: 40 }, active: true },

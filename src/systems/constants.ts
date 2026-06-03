@@ -68,6 +68,21 @@ export const PRICE_MIN_MULT = 0.4;
 export const PRICE_MAX_MULT = 1.6;
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;
+/**
+ * Restoring force (Phase 10f, fixes P9-9). When a resource's utilization sits in
+ * the neutral band — neither over- nor under-worked — its price drifts this
+ * fraction of the way back toward base each day. Without it the price has no
+ * memory of base and simply freezes wherever an early-ramp transient left it, so
+ * the city ran a persistent low-grade deflation (avg price ratcheted down and
+ * stuck below base). With it, base is the unique attractor.
+ */
+export const PRICE_REVERT_FRACTION = 0.2;
+/**
+ * Once a reverting price is within this fraction of base, snap it exactly to
+ * base. Keeps the steady state bit-flat (so "prices flat at steady state" still
+ * holds to full precision) instead of crawling toward base forever.
+ */
+export const PRICE_REVERT_SNAP = 0.005;
 /** A business is declared bankrupt below this cash for BANKRUPT_GRACE_DAYS running. */
 export const BANKRUPT_CASH_FLOOR = 1;
 export const BANKRUPT_GRACE_DAYS = 5;
