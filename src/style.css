@@ -309,6 +309,17 @@ svg.spark {
   background: #b18cf0;
 }
 
+.cost h2 {
+  font-size: 14px;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+.cost h2 .hint {
+  color: var(--muted);
+  font-weight: 400;
+}
+
 .god h2 {
   font-size: 14px;
   margin: 0 0 10px;

@@ -8,6 +8,7 @@ import type { ResourceKind } from "./world/types";
 import type { DisasterKind } from "./systems/disasters";
 import { GRANT_AMOUNT } from "./systems/constants";
 import { compareExperiments, formatComparison } from "./experiment/harness";
+import { summarizeCost } from "./ai/cost";
 
 const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
 
@@ -38,7 +39,7 @@ const { sim, world, market, macro, agent, residentAgent, events, god } = createC
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>CityWithLifeClaude — Phase 7 (god mode &amp; experiments)</h1>
+  <h1>CityWithLifeClaude — Phase 8 (hardening, persistence &amp; cost)</h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
@@ -75,6 +76,10 @@ app.innerHTML = `
     <h2>Resident decisions <span class="hint" id="resBrainTag"></span></h2>
     <div id="resTraceLog"><p class="hint">No decisions yet — residents review their life once a day.</p></div>
   </div>
+  <div class="hud cost">
+    <h2>LLM cost <span class="hint">· spend across both brains (rules = free)</span></h2>
+    <div class="pricebook" id="costPanel"></div>
+  </div>
 `;
 
 const clockEl = el<HTMLSpanElement>("#clock");
@@ -93,6 +98,7 @@ const godControlsEl = el<HTMLDivElement>("#godControls");
 const godLogEl = el<HTMLDivElement>("#godLog");
 const expControlsEl = el<HTMLDivElement>("#expControls");
 const expOutputEl = el<HTMLPreElement>("#expOutput");
+const costPanelEl = el<HTMLDivElement>("#costPanel");
 const canvas = el<HTMLCanvasElement>("#city");
 
 eventsTagEl.textContent = events ? "· disasters on" : "· disasters off";
@@ -206,6 +212,10 @@ function money(n: number): string {
 
 function money2(n: number): string {
   return `$${n.toFixed(2)}`;
+}
+
+function money4(n: number): string {
+  return `$${n.toFixed(4)}`;
 }
 
 /** A tiny inline-SVG sparkline of a metric's recent history. */
@@ -355,6 +365,20 @@ function renderGod(): void {
     .join("");
 }
 
+function renderCost(): void {
+  // Folds both decision logs into one spend/latency line. With the default rules
+  // brains there's no usage, so it reads $0.0000 — the meter is live regardless,
+  // ready to tally the moment a Claude provider is wired in.
+  const s = summarizeCost(agent?.decisions() ?? [], residentAgent?.decisions() ?? []);
+  const lat = s.avgLatencyMs > 0 ? `${Math.round(s.avgLatencyMs)}ms` : "—";
+  costPanelEl.innerHTML =
+    `<span class="price"><span>spend</span><b>${money4(s.totalCostUsd)}</b></span>` +
+    `<span class="price"><span>decisions</span><b>${s.calls}</b></span>` +
+    `<span class="price"><span>fallbacks</span><b>${s.fallbacks}</b></span>` +
+    `<span class="price"><span>tokens</span><b>${s.inputTokens}/${s.outputTokens}</b></span>` +
+    `<span class="price"><span>avg latency</span><b>${lat}</b></span>`;
+}
+
 function renderMacro(): void {
   const history = macro.history();
   const latest = macro.latest();
@@ -400,6 +424,7 @@ function renderFrame(): void {
   renderGod();
   renderTrace();
   renderResidentTrace();
+  renderCost();
 }
 
 window.addEventListener("keydown", (e) => {
