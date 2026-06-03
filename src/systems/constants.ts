@@ -99,3 +99,9 @@ export const GRANT_AMOUNT = 1500;
 // God Mode (Phase 7)
 /** How many recent divine-intervention records the God Mode log retains (ring buffer). */
 export const GODMODE_LOG_SIZE = 50;
+
+// Aspirational depth (Phase 10b)
+/** Price of one discretionary luxury (resident -> goods store). Repeatable, money-conserving. */
+export const LUXURY_COST = 150;
+/** Upper bound a resident may set as their savings-goal buffer. */
+export const MAX_SAVINGS_GOAL = 2000;

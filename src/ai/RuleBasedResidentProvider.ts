@@ -71,6 +71,23 @@ export class RuleBasedResidentProvider implements ResidentDecisionProvider {
       notes.push("asking for a raise");
     }
 
+    // Aspirational depth (Phase 10b): once the necessities are handled — a job
+    // and a vehicle — a thriving resident first carves out a savings buffer,
+    // then on later days splurges the surplus above it. This gives an otherwise
+    // fully-optimized life a standing goal to pursue instead of going idle.
+    const thriving = o.employed && o.hasVehicle;
+    if (thriving && o.savingsGoal <= 0) {
+      action.setSavingsGoal = Math.min(req.limits.maxSavingsGoal, Math.max(300, o.rent * 14));
+      notes.push("setting aside a savings buffer");
+    } else if (
+      thriving &&
+      o.luxurySellerOpen &&
+      o.money >= o.savingsGoal + req.limits.luxuryCost
+    ) {
+      action.buyLuxury = true;
+      notes.push("treating myself to a luxury");
+    }
+
     return {
       action,
       reason: notes.length > 0 ? notes.join("; ") : "settled, no change",

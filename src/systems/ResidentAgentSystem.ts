@@ -112,6 +112,8 @@ export class ResidentAgentSystem implements System {
     if (clamped.buyVehicle) this.applyBuyVehicle(r);
     if (clamped.sellVehicle) this.applySellVehicle(r);
     if (clamped.negotiateRaise) this.applyRaise(r, req.observation.jobBaseWage, day);
+    if (clamped.setSavingsGoal !== undefined) r.savingsGoal = clamped.setSavingsGoal;
+    if (clamped.buyLuxury) this.applyBuyLuxury(r);
 
     this.log.push({
       day,
@@ -158,6 +160,19 @@ export class ResidentAgentSystem implements System {
     if (paid > 0) r.hasVehicle = false;
   }
 
+  /** Buy one luxury: money-conserving (resident -> goods store), never minted. */
+  private applyBuyLuxury(r: Resident): void {
+    const goods = this.world.getBusiness("biz_goods");
+    if (!goods || !goods.active) return; // can't buy from a closed store
+    const paid = this.world.transfer(r.id, goods.id, this.limits.luxuryCost);
+    if (paid >= this.limits.luxuryCost) {
+      r.luxuriesOwned = (r.luxuriesOwned ?? 0) + 1;
+      goods.pnl.revenue += paid;
+    } else if (paid > 0) {
+      this.world.transfer(goods.id, r.id, paid); // couldn't cover it in full; refund
+    }
+  }
+
   private applyRaise(r: Resident, jobBaseWage: number, day: number): void {
     if (jobBaseWage <= 0) return;
     const cap = jobBaseWage * this.limits.maxWageMultiple;
@@ -201,6 +216,9 @@ export class ResidentAgentSystem implements System {
       rent: home.rent ?? 0,
       hasVehicle: r.hasVehicle,
       vehicleSellerOpen,
+      savingsGoal: r.savingsGoal ?? 0,
+      luxuriesOwned: r.luxuriesOwned ?? 0,
+      luxurySellerOpen: vehicleSellerOpen, // same storefront (biz_goods)
       daysSinceJobChange,
       daysSinceRaise,
       jobOptions,

@@ -53,6 +53,12 @@ export interface ResidentObservation {
   hasVehicle: boolean;
   /** Whether the vehicle seller is open — you can't buy from a closed store. */
   vehicleSellerOpen: boolean;
+  /** The resident's current savings goal — the buffer they keep before splurging. */
+  savingsGoal: number;
+  /** How many luxuries the resident already owns. */
+  luxuriesOwned: number;
+  /** Whether the luxury seller is open — you can't buy from a closed store. */
+  luxurySellerOpen: boolean;
   /** Days since this resident last switched jobs (large when never). */
   daysSinceJobChange: number;
   /** Days since this resident last won a raise (large when never). */
@@ -81,6 +87,10 @@ export interface ResidentAction {
   buyVehicle?: boolean;
   /** Sell the owned vehicle back. */
   sellVehicle?: boolean;
+  /** Buy one discretionary luxury — repeatable, spends down surplus above the savings goal. */
+  buyLuxury?: boolean;
+  /** Set the cash buffer to keep on hand before splurging. */
+  setSavingsGoal?: number;
 }
 
 /** Hard bounds on resident moves, enforced no matter who proposed them. */
@@ -97,6 +107,10 @@ export interface ResidentDecisionLimits {
   vehicleCost: number;
   /** Refund when selling a vehicle. */
   vehicleResale: number;
+  /** Price of one luxury purchase. */
+  luxuryCost: number;
+  /** A savings goal may not exceed this. */
+  maxSavingsGoal: number;
 }
 
 /** A provider's verdict for one resident: what to do, and why. */

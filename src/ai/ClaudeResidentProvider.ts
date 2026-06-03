@@ -79,11 +79,12 @@ export class ClaudeResidentProvider implements ResidentDecisionProvider {
       system:
         "You live one life in a watchable city economy. Each day you may make " +
         "ONE deliberate move with the `set_life_plan` tool — switch jobs, move " +
-        "home, buy or sell a vehicle — and optionally ask for a raise. Be " +
-        "prudent: keep money positive, prefer higher pay and lower rent, and " +
-        "only buy a vehicle with comfortable savings. Invalid or out-of-bounds " +
-        "choices are dropped, so choose from the listed options. Always give a " +
-        "one-sentence reason.",
+        "home, buy or sell a vehicle — and optionally ask for a raise, set a " +
+        "savings goal, or treat yourself to a luxury once you're above that " +
+        "goal. Be prudent: keep money positive, prefer higher pay and lower " +
+        "rent, and only spend on a vehicle or luxuries with comfortable " +
+        "savings. Invalid or out-of-bounds choices are dropped, so choose from " +
+        "the listed options. Always give a one-sentence reason.",
       tool_choice: { type: "tool", name: "set_life_plan" },
       tools: [
         {
@@ -112,6 +113,14 @@ export class ClaudeResidentProvider implements ResidentDecisionProvider {
                 type: "boolean",
                 description: `Sell your vehicle for ${limits.vehicleResale}. Omit for no.`,
               },
+              setSavingsGoal: {
+                type: "number",
+                description: `Set the cash buffer to keep before splurging (0..${limits.maxSavingsGoal}). Omit to leave unchanged.`,
+              },
+              buyLuxury: {
+                type: "boolean",
+                description: `Treat yourself to a luxury for ${limits.luxuryCost} (only fires when money is above your savings goal). Omit for no.`,
+              },
               reason: { type: "string", description: "One sentence: why." },
             },
             required: ["reason"],
@@ -133,6 +142,8 @@ export class ClaudeResidentProvider implements ResidentDecisionProvider {
     if (input.negotiateRaise === true) action.negotiateRaise = true;
     if (input.buyVehicle === true) action.buyVehicle = true;
     if (input.sellVehicle === true) action.sellVehicle = true;
+    if (input.buyLuxury === true) action.buyLuxury = true;
+    if (typeof input.setSavingsGoal === "number") action.setSavingsGoal = input.setSavingsGoal;
 
     const usage: ResidentProviderUsage = {
       inputTokens: response.usage.input_tokens,
@@ -161,6 +172,7 @@ export class ClaudeResidentProvider implements ResidentDecisionProvider {
         ? `Job: ${o.jobName} at wage ${o.wagePerTick}/tick (base ${o.jobBaseWage}), ${o.daysSinceJobChange} days since you last switched.`
         : `You are jobless (no wage).`,
       `Home: ${o.homeName}, rent ${o.rent}/day. Vehicle: ${o.hasVehicle ? "yes" : "no"}.`,
+      `Savings goal ${round(o.savingsGoal)}, luxuries owned ${o.luxuriesOwned}.`,
       `Needs — hunger ${round(o.needs.hunger)}, energy ${round(o.needs.energy)}, social ${round(o.needs.social)}.`,
       `Job options: ${jobs || "(none)"}.`,
       `Home options: ${homes || "(none)"}.`,

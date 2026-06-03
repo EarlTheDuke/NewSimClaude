@@ -147,6 +147,8 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
       schedule: scheduleFor(i),
       earnedThisPeriod: 0,
       lastPaycheck: 0,
+      savingsGoal: 0,
+      luxuriesOwned: 0,
       needs: {
         hunger: 70 + rng.int(0, 20),
         energy: 80 + rng.int(0, 15),

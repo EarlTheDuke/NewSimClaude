@@ -24,6 +24,9 @@ function baseObs(over: Partial<ResidentObservation> = {}): ResidentObservation {
     rent: 70,
     hasVehicle: false,
     vehicleSellerOpen: true,
+    savingsGoal: 0,
+    luxuriesOwned: 0,
+    luxurySellerOpen: true,
     daysSinceJobChange: 10,
     daysSinceRaise: 10,
     jobOptions: [
@@ -100,6 +103,34 @@ describe("clampResidentAction", () => {
     expect(clampResidentAction({ sellVehicle: true }, baseObs({ hasVehicle: false }), DEFAULT_RESIDENT_LIMITS).sellVehicle).toBeUndefined();
     expect(clampResidentAction({ sellVehicle: true }, baseObs({ hasVehicle: true }), DEFAULT_RESIDENT_LIMITS).sellVehicle).toBe(true);
   });
+
+  it("clamps a savings goal into [0, max]", () => {
+    expect(clampResidentAction({ setSavingsGoal: -50 }, baseObs(), DEFAULT_RESIDENT_LIMITS).setSavingsGoal).toBe(0);
+    expect(clampResidentAction({ setSavingsGoal: 1e9 }, baseObs(), DEFAULT_RESIDENT_LIMITS).setSavingsGoal).toBe(DEFAULT_RESIDENT_LIMITS.maxSavingsGoal);
+    expect(clampResidentAction({ setSavingsGoal: 500 }, baseObs(), DEFAULT_RESIDENT_LIMITS).setSavingsGoal).toBe(500);
+    // A non-finite goal is ignored rather than poisoning the number.
+    expect(clampResidentAction({ setSavingsGoal: NaN }, baseObs(), DEFAULT_RESIDENT_LIMITS).setSavingsGoal).toBeUndefined();
+  });
+
+  it("buys a luxury only with surplus above the savings goal, from an open seller", () => {
+    // money 1000, goal 0, luxury 150 → surplus, fires.
+    expect(clampResidentAction({ buyLuxury: true }, baseObs(), DEFAULT_RESIDENT_LIMITS).buyLuxury).toBe(true);
+    // goal eats the surplus (1000 < 900 + 150) → dropped.
+    expect(clampResidentAction({ buyLuxury: true }, baseObs({ savingsGoal: 900 }), DEFAULT_RESIDENT_LIMITS).buyLuxury).toBeUndefined();
+    // seller closed → dropped.
+    expect(clampResidentAction({ buyLuxury: true }, baseObs({ luxurySellerOpen: false }), DEFAULT_RESIDENT_LIMITS).buyLuxury).toBeUndefined();
+  });
+
+  it("lets a luxury and a goal ride alongside a structural move (all non-structural)", () => {
+    const out = clampResidentAction(
+      { reHomeTo: "loc_home_5", buyLuxury: true, setSavingsGoal: 400 },
+      baseObs(),
+      DEFAULT_RESIDENT_LIMITS,
+    );
+    expect(out.reHomeTo).toBe("loc_home_5");
+    expect(out.buyLuxury).toBe(true);
+    expect(out.setSavingsGoal).toBe(400);
+  });
 });
 
 describe("ResidentAgentSystem", () => {
@@ -157,6 +188,27 @@ describe("ResidentAgentSystem", () => {
 
     expect(world.getResident("res_0")!.hasVehicle).toBe(false);
     expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("buys a luxury, conserving money and counting it", () => {
+    const provider = new MockResidentProvider({ fixed: { action: { buyLuxury: true }, reason: "treat myself" } });
+    const { sim, world } = createCity({ seed: 1, residentBrain: provider, agenticResidentIds: ["res_0"] });
+    world.getResident("res_0")!.money = 3000; // surplus above the (zero) savings goal
+    const start = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY);
+
+    expect(world.getResident("res_0")!.luxuriesOwned).toBe(1);
+    expect(world.totalMoney()).toBeCloseTo(start, 6); // a transfer, nothing minted
+  });
+
+  it("sets a savings goal, clamped to the allowed range", () => {
+    const provider = new MockResidentProvider({ fixed: { action: { setSavingsGoal: 800 }, reason: "build a buffer" } });
+    const { sim, world } = createCity({ seed: 1, residentBrain: provider, agenticResidentIds: ["res_0"] });
+
+    sim.run(TICKS_PER_DAY);
+
+    expect(world.getResident("res_0")!.savingsGoal).toBe(800);
   });
 
   it("grants a capped raise", () => {

@@ -144,6 +144,10 @@ export interface Resident {
   earnedThisPeriod: number;
   /** The most recent settled day's earnings — the dossier's "last paycheck". */
   lastPaycheck: number;
+  /** A self-set cash buffer the resident keeps before splurging (Phase 10b). */
+  savingsGoal: number;
+  /** Count of discretionary luxuries bought — a visible marker of a thriving life. */
+  luxuriesOwned: number;
   needs: Needs;
   activity: Activity;
   /** Location the resident is currently heading to / occupying. */

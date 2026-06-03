@@ -1,5 +1,7 @@
 import {
   JOB_CHANGE_COOLDOWN_DAYS,
+  LUXURY_COST,
+  MAX_SAVINGS_GOAL,
   MAX_WAGE_MULT,
   RAISE_COOLDOWN_DAYS,
   RAISE_FRACTION,
@@ -20,6 +22,8 @@ export const DEFAULT_RESIDENT_LIMITS: ResidentDecisionLimits = {
   raiseFraction: RAISE_FRACTION,
   vehicleCost: VEHICLE_COST,
   vehicleResale: VEHICLE_RESALE,
+  luxuryCost: LUXURY_COST,
+  maxSavingsGoal: MAX_SAVINGS_GOAL,
 };
 
 /**
@@ -83,6 +87,18 @@ export function clampResidentAction(
     const cap = o.jobBaseWage * limits.maxWageMultiple;
     const offCooldown = o.daysSinceRaise >= limits.raiseCooldownDays;
     if (o.wagePerTick < cap && offCooldown) out.negotiateRaise = true;
+  }
+
+  // --- Aspirational levers (Phase 10b): non-structural, may ride alongside a move. ---
+  // A savings goal is just a bounded number — clamp it into range.
+  if (action.setSavingsGoal !== undefined && Number.isFinite(action.setSavingsGoal)) {
+    out.setSavingsGoal = Math.max(0, Math.min(limits.maxSavingsGoal, action.setSavingsGoal));
+  }
+  // Splurge only surplus *above* the resident's own buffer, and only when the
+  // store is open and the spend still leaves them at/above their goal. Gated on
+  // the observed (current) goal, so a same-day goal change applies next review.
+  if (action.buyLuxury && o.luxurySellerOpen && o.money >= o.savingsGoal + limits.luxuryCost) {
+    out.buyLuxury = true;
   }
 
   return out;

@@ -70,6 +70,8 @@ function toAction(j: JoyMove): ResidentAction {
   if (j.negotiateRaise !== undefined) a.negotiateRaise = j.negotiateRaise;
   if (j.buyVehicle !== undefined) a.buyVehicle = j.buyVehicle;
   if (j.sellVehicle !== undefined) a.sellVehicle = j.sellVehicle;
+  if (j.buyLuxury !== undefined) a.buyLuxury = j.buyLuxury;
+  if (j.setSavingsGoal !== undefined) a.setSavingsGoal = j.setSavingsGoal;
   return a;
 }
 
@@ -159,6 +161,7 @@ function main(): void {
   );
   out.push(`  home    ${home.name} @ ${money2(home.rent ?? 0)}/day rent`);
   out.push(`  vehicle ${joy.hasVehicle ? "yes" : "no"}`);
+  out.push(`  savings goal ${money2(joy.savingsGoal ?? 0)} · luxuries ${joy.luxuriesOwned ?? 0}`);
 
   // Joy's applied decisions during this run (after clamping).
   const myMoves = (residentAgent?.decisions() ?? []).filter(
@@ -189,7 +192,8 @@ function main(): void {
   }
   out.push(
     `OTHER LEVERS: negotiateRaise (×${1 + L.raiseFraction}, cap ${L.maxWageMultiple}× base, cooldown ${L.raiseCooldownDays}d) · ` +
-      `buyVehicle (${money(L.vehicleCost)}) · sellVehicle (refund ${money(L.vehicleResale)})`,
+      `buyVehicle (${money(L.vehicleCost)}) · sellVehicle (refund ${money(L.vehicleResale)}) · ` +
+      `setSavingsGoal (0..${money(L.maxSavingsGoal)}) · buyLuxury (${money(L.luxuryCost)}, above your goal)`,
   );
 
   // City vitals + prices.
