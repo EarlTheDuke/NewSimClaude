@@ -34,7 +34,7 @@ const { sim, world, market, macro, agent, residentAgent } = createCity({
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>CityWithLifeClaude — Phase 4 (markets &amp; macro)</h1>
+  <h1>CityWithLifeClaude — Phase 5 (breathing city)</h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
@@ -299,7 +299,7 @@ function renderFrame(): void {
     sim.time.isPaused() ? "paused" : "running"
   }`;
   syncControls();
-  renderer.draw(selected);
+  renderer.draw(t.hour + t.minute / 60, selected);
   renderInspector();
   renderMacro();
   renderTrace();
