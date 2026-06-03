@@ -51,6 +51,8 @@ export interface ResidentObservation {
   homeName: string;
   rent: number;
   hasVehicle: boolean;
+  /** Whether the vehicle seller is open — you can't buy from a closed store. */
+  vehicleSellerOpen: boolean;
   /** Days since this resident last switched jobs (large when never). */
   daysSinceJobChange: number;
   /** Days since this resident last won a raise (large when never). */

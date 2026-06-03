@@ -65,7 +65,7 @@ export function clampResidentAction(
   }
 
   if (action.buyVehicle && !structuralTaken) {
-    if (!o.hasVehicle && o.money >= limits.vehicleCost) {
+    if (!o.hasVehicle && o.vehicleSellerOpen && o.money >= limits.vehicleCost) {
       out.buyVehicle = true;
       structuralTaken = true;
     }

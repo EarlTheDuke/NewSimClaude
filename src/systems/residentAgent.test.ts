@@ -23,6 +23,7 @@ function baseObs(over: Partial<ResidentObservation> = {}): ResidentObservation {
     homeName: "Home 1",
     rent: 70,
     hasVehicle: false,
+    vehicleSellerOpen: true,
     daysSinceJobChange: 10,
     daysSinceRaise: 10,
     jobOptions: [
@@ -90,6 +91,11 @@ describe("clampResidentAction", () => {
     expect(clampResidentAction({ buyVehicle: true }, rich, DEFAULT_RESIDENT_LIMITS).buyVehicle).toBe(true);
   });
 
+  it("drops a vehicle purchase when the seller is closed", () => {
+    const closed = baseObs({ money: 1000, vehicleSellerOpen: false });
+    expect(clampResidentAction({ buyVehicle: true }, closed, DEFAULT_RESIDENT_LIMITS).buyVehicle).toBeUndefined();
+  });
+
   it("drops selling a vehicle the resident doesn't own", () => {
     expect(clampResidentAction({ sellVehicle: true }, baseObs({ hasVehicle: false }), DEFAULT_RESIDENT_LIMITS).sellVehicle).toBeUndefined();
     expect(clampResidentAction({ sellVehicle: true }, baseObs({ hasVehicle: true }), DEFAULT_RESIDENT_LIMITS).sellVehicle).toBe(true);
@@ -137,6 +143,19 @@ describe("ResidentAgentSystem", () => {
     sim.run(TICKS_PER_DAY);
 
     expect(world.getResident("res_0")!.hasVehicle).toBe(true);
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("won't buy a vehicle from a closed seller, conserving money", () => {
+    const provider = new MockResidentProvider({ fixed: { action: { buyVehicle: true }, reason: "try anyway" } });
+    const { sim, world } = createCity({ seed: 1, residentBrain: provider, agenticResidentIds: ["res_0"] });
+    world.getResident("res_0")!.money = 3000;
+    world.getBusiness("biz_goods")!.active = false; // store shut down
+    const start = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY);
+
+    expect(world.getResident("res_0")!.hasVehicle).toBe(false);
     expect(world.totalMoney()).toBeCloseTo(start, 6);
   });
 

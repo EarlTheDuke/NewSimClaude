@@ -141,7 +141,7 @@ export class ResidentAgentSystem implements System {
 
   private applyBuyVehicle(r: Resident): void {
     const goods = this.world.getBusiness("biz_goods");
-    if (!goods) return;
+    if (!goods || !goods.active) return; // can't buy from a closed store
     const paid = this.world.transfer(r.id, goods.id, this.limits.vehicleCost);
     if (paid >= this.limits.vehicleCost) {
       r.hasVehicle = true;
@@ -178,6 +178,8 @@ export class ResidentAgentSystem implements System {
       .filter((l) => l.type === "home" && l.id !== r.homeId)
       .map((l) => ({ homeId: l.id, name: l.name, rent: l.rent ?? 0 }));
 
+    const vehicleSellerOpen = this.world.getBusiness("biz_goods")?.active ?? false;
+
     const last = this.lastJobChangeDay.get(r.id);
     const daysSinceJobChange = last === undefined ? this.limits.jobChangeCooldownDays : day - last;
     const lastRaise = this.lastRaiseDay.get(r.id);
@@ -198,6 +200,7 @@ export class ResidentAgentSystem implements System {
       homeName: home.name,
       rent: home.rent ?? 0,
       hasVehicle: r.hasVehicle,
+      vehicleSellerOpen,
       daysSinceJobChange,
       daysSinceRaise,
       jobOptions,
