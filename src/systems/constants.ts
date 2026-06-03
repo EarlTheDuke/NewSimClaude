@@ -3,13 +3,25 @@
  * chosen so a resident sleeps ~at night, works the day, eats once or twice,
  * and money stays in healthy circulation across the closed economy.
  */
-import type { ResourceKind } from "../world/types";
+import type { ResourceKind, WorkSchedule } from "../world/types";
 
 // Daily schedule (hour of day, 0..23)
 export const SLEEP_START_HOUR = 22;
 export const WAKE_HOUR = 7;
 export const WORK_START_HOUR = 9;
 export const WORK_END_HOUR = 17;
+
+/**
+ * Fallback work pattern for any resident missing one — e.g. a pre-10a save
+ * restored into the new model. Mirrors the original behaviour exactly: a 9–17
+ * shift, every day, no days off. Fresh cities assign varied schedules in
+ * cityGen, so this only ever applies to legacy restored residents.
+ */
+export const DEFAULT_SCHEDULE: WorkSchedule = {
+  startHour: WORK_START_HOUR,
+  endHour: WORK_END_HOUR,
+  daysOff: [],
+};
 
 // Need decay per tick (points/tick; needs are 0..100)
 export const HUNGER_DECAY = 0.12;

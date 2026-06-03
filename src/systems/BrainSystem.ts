@@ -4,11 +4,10 @@ import type { Activity, Resident } from "../world/types";
 import {
   SLEEP_START_HOUR,
   WAKE_HOUR,
-  WORK_START_HOUR,
-  WORK_END_HOUR,
   HUNGRY_THRESHOLD,
   TIRED_THRESHOLD,
   LONELY_THRESHOLD,
+  DEFAULT_SCHEDULE,
 } from "./constants";
 
 export interface Decision {
@@ -30,19 +29,23 @@ export class BrainSystem implements System {
   constructor(private readonly world: World) {}
 
   update(ctx: SystemContext): void {
-    const { hour } = ctx.time.time();
+    const { hour, dayOfWeek } = ctx.time.time();
     for (const resident of this.world.residents) {
-      const decision = this.decide(resident, hour);
+      const decision = this.decide(resident, hour, dayOfWeek);
       resident.destinationId = decision.destinationId;
       resident.activity = decision.activity; // MovementSystem refines to "commuting" if not yet there
     }
   }
 
   /** Rule-based mind. Replace with a DecisionProvider call in Phase 2. */
-  private decide(resident: Resident, hour: number): Decision {
+  private decide(resident: Resident, hour: number, dayOfWeek: number): Decision {
     const { hunger, energy, social } = resident.needs;
     const isNight = hour >= SLEEP_START_HOUR || hour < WAKE_HOUR;
-    const isWorkTime = hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
+    // Each resident works their own shift (Phase 10a); legacy residents with no
+    // schedule fall back to the original 9–17 every-day pattern.
+    const sched = resident.schedule ?? DEFAULT_SCHEDULE;
+    const isWorkDay = !sched.daysOff.includes(dayOfWeek);
+    const isWorkTime = isWorkDay && hour >= sched.startHour && hour < sched.endHour;
 
     // 1. Sleep — at night, or when running on empty.
     if (isNight || energy < TIRED_THRESHOLD) {

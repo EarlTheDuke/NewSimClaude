@@ -6,6 +6,7 @@ import type {
   Location,
   Business,
   Resident,
+  WorkSchedule,
 } from "./types";
 import { RENT_PER_DAY } from "../systems/constants";
 
@@ -28,6 +29,30 @@ const FIRST_NAMES = [
 
 function nodeId(c: number, r: number): string {
   return `n_${c}_${r}`;
+}
+
+/**
+ * Four staggered 8-hour shifts (Phase 10a). Keeping the length fixed at 8h
+ * means a full working day pays exactly as before; only the start time fans out
+ * so the morning commute spreads across the clock.
+ */
+const SHIFTS: ReadonlyArray<{ startHour: number; endHour: number }> = [
+  { startHour: 7, endHour: 15 },
+  { startHour: 8, endHour: 16 },
+  { startHour: 9, endHour: 17 },
+  { startHour: 10, endHour: 18 },
+];
+
+/**
+ * A deterministic, varied work pattern per resident, derived from the index
+ * (not the RNG) so that adding it leaves every resident's starting needs
+ * byte-identical to before — the only new behaviour is the schedule itself. One
+ * rotating day off per week (staggered by index) keeps the city from ever going
+ * fully idle on the same weekday.
+ */
+function scheduleFor(i: number): WorkSchedule {
+  const shift = SHIFTS[i % SHIFTS.length]!;
+  return { startHour: shift.startHour, endHour: shift.endHour, daysOff: [i % 7] };
 }
 
 function buildGrid(): { nodes: MapNode[]; roads: Road[] } {
@@ -119,6 +144,9 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
       jobId: employed ? biz.id : "",
       wagePerTick: employed ? biz.wagePerTick : 0,
       hasVehicle: false,
+      schedule: scheduleFor(i),
+      earnedThisPeriod: 0,
+      lastPaycheck: 0,
       needs: {
         hunger: 70 + rng.int(0, 20),
         energy: 80 + rng.int(0, 15),

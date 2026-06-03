@@ -105,6 +105,17 @@ export interface Needs {
   social: number; // 100 = content, 0 = lonely
 }
 
+/**
+ * A resident's working pattern (Phase 10a). Hours are 0..23 and `endHour` is
+ * exclusive. `daysOff` lists weekdays (0..6, matching TimeSystem's dayOfWeek)
+ * the resident does not work — their free days.
+ */
+export interface WorkSchedule {
+  startHour: number;
+  endHour: number;
+  daysOff: number[];
+}
+
 /** Live movement state along the road graph. */
 export interface Movement {
   x: number;
@@ -127,6 +138,12 @@ export interface Resident {
   wagePerTick: number;
   /** Owns a vehicle: commutes faster and can reach farther jobs. */
   hasVehicle: boolean;
+  /** When this resident works (Phase 10a): drives the daily work decision. */
+  schedule: WorkSchedule;
+  /** Wages accrued since the last paycheck settlement; resets daily at midnight. */
+  earnedThisPeriod: number;
+  /** The most recent settled day's earnings — the dossier's "last paycheck". */
+  lastPaycheck: number;
   needs: Needs;
   activity: Activity;
   /** Location the resident is currently heading to / occupying. */

@@ -23,8 +23,9 @@ export class EconomySystem implements System {
       this.buyMealIfEating(resident);
       this.spendIfSocializing(resident);
     }
-    // Rent settles once a day, at the stroke of midnight.
+    // Paychecks and rent both settle once a day, at the stroke of midnight.
     if (ctx.totalTicks > 0 && ctx.totalTicks % TICKS_PER_DAY === 0) {
+      this.settlePaychecks();
       this.collectRent();
     }
   }
@@ -35,6 +36,21 @@ export class EconomySystem implements System {
     if (!employer) return;
     const paid = this.world.transfer(employer.id, resident.id, resident.wagePerTick);
     employer.pnl.wagesPaid += paid;
+    // Accrue the dossier's running tally; the money already moved above.
+    resident.earnedThisPeriod = (resident.earnedThisPeriod ?? 0) + paid;
+  }
+
+  /**
+   * Close out the day's wages into each resident's "last paycheck" and reset the
+   * accumulator (Phase 10a). Reporting only: every wage dollar already moved
+   * tick-by-tick in {@link payWageIfWorking}, so this touches no balances and
+   * leaves money conservation untouched.
+   */
+  private settlePaychecks(): void {
+    for (const r of this.world.residents) {
+      r.lastPaycheck = r.earnedThisPeriod ?? 0;
+      r.earnedThisPeriod = 0;
+    }
   }
 
   private buyMealIfEating(resident: Resident): void {
