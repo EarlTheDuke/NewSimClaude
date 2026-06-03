@@ -6,6 +6,7 @@ import { BrainSystem } from "./systems/BrainSystem";
 import { MovementSystem } from "./systems/MovementSystem";
 import { EconomySystem } from "./systems/EconomySystem";
 import { MarketSystem } from "./systems/MarketSystem";
+import { EventSystem, type EventSystemOptions } from "./systems/EventSystem";
 import { NeedsSystem } from "./systems/NeedsSystem";
 import { LifecycleSystem } from "./systems/LifecycleSystem";
 import { MacroSystem } from "./systems/MacroSystem";
@@ -43,6 +44,11 @@ export interface CitySimOptions extends CityOptions {
   agenticResidentIds?: string[];
   /** Override the resident action safety limits. */
   residentLimits?: ResidentDecisionLimits;
+  /**
+   * Opt in to Phase 6 disasters. `true` uses the default roster/odds; pass an
+   * object to tune them. Off by default, so pre-Phase-6 runs are unchanged.
+   */
+  disasters?: boolean | EventSystemOptions;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -62,15 +68,33 @@ export function createCity(options: CitySimOptions = {}): {
   macro: MacroSystem;
   agent?: BusinessAgentSystem;
   residentAgent?: ResidentAgentSystem;
+  events?: EventSystem;
 } {
-  const sim = new Simulation({ seed: options.seed ?? 1 });
+  const seed = options.seed ?? 1;
+  const sim = new Simulation({ seed });
   const world = buildCity(sim.rng, options);
 
+  // Constructed up front so the EventSystem can hold a market reference; it is
+  // still *registered* (run) at its normal position below.
+  const market = new MarketSystem(world);
+
+  let events: EventSystem | undefined;
+  const disasters = options.disasters ?? false;
+  if (disasters) {
+    events = new EventSystem(
+      world,
+      market,
+      seed,
+      typeof disasters === "object" ? disasters : undefined,
+    );
+  }
+
   sim.addSystem(new WorldSystem(world));
+  // Disasters strike at the start of the day, before the economy settles.
+  if (events) sim.addSystem(events);
   sim.addSystem(new BrainSystem(world));
   sim.addSystem(new MovementSystem(world));
   sim.addSystem(new EconomySystem(world));
-  const market = new MarketSystem(world);
   sim.addSystem(market);
 
   let agent: BusinessAgentSystem | undefined;
@@ -111,5 +135,5 @@ export function createCity(options: CitySimOptions = {}): {
   const macro = new MacroSystem(world, market);
   sim.addSystem(macro);
 
-  return { sim, world, market, macro, agent, residentAgent };
+  return { sim, world, market, macro, agent, residentAgent, events };
 }

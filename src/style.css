@@ -274,3 +274,33 @@ svg.spark {
   padding: 0 6px;
   font-size: 11px;
 }
+
+.evt {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 0 6px;
+  margin-right: 4px;
+  font-size: 11px;
+  color: #0e1116;
+  font-weight: 600;
+}
+
+.evt-fire {
+  background: #e0533a;
+}
+
+.evt-festival {
+  background: #e1d65b;
+}
+
+.evt-illness {
+  background: #5bd1c0;
+}
+
+.evt-supplyShock {
+  background: #d29922;
+}
+
+.evt-grant {
+  background: #2ea043;
+}

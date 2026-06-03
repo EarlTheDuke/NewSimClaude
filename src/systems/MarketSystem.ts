@@ -52,6 +52,19 @@ export class MarketSystem implements System {
     return this.prices;
   }
 
+  /**
+   * Phase 6 hook — slam a resource's price to `base * multiplier`, clamped to
+   * the usual [MIN, MAX] band so a supply-shock can't break the price model.
+   * Touches no cash (the spike is felt later, as dearer B2B procurement, which
+   * still flows through {@link World.transfer}). Returns the new price.
+   */
+  shockPrice(resource: ResourceKind, multiplier: number): number {
+    const base = BASE_RESOURCE_PRICE[resource];
+    const p = clamp(base * multiplier, base * PRICE_MIN_MULT, base * PRICE_MAX_MULT);
+    this.prices[resource] = p;
+    return p;
+  }
+
   private procure(sold: Record<ResourceKind, number>): void {
     for (const biz of this.world.businesses) {
       if (!biz.active) continue;

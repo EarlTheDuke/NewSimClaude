@@ -2,7 +2,7 @@ import "./style.css";
 import { createCity, type BrainOption, type ResidentBrainOption } from "./createCity";
 import { SPEED_OPTIONS, type SpeedMultiplier } from "./core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "./utils/serialization";
-import { CanvasRenderer, type Pick } from "./render/CanvasRenderer";
+import { CanvasRenderer, type Pick, type DisasterMarker } from "./render/CanvasRenderer";
 import { ARCHETYPES } from "./world/archetypes";
 import type { ResourceKind } from "./world/types";
 
@@ -25,16 +25,17 @@ const brain: BrainOption = "rules";
 const residentBrain: ResidentBrainOption = "rules";
 const agenticResidentIds = ["res_0", "res_1", "res_2", "res_3"];
 
-const { sim, world, market, macro, agent, residentAgent } = createCity({
+const { sim, world, market, macro, agent, residentAgent, events } = createCity({
   seed: 1,
   brain,
   residentBrain,
   agenticResidentIds,
+  disasters: true,
 });
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>CityWithLifeClaude — Phase 5 (breathing city)</h1>
+  <h1>CityWithLifeClaude — Phase 6 (disasters &amp; drama)</h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
@@ -48,6 +49,10 @@ app.innerHTML = `
     <h2>Economy <span class="hint" id="econTag"></span></h2>
     <div class="vitals" id="vitals"><p class="hint">No data yet — vitals post at each day boundary.</p></div>
     <div class="pricebook" id="pricebook"></div>
+  </div>
+  <div class="hud trace">
+    <h2>City events <span class="hint" id="eventsTag"></span></h2>
+    <div id="eventsLog"><p class="hint">All quiet — disasters strike at the start of a day.</p></div>
   </div>
   <div class="hud trace">
     <h2>Business decisions <span class="hint" id="brainTag"></span></h2>
@@ -69,7 +74,11 @@ const pricebookEl = el<HTMLDivElement>("#pricebook");
 const econTagEl = el<HTMLSpanElement>("#econTag");
 const traceLogEl = el<HTMLDivElement>("#traceLog");
 const resTraceLogEl = el<HTMLDivElement>("#resTraceLog");
+const eventsLogEl = el<HTMLDivElement>("#eventsLog");
+const eventsTagEl = el<HTMLSpanElement>("#eventsTag");
 const canvas = el<HTMLCanvasElement>("#city");
+
+eventsTagEl.textContent = events ? "· disasters on" : "· disasters off";
 
 el<HTMLSpanElement>("#brainTag").textContent = agent ? `· ${brain === "rules" ? "rules" : "claude"} brain` : "· brain off";
 el<HTMLSpanElement>("#resBrainTag").textContent = residentAgent
@@ -266,6 +275,20 @@ function renderResidentTrace(): void {
   resTraceLogEl.innerHTML = rows;
 }
 
+function renderEvents(): void {
+  if (!events) return;
+  const entries = events.events();
+  if (entries.length === 0) return;
+  eventsLogEl.innerHTML = entries
+    .slice(-10)
+    .reverse()
+    .map(
+      (e) =>
+        `<p class="trace-row"><b>Day ${e.day}</b> <span class="evt evt-${e.kind}">${e.kind}</span> ${e.headline}</p>`,
+    )
+    .join("");
+}
+
 function renderMacro(): void {
   const history = macro.history();
   const latest = macro.latest();
@@ -299,9 +322,15 @@ function renderFrame(): void {
     sim.time.isPaused() ? "paused" : "running"
   }`;
   syncControls();
-  renderer.draw(t.hour + t.minute / 60, selected);
+  const todays = events?.latest();
+  const marker: DisasterMarker | undefined =
+    todays && todays.day === t.day
+      ? { kind: todays.kind, headline: todays.headline, targetId: todays.targetId }
+      : undefined;
+  renderer.draw(t.hour + t.minute / 60, selected, marker);
   renderInspector();
   renderMacro();
+  renderEvents();
   renderTrace();
   renderResidentTrace();
 }

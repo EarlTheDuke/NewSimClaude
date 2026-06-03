@@ -74,3 +74,11 @@ export const PROFIT_DISTRIBUTION_CAP = 900;
 export const EVICTION_GRACE_DAYS = 3;
 /** Days of macro vitals retained in the ring buffer (chartable history). */
 export const MACRO_HISTORY_DAYS = 400;
+
+// Disasters & drama (Phase 6)
+/** Probability that *some* disaster strikes on any given day (opt-in EventSystem). */
+export const DISASTER_DAILY_CHANCE = 0.18;
+/** How many recent disaster records the events log retains (ring buffer). */
+export const DISASTER_LOG_SIZE = 50;
+/** A relief grant moves at most this much landlord cash to the neediest business ($). */
+export const GRANT_AMOUNT = 1500;

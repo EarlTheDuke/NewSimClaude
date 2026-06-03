@@ -1,5 +1,6 @@
 import type { World } from "../world/World";
 import type { Activity, BusinessKind, Business, Resident } from "../world/types";
+import type { DisasterKind } from "../systems/disasters";
 import { skyColor, ambient, windowGlow, dim, hexToRgb, type Rgb } from "./daynight";
 
 const ACTIVITY_COLOR: Record<Activity, string> = {
@@ -33,9 +34,25 @@ const LABEL_RGB: Rgb = [174, 180, 189];
 const BUILDING = 26;
 const DOT_RADIUS = 5;
 
+/** Per-kind glyph + accent colour for the on-canvas disaster marker. */
+const DISASTER_STYLE: Record<DisasterKind, { color: string; glyph: string }> = {
+  fire: { color: "#e0533a", glyph: "!" },
+  festival: { color: "#e1d65b", glyph: "*" },
+  illness: { color: "#5bd1c0", glyph: "+" },
+  supplyShock: { color: "#d29922", glyph: "$" },
+  grant: { color: "#2ea043", glyph: "$" },
+};
+
 export interface Pick {
   kind: "resident" | "business";
   id: string;
+}
+
+/** The disaster the renderer should flag this frame (today's headline). */
+export interface DisasterMarker {
+  kind: DisasterKind;
+  headline: string;
+  targetId?: string;
 }
 
 /**
@@ -57,7 +74,7 @@ export class CanvasRenderer {
   }
 
   /** Paint a frame for the given hour of day (0..24, fractional for smoothness). */
-  draw(hourFloat: number, selected?: Pick): void {
+  draw(hourFloat: number, selected?: Pick, disaster?: DisasterMarker): void {
     const { ctx, canvas, world } = this;
     const a = ambient(hourFloat);
     const glow = windowGlow(hourFloat);
@@ -99,6 +116,7 @@ export class CanvasRenderer {
 
     this.drawLegend();
     this.drawSky(hourFloat);
+    if (disaster) this.drawDisaster(disaster);
   }
 
   private drawResident(r: Resident, isSelected: boolean): void {
@@ -293,6 +311,85 @@ export class CanvasRenderer {
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 2;
     ctx.strokeRect(cx - half - 2, cy - half - 2, BUILDING + 4, BUILDING + 4);
+    ctx.restore();
+  }
+
+  /**
+   * Flag today's disaster: a colour-coded badge over the affected building or
+   * resident (when the target has a place on the map), plus a headline banner
+   * across the top so city-wide and resource shocks are still legible.
+   */
+  private drawDisaster(marker: DisasterMarker): void {
+    const style = DISASTER_STYLE[marker.kind];
+    const pos = this.locateTarget(marker.targetId);
+
+    if (pos) {
+      const { ctx } = this;
+      ctx.save();
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, BUILDING / 2 + 6, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const bx = pos.x;
+      const by = pos.y - BUILDING / 2 - 13;
+      ctx.shadowColor = style.color;
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = style.color;
+      ctx.beginPath();
+      ctx.arc(bx, by, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#0e1116";
+      ctx.font = "bold 11px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(style.glyph, bx, by);
+      ctx.restore();
+    }
+
+    this.drawDisasterBanner(marker.headline, style.color);
+  }
+
+  /** Resolve a disaster target id to a canvas position (building or resident). */
+  private locateTarget(targetId?: string): { x: number; y: number } | undefined {
+    if (!targetId) return undefined;
+    const biz = this.world.businesses.find((b) => b.id === targetId);
+    if (biz) {
+      const loc = this.world.locations.find((l) => l.id === biz.locationId);
+      if (loc) {
+        const node = this.world.getNode(loc.nodeId);
+        return { x: node.x, y: node.y };
+      }
+    }
+    const res = this.world.residents.find((r) => r.id === targetId);
+    if (res) return { x: res.move.x, y: res.move.y };
+    return undefined;
+  }
+
+  /** Top-of-canvas headline banner for the current disaster. */
+  private drawDisasterBanner(text: string, color: string): void {
+    const { ctx, canvas } = this;
+    ctx.save();
+    ctx.font = "bold 12px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const w = Math.min(canvas.width - 40, ctx.measureText(text).width + 32);
+    const h = 22;
+    const x = (canvas.width - w) / 2;
+    const y = 8;
+    ctx.fillStyle = "rgba(14, 17, 22, 0.82)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x + 12, y + h / 2, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#e6edf3";
+    ctx.fillText(text, x + w / 2 + 8, y + h / 2);
     ctx.restore();
   }
 
