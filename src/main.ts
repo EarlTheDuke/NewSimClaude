@@ -6,11 +6,13 @@ import { CanvasRenderer, type Pick, type DisasterMarker } from "./render/CanvasR
 import { ARCHETYPES } from "./world/archetypes";
 import type { ResourceKind } from "./world/types";
 import type { DisasterKind } from "./systems/disasters";
-import { GRANT_AMOUNT } from "./systems/constants";
+import { GRANT_AMOUNT, MOVE_SPEED, VEHICLE_SPEED_MULT } from "./systems/constants";
 import { compareExperiments, formatComparison } from "./experiment/harness";
 import { summarizeCost } from "./ai/cost";
 
 const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
 
 const SAVE_KEY = "cwlc.save.v1";
 const WIDTH = 640;
@@ -252,12 +254,20 @@ function renderInspector(): void {
     const job = world.getBusiness(r.jobId);
     const home = world.getLocation(r.homeId);
     const arrears = r.rentMissedDays ?? 0;
+    const speed = r.hasVehicle ? MOVE_SPEED * VEHICLE_SPEED_MULT : MOVE_SPEED;
+    const off =
+      r.schedule && r.schedule.daysOff.length > 0
+        ? r.schedule.daysOff.map((d) => WEEKDAYS[d] ?? `d${d}`).join(", ")
+        : "none";
     inspectorEl.innerHTML = `
       <h2>${r.name}</h2>
       <p class="tag">${r.activity}</p>
-      <p>${money(r.money)} · ${r.hasVehicle ? "has vehicle" : "no vehicle"}</p>
+      <p>${money(r.money)} · ${r.hasVehicle ? "has vehicle" : "no vehicle"} · ${speed.toFixed(0)} u/tick</p>
       <p>home: ${home.name} · rent ${money(home.rent ?? 0)}/day</p>
       <p>job: ${job?.name ?? "—"}${r.jobId ? ` · wage ${r.wagePerTick.toFixed(2)}/tick` : ""}</p>
+      ${r.schedule ? `<p>shift ${hh(r.schedule.startHour)}–${hh(r.schedule.endHour)} · off ${off}</p>` : ""}
+      <p>last paycheck ${money(r.lastPaycheck ?? 0)} · earned today ${money(r.earnedThisPeriod ?? 0)}</p>
+      <p>savings goal ${money(r.savingsGoal ?? 0)} · luxuries ${r.luxuriesOwned ?? 0}</p>
       ${arrears > 0 ? `<p class="warn">rent unpaid ${arrears}d</p>` : ""}
       ${bar("Hunger", r.needs.hunger)}
       ${bar("Energy", r.needs.energy)}
@@ -277,15 +287,16 @@ function renderInspector(): void {
         .map(([k, v]) => `${k} ${v}`)
         .join(", ") || "—";
     const insolvent = b.insolventDays ?? 0;
+    const net = b.pnl.revenue + b.pnl.rentCollected - b.pnl.wagesPaid;
     inspectorEl.innerHTML = `
       <h2>${b.name}</h2>
       <p class="tag">${b.kind}${b.active ? "" : " · CLOSED"}</p>
       <p>cash: ${money(b.cash)} · inventory: ${b.inventory} · price: ${money(b.price)}</p>
       <p>chain: ${chain}</p>
       <p>resources: ${stock}</p>
-      <p>employees: ${b.employeeIds.length}</p>
+      <p>employees: ${b.employeeIds.length} · wage ${b.wagePerTick.toFixed(2)}/tick</p>
       ${insolvent > 0 ? `<p class="warn">insolvent ${insolvent}d</p>` : ""}
-      <p class="pnl">revenue ${money(b.pnl.revenue)} · wages ${money(b.pnl.wagesPaid)} · rent ${money(b.pnl.rentCollected)}</p>
+      <p class="pnl">revenue ${money(b.pnl.revenue)} · wages ${money(b.pnl.wagesPaid)} · rent ${money(b.pnl.rentCollected)} · net ${money(net)}</p>
     `;
   }
 }
