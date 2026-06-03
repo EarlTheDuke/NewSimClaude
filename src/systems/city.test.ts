@@ -11,9 +11,13 @@ describe("Phase 1 city", () => {
     const { world } = createCity({ seed: 1 });
     expect(world.residents).toHaveLength(12);
     expect(world.businesses.map((b) => b.kind).sort()).toEqual([
+      "bakery",
       "diner",
+      "factory",
+      "farm",
       "goods",
       "landlord",
+      "mine",
     ]);
     // Every resident has a real home and a real employer.
     for (const r of world.residents) {

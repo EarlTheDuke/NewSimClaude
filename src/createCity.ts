@@ -5,7 +5,10 @@ import { WorldSystem } from "./systems/WorldSystem";
 import { BrainSystem } from "./systems/BrainSystem";
 import { MovementSystem } from "./systems/MovementSystem";
 import { EconomySystem } from "./systems/EconomySystem";
+import { MarketSystem } from "./systems/MarketSystem";
 import { NeedsSystem } from "./systems/NeedsSystem";
+import { LifecycleSystem } from "./systems/LifecycleSystem";
+import { MacroSystem } from "./systems/MacroSystem";
 import { BusinessAgentSystem } from "./systems/BusinessAgentSystem";
 import { ResidentAgentSystem } from "./systems/ResidentAgentSystem";
 import { RuleBasedProvider } from "./ai/RuleBasedProvider";
@@ -55,6 +58,8 @@ const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
 export function createCity(options: CitySimOptions = {}): {
   sim: Simulation;
   world: World;
+  market: MarketSystem;
+  macro: MacroSystem;
   agent?: BusinessAgentSystem;
   residentAgent?: ResidentAgentSystem;
 } {
@@ -65,6 +70,8 @@ export function createCity(options: CitySimOptions = {}): {
   sim.addSystem(new BrainSystem(world));
   sim.addSystem(new MovementSystem(world));
   sim.addSystem(new EconomySystem(world));
+  const market = new MarketSystem(world);
+  sim.addSystem(market);
 
   let agent: BusinessAgentSystem | undefined;
   const brain = options.brain ?? "off";
@@ -93,7 +100,16 @@ export function createCity(options: CitySimOptions = {}): {
     sim.addSystem(residentAgent);
   }
 
+  // Lifecycle runs after the economy, market, and any agents so it judges each
+  // holder on the fully-settled day: bankruptcy off true end-of-day cash, and
+  // eviction off the rent actually paid this day.
+  sim.addSystem(new LifecycleSystem(world));
   sim.addSystem(new NeedsSystem(world));
 
-  return { sim, world, agent, residentAgent };
+  // Macro vitals last of all: it reads the fully-settled day (post-economy,
+  // -market, -lifecycle) and only observes, never mutates.
+  const macro = new MacroSystem(world, market);
+  sim.addSystem(macro);
+
+  return { sim, world, market, macro, agent, residentAgent };
 }

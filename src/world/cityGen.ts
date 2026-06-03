@@ -68,12 +68,23 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
   const dinerLoc: Location = { id: "loc_diner", name: "The Corner Diner", type: "workplace", nodeId: nodeId(3, 0) };
   const goodsLoc: Location = { id: "loc_goods", name: "Maker Goods Co.", type: "workplace", nodeId: nodeId(3, 2) };
   const landlordLoc: Location = { id: "loc_landlord", name: "Keystone Housing", type: "workplace", nodeId: nodeId(3, 1) };
-  locations.push(dinerLoc, goodsLoc, landlordLoc);
+  // Phase 4 producers/processors fill the previously empty middle column (c=2).
+  // The factory shares the mine's node — materials flow next door to be worked.
+  const farmLoc: Location = { id: "loc_farm", name: "Greenfield Farm", type: "workplace", nodeId: nodeId(2, 0) };
+  const mineLoc: Location = { id: "loc_mine", name: "Iron Hollow Mine", type: "workplace", nodeId: nodeId(2, 1) };
+  const bakeryLoc: Location = { id: "loc_bakery", name: "Hearth Bakery", type: "workplace", nodeId: nodeId(2, 2) };
+  const factoryLoc: Location = { id: "loc_factory", name: "Ironworks Factory", type: "workplace", nodeId: nodeId(2, 1) };
+  locations.push(dinerLoc, goodsLoc, landlordLoc, farmLoc, mineLoc, bakeryLoc, factoryLoc);
 
+  const pnl = () => ({ revenue: 0, wagesPaid: 0, rentCollected: 0 });
   businesses.push(
-    { id: "biz_diner", name: dinerLoc.name, kind: "diner", locationId: dinerLoc.id, cash: 4000, inventory: 200, price: 14, employeeIds: [], wagePerTick: 0.5, pnl: { revenue: 0, wagesPaid: 0, rentCollected: 0 } },
-    { id: "biz_goods", name: goodsLoc.name, kind: "goods", locationId: goodsLoc.id, cash: 4000, inventory: 120, price: 25, employeeIds: [], wagePerTick: 0.55, pnl: { revenue: 0, wagesPaid: 0, rentCollected: 0 } },
-    { id: "biz_landlord", name: landlordLoc.name, kind: "landlord", locationId: landlordLoc.id, cash: 4000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.5, pnl: { revenue: 0, wagesPaid: 0, rentCollected: 0 } },
+    { id: "biz_diner", name: dinerLoc.name, kind: "diner", locationId: dinerLoc.id, cash: 4000, inventory: 40, price: 18, employeeIds: [], wagePerTick: 0.12, pnl: pnl(), resources: { food: 0 }, active: true },
+    { id: "biz_goods", name: goodsLoc.name, kind: "goods", locationId: goodsLoc.id, cash: 4000, inventory: 20, price: 34, employeeIds: [], wagePerTick: 0.14, pnl: pnl(), resources: { wares: 0 }, active: true },
+    { id: "biz_landlord", name: landlordLoc.name, kind: "landlord", locationId: landlordLoc.id, cash: 4000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.20, pnl: pnl(), resources: {}, active: true },
+    { id: "biz_farm", name: farmLoc.name, kind: "farm", locationId: farmLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.08, pnl: pnl(), resources: { grain: 50 }, active: true },
+    { id: "biz_mine", name: mineLoc.name, kind: "mine", locationId: mineLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.05, pnl: pnl(), resources: { materials: 24 }, active: true },
+    { id: "biz_bakery", name: bakeryLoc.name, kind: "bakery", locationId: bakeryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { food: 40 }, active: true },
+    { id: "biz_factory", name: factoryLoc.name, kind: "factory", locationId: factoryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { wares: 20 }, active: true },
   );
 
   // --- Homes on the left/middle columns (c = 0,1) ---

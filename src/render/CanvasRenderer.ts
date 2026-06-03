@@ -14,6 +14,10 @@ const BUSINESS_COLOR: Record<BusinessKind, string> = {
   diner: "#7a4a1f",
   goods: "#1f4a7a",
   landlord: "#4a4a4a",
+  farm: "#3f6e2a",
+  mine: "#6e5a2a",
+  bakery: "#8a5a2f",
+  factory: "#5a2f6e",
 };
 
 const HOME_COLOR = "#3a3320";

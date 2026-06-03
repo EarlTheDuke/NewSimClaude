@@ -72,6 +72,10 @@ export class EconomySystem implements System {
       const rent = this.world.getLocation(resident.homeId).rent ?? RENT_PER_DAY;
       const paid = this.world.transfer(resident.id, landlord.id, rent);
       landlord.pnl.rentCollected += paid;
+      // A running shortfall streak the LifecycleSystem reads to re-home anyone
+      // who keeps falling short. transfer caps at the resident's balance, so
+      // paid < rent means they couldn't cover the full bill this day.
+      resident.rentMissedDays = paid + 1e-9 < rent ? (resident.rentMissedDays ?? 0) + 1 : 0;
     }
     for (const biz of this.world.businesses) {
       if (biz.kind === "diner" || biz.kind === "goods") {
@@ -81,8 +85,10 @@ export class EconomySystem implements System {
     }
   }
 
-  private venueForResident(resident: Resident): string {
-    const idx = Number(resident.id.split("_")[1] ?? 0);
-    return idx % 2 === 0 ? "biz_diner" : "biz_goods";
+  private venueForResident(_resident: Resident): string {
+    // Leisure/shopping happens at the general goods store, so the diner anchors
+    // the food chain and the goods store anchors the wares chain — two retail
+    // venues, each driving one production chain at comparable volume.
+    return "biz_goods";
   }
 }

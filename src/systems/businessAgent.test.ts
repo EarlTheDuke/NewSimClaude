@@ -15,9 +15,9 @@ describe("BusinessAgentSystem", () => {
 
     sim.run(TICKS_PER_DAY); // exactly one day-boundary review
 
-    // price clamped: 14 -> at most 14 * 1.25 = 17.5
-    expect(diner.price).toBeLessThanOrEqual(17.5);
-    expect(diner.price).toBeGreaterThan(14);
+    // price clamped: diner starts at 18 -> at most 18 * 1.25 = 22.5
+    expect(diner.price).toBeLessThanOrEqual(22.5);
+    expect(diner.price).toBeGreaterThan(18);
     // produce added to inventory (minus any meals sold during the day)
     expect(diner.inventory).toBeGreaterThan(startInv - 200 + 50 - 1);
     expect(agent!.decisions()).toHaveLength(1);

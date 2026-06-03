@@ -32,11 +32,28 @@ export interface Location {
   rent?: number;
 }
 
-export type BusinessKind = "diner" | "goods" | "landlord";
+/**
+ * The seven business archetypes form a supply chain (Phase 4):
+ *   farm → grain → bakery → food → diner → meals (sold to residents)
+ *   mine → materials → factory → wares → goods (sold to residents)
+ *   landlord collects rent and runs no production.
+ */
+export type BusinessKind =
+  | "diner"
+  | "goods"
+  | "landlord"
+  | "farm"
+  | "mine"
+  | "bakery"
+  | "factory";
+
+/** Tradeable intermediate goods that flow between businesses (Phase 4). */
+export type ResourceKind = "grain" | "materials" | "food" | "wares";
 
 /**
  * An enterprise with cash, a simple P&L, and (for diner/goods) something to
- * sell. The landlord collects rent; it has no storefront visits.
+ * sell. Producers/processors hold resource stock and trade it B2B; the landlord
+ * collects rent and has no storefront visits.
  */
 export interface Business {
   id: string;
@@ -45,7 +62,7 @@ export interface Business {
   /** Building the business operates from (employees commute here). */
   locationId: string;
   cash: number;
-  /** Units of sellable good on hand (diner/goods only). */
+  /** Units of resident-sellable good on hand (diner meals / goods wares). */
   inventory: number;
   /** Price charged per unit sold. */
   price: number;
@@ -55,6 +72,12 @@ export interface Business {
   wagePerTick: number;
   /** Running P&L since the start of the run. */
   pnl: ProfitAndLoss;
+  /** B2B resource stock on hand, keyed by resource (Phase 4). */
+  resources: Partial<Record<ResourceKind, number>>;
+  /** False once the business has gone bankrupt; it stops trading. */
+  active: boolean;
+  /** Consecutive day-boundaries observed below the cash floor (Phase 4c). 0/absent = solvent. */
+  insolventDays?: number;
 }
 
 export interface ProfitAndLoss {
@@ -109,6 +132,8 @@ export interface Resident {
   /** Location the resident is currently heading to / occupying. */
   destinationId: string;
   move: Movement;
+  /** Consecutive day-boundaries the full rent went unpaid (Phase 4c eviction). 0/absent = current. */
+  rentMissedDays?: number;
 }
 
 /** Serializable slice owned by the World. */
