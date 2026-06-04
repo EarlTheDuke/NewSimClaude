@@ -106,6 +106,66 @@ relieved (storefronts can no longer pump captive demand); the cascade items (P10
 deflation, P10-3 labour concentration, P10-5 eviction pressure) are not yet directly
 addressed and await the 11b competitor + a re-soak.
 
+### 11b re-soak checkpoint — 12-agent / 365-day full-agency soak (2026-06-03)
+
+This is the validation the 11a note asked for: the full soak that originally surfaced
+P10-1..5, re-run after 11a + 11b. **All 12 residents agentic** (rules), **365 days**,
+**disasters OFF** (a clean, money-conserved structural read), seeds 1/2/3/5/7. Two arms on
+the same seeds isolate the rival's marginal effect: **A = 11a only** (one diner), **B = 11a +
+11b** (a second, competing diner). Money conserved to ±$0.00 in all 10 runs.
+
+| Metric (5-seed mean) | Original soak (pre-11a) | A · no rival | B · rival diner |
+| --- | --- | --- | --- |
+| Resident median wealth | ~$100 | **$753** | **$797** |
+| Resident min wealth | ~floor | $554 | **$736** |
+| Wealth Gini (0 = equal) | 0.01–0.05 | ~0.0 | ~0.05 |
+| Business cash share | ~96% | 70% | 71% |
+| Vehicles owned | 0 / 12 | **11.6 / 12** | **12.0 / 12** |
+| Residents with a savings goal | 0 / 12 | **11.6 / 12** | **12.0 / 12** |
+| Luxuries bought (total) | 0 | 2,251 | 3,651 |
+| Residents under eviction pressure | 7–8 / 12 | **0 / 12** | **0 / 12** |
+| Producers running 0-staff | — | 4 / 4 | 4 / 4 |
+| Resources pinned at floor | 2 / 4 | 4 / 4 | 4 / 4 |
+| Storefront bankruptcies | 0 | 0 | 1 (every seed) |
+
+**What's now healthy (P10-1, P10-4, P10-5 resolved):**
+
+- **P10-1 (money pooling) — resolved.** Resident median rose from ~$100 to ~$780; the wealth
+  Gini collapsed to ~0; *no business holds cash above its own reserve*. The residual ~70%
+  "business share" is **not** pooling — it's the locked working capital every business is
+  *designed* to keep on hand (the landlord's $4,500 + four producers at $3,000 each = $16.5k),
+  sitting exactly at their floors. In plain terms: the one-way money pump is gone, surplus
+  recirculates to residents, and what's left in business accounts is just the float a shop
+  needs to keep its doors open.
+- **P10-4 (aspirational arc) — resolved.** With real disposable income the "thriving" gate
+  opens on its own: ~12/12 residents own a vehicle, ~12/12 set a savings goal, and the town
+  buys thousands of luxuries over the year. The depth built in 10b is now reachable — exactly
+  the P10-1 → P10-4 unlock we predicted (fix the income, the arc lights up for free).
+- **P10-5 (eviction pressure) — resolved.** From 7–8/12 residents behind on rent to **0/12**.
+  The town is no longer a debtors' town leaning on the safe-eviction backstop.
+
+**What's still open (P10-2, P10-3 — same root):**
+
+- **P10-2 (deflation to floor) — open, and worse at full scale.** All **4/4** resource prices
+  now pin at the floor (the original soak had 2/4). 
+- **P10-3 (labour concentration) — open.** All 4 producers run with **0 staff**; all 12
+  workers pile into the 3 storefronts, yet the producers still ship full output.
+- These are **one bug, not two.** Production is labour-independent, so an empty farm/mine/
+  bakery/factory still makes a full batch; the wage ladder then pulls every worker into the
+  higher-paying storefronts. Empty producers over-supplying B2B goods is what ratchets resource
+  prices to the floor. **The single highest-value next build is labour-dependent production**
+  (output scales with staffing) — it attacks both P10-2 and P10-3 at the source.
+
+**New finding — rivalry consolidates over a full year (P10-6):** under pure rules with
+disasters off, the original **biz_diner ends at $0 and goes inactive in all 5 seeds** (the
+newer diner_2 + the goods store survive). The 90-day "truce, both survive" that
+`competition.test.ts` proves does **not** hold out to 365 days — given long enough, geography
+and the pricer let one diner quietly win the corner. The town is *better off for the rivalry
+while it lasts*: the rival arm's residents are richer (min wealth +33%, $554 → $736; median
++6%) because two diners compete the price down and recirculate more cash. The open question is
+a design choice, not a bug: accept realistic consolidation (one survivor), or tune the
+pricer/geography for a durable duopoly. Logged as **P10-6** below.
+
 ---
 
 ## Issues & ideas backlog
@@ -126,8 +186,9 @@ Status: `open` → `fixed (commit)` / `wontfix (reason)`.
 | P9-8 | 6 | S3 | Fire at one food vendor (the diner) cascaded into a city-wide food shortage — Joy, who doesn't work there, starved (hunger 88→23, recovered by Day 7). | Food supply is concentrated; one vendor's destroyed stock leaves the city short until it restocks. | Emergent and realistic — arguably working-as-intended. Flag only if one-vendor fragility feels too punishing over longer play. | wontfix (emergent realism) |
 | P9-9 | 10 | S3 | Persistent deflation: avg resource price ratcheted 7.00 (D1) → 5.43 (D10) as utilization stayed low; prices drift toward the floor. | `adjustPrices` had no restoring force: in the neutral utilization band it simply *held*, so prices froze wherever the early-ramp transient left them — a path-dependent downward drift with no memory of base. | Added mean-reversion (Phase 10f): in the neutral band the price drifts `PRICE_REVERT_FRACTION` (0.2) toward base each day and snaps to base within `PRICE_REVERT_SNAP` (0.5%). Base is now the unique attractor — every price returns *exactly* to base at steady state (verified seeds 1/2/7 over 120d). Test: `market.test.ts` P9-9. | **partially fixed** (10f) — neutral-band freeze fixed & verified in the no-agency steady state, but the live full-agency game still deflates to the floor (utilization stays <0.3). See **P10-2**. |
 | P9-10 | 6–10 | S2 | An optimized resident runs out of meaningful levers: at top wage + cheapest home + owning a vehicle, only `negotiateRaise` is live, and it caps at 2×. No late-game depth. | Small lever set; the inverted wage ladder (P9-2) kills `switchJobTo`; no aspirational sinks (savings goals, luxury, business ownership). | Phase-10 design item: add upward goals/sinks so a thriving resident still faces decisions. | **mitigated** — 10b added aspirational sinks (savings goal + luxury spend); 10f fixed the inverted ladder (P9-2) so `switchJobTo` is a live upward move again. Business ownership remains a future idea. But the sinks are unreachable in a real run — see **P10-4**. |
-| P10-1 | soak | S2 | **Money pools in businesses; residents stuck at subsistence.** Over 365d (seeds 1/7/3) businesses hold ~96% of all cash; the diner hoards $11–12k vs its $3k reserve, residents converge to ~$100 each (Gini 0.01–0.05). | Profit-distribution is flat-capped at `PROFIT_DISTRIBUTION_CAP` $900/biz/day, but storefront inflow (meals + social) outruns the cap, so surplus strands in the diner instead of recirculating. Reserves ($3k/$4.5k) sit above what residents ever re-accumulate. | Balance/design: make distribution scale with surplus (e.g. % above reserve) rather than a flat cap; and/or lower `BUSINESS_RESERVE`; and/or add a wage-pressure feedback. **Root cause** — P10-2/4/5 cascade from it. | **mitigating** (11a) — price-elastic leisure + reference-anchored pricer removes the captive-demand pump: under the product config (4 agents, 120d) business cash share fell 91%→37% and resident median rose $91→~$860. Awaits a 12-agent/365d re-soak + the 11b competitor. See the 11a checkpoint above. |
-| P10-2 | soak | S2 | **Live-game deflation to the floor.** Avg resource price 7.0 → ~3 over the run; materials & wares end pinned at base×0.4 (the floor). | The 10f reversion only pulls toward base inside the neutral band [0.3,0.6]; low resident demand (P10-1) holds producer utilization <0.3, where the explicit ×0.95 branch ratchets to the floor unopposed. P9-9's fix never engages. | Extend reversion to also pull *up* from below base when demand is structurally low, or gate the ×0.95 to not undercut a base-relative floor, or fix P10-1 (the demand root). Add a *live-config* market test (full agency) so this is caught. | open |
-| P10-3 | soak | S3 | **Labour fully concentrates at the 2 storefronts; all 4 producers run with 0 employees** yet keep producing at full capacity. | The P9-2 wage fix works but overshoots: `switchJobTo` chases the top wage, so everyone piles into diner+goods. `MarketSystem.produce()` is labour-independent, so empty producers still make full output — masking the exodus. | Labour-dependent production (output scales with staffing), and/or per-employer hiring caps, and/or a wage equilibrium so jobs don't collapse to 2 employers. Needs design. | open |
-| P10-4 | soak | S2 | **Phase-10b aspirational arc is dead in a real run:** 0 vehicles, 0 luxuries, 0 savings-goals across all 3 seeds / 365d. | The rules provider gates luxury/savings on `thriving = employed && hasVehicle`; a vehicle costs $800 but residents sit at ~$100 (P10-1), so the gate never opens — the depth we built is unreachable. | Primarily a P10-1 fix (give residents disposable income). Secondarily revisit the $800 vehicle gate / `thriving` definition so the arc can start. | open |
-| P10-5 | soak | S3 | **7–8/12 residents under chronic eviction pressure** (rentMissedDays > 0) at day 365. | Residents at ~$100 can't reliably cover rent ($50–70/day) plus meals/social. Symptom of P10-1; the safe-eviction backstop keeps them housed so no invariant breaks. | Follows P10-1. Until then, the re-home backstop is doing real work — worth confirming it never thrashes. | open |
+| P10-1 | soak | S2 | **Money pools in businesses; residents stuck at subsistence.** Over 365d (seeds 1/7/3) businesses hold ~96% of all cash; the diner hoards $11–12k vs its $3k reserve, residents converge to ~$100 each (Gini 0.01–0.05). | Profit-distribution is flat-capped at `PROFIT_DISTRIBUTION_CAP` $900/biz/day, but storefront inflow (meals + social) outruns the cap, so surplus strands in the diner instead of recirculating. Reserves ($3k/$4.5k) sit above what residents ever re-accumulate. | Balance/design: make distribution scale with surplus (e.g. % above reserve) rather than a flat cap; and/or lower `BUSINESS_RESERVE`; and/or add a wage-pressure feedback. **Root cause** — P10-2/4/5 cascade from it. | **resolved** (11a + re-soak) — the 12-agent/365d re-soak confirms it: resident median ~$100→~$780, Gini→~0, no business holds cash above its reserve. The residual ~70% business share is just locked working capital (landlord $4.5k + 4 producers ×$3k), by design. See the 11b re-soak checkpoint above. |
+| P10-2 | soak | S2 | **Live-game deflation to the floor.** Re-soak (12-agent/365d) confirms & worsens it: **all 4/4** resources end pinned at base×0.4 (was 2/4) — grain 1.6, materials 2.0, food 3.2, wares 4.4. | **Shares one root with P10-3.** Production is labour-independent, so the 4 producers ship full output with 0 staff (P10-3); that oversupply holds utilization <0.3, where the ×0.95 branch ratchets to the floor and the 10f reversion (neutral band only) never engages. *Not* a demand problem now — P10-1 is fixed and residents are rich; it's a supply glut from empty, full-output producers. | **Labour-dependent production** (output scales with staffing) is the shared fix — fewer/no staff → less output → utilization recovers off the floor. Secondarily, gate the ×0.95 to a base-relative floor. Add a live-config (full-agency) market test. | open |
+| P10-3 | soak | S3 | **Labour fully concentrates at the storefronts; all 4 producers run with 0 employees** yet keep producing at full capacity. Re-soak confirms: 4/4 producers 0-staff, all 12 workers in the 3 storefronts, both arms, every seed. | The P9-2 wage fix works but overshoots: `switchJobTo` chases the top wage, so everyone piles into the diner(s)+goods. `MarketSystem.produce()` is labour-independent, so empty producers still make full output — masking the exodus **and** gluting the B2B market (this is the P10-2 deflation root). | **Labour-dependent production** (output scales with staffing) — the shared fix with P10-2. Optionally per-employer hiring caps / a wage equilibrium so jobs don't collapse to a few employers. Needs design. | open |
+| P10-4 | soak | S2 | **Phase-10b aspirational arc is dead in a real run:** 0 vehicles, 0 luxuries, 0 savings-goals across all 3 seeds / 365d. | The rules provider gates luxury/savings on `thriving = employed && hasVehicle`; a vehicle costs $800 but residents sit at ~$100 (P10-1), so the gate never opens — the depth we built is unreachable. | Primarily a P10-1 fix (give residents disposable income). Secondarily revisit the $800 vehicle gate / `thriving` definition so the arc can start. | **resolved** (via P10-1) — re-soak shows the arc fully alive once income recovers: ~12/12 own a vehicle, ~12/12 set a savings goal, thousands of luxuries/year. No gate change needed; the P10-1 fix unlocked it for free, exactly as predicted. |
+| P10-5 | soak | S3 | **7–8/12 residents under chronic eviction pressure** (rentMissedDays > 0) at day 365. | Residents at ~$100 can't reliably cover rent ($50–70/day) plus meals/social. Symptom of P10-1; the safe-eviction backstop keeps them housed so no invariant breaks. | Follows P10-1. Until then, the re-home backstop is doing real work — worth confirming it never thrashes. | **resolved** (via P10-1) — re-soak: **0/12** under eviction pressure in both arms, every seed. With income restored the town pays its rent. |
+| P10-6 | soak | S3 | **Storefront rivalry consolidates over a full year.** Under pure rules / disasters-off, the original `biz_diner` ends at $0 and goes inactive in **all 5 seeds** by day 365; the newer `diner_2` + the goods store survive. The 90-day "truce, both survive" in `competition.test.ts` does not hold to 365 days. | Given long enough, geography + the rules pricer let one diner win the corner — a slow, deterministic shake-out, not a crash (money stays conserved; the town is *richer* for the rivalry while it lasts: resident min wealth +33% vs the no-rival arm). | **Design choice, not a bug.** Either accept realistic consolidation (one survivor) — likely fine — or, if a durable duopoly is wanted, tune the pricer/geography (e.g. a softer undercut response, or a loyalty/locality pull) so both hold. Add a long-horizon (365d) competition assertion either way. | open (decision) |
