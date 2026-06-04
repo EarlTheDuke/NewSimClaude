@@ -76,6 +76,26 @@ describe("RuleBasedProvider", () => {
     expect(d.action.setPrice).toBeGreaterThan(14);
   });
 
+  it("eases price back toward the reference after a loss above it", () => {
+    // Overpriced (30 > anchor 18) and bleeding: under elastic demand the high
+    // price is *causing* the loss (shoppers walked), so cut toward the going
+    // rate instead of chasing the loss upward into a death spiral.
+    const d = rules.decide(req({ price: 30, referencePrice: 18, dayProfit: -60 }));
+    expect(d.action.setPrice!).toBeLessThan(30);
+    expect(d.action.setPrice!).toBeCloseTo(28.5, 6); // max(18, 30*0.95)
+  });
+
+  it("never eases below the reference price (floors at the going rate)", () => {
+    // A 5% cut from 18.2 would undershoot the anchor; it floors at 18 instead.
+    const d = rules.decide(req({ price: 18.2, referencePrice: 18, dayProfit: -60 }));
+    expect(d.action.setPrice!).toBe(18);
+  });
+
+  it("still raises after a loss below the reference (headroom to mark up)", () => {
+    const d = rules.decide(req({ price: 14, referencePrice: 18, dayProfit: -60 }));
+    expect(d.action.setPrice!).toBeGreaterThan(14);
+  });
+
   it("produces when inventory runs low", () => {
     const d = rules.decide(req({ inventory: 20 }));
     expect(d.action.produce).toBeGreaterThan(0);

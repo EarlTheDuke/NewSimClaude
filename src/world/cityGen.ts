@@ -8,7 +8,7 @@ import type {
   Resident,
   WorkSchedule,
 } from "./types";
-import { RENT_PER_DAY } from "../systems/constants";
+import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE } from "../systems/constants";
 
 /**
  * Builds the default small city, deterministically from the given RNG.
@@ -81,6 +81,10 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
   const residentCount = options.residentCount ?? 12;
   const unemployed = Math.max(0, Math.min(options.unemployed ?? 0, residentCount));
   const employedCount = residentCount - unemployed;
+  // One owner per business, by resident index (Phase 10g). With the default 12
+  // residents the seven owners are res_0..res_6 (distinct); the modulo only
+  // wraps for tiny cities, so an owner id always names a resident that exists.
+  const ownerOf = (i: number) => `res_${i % Math.max(1, residentCount)}`;
   const world = new World();
   const { nodes, roads } = buildGrid();
   world.nodes = nodes;
@@ -103,13 +107,13 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
 
   const pnl = () => ({ revenue: 0, wagesPaid: 0, rentCollected: 0 });
   businesses.push(
-    { id: "biz_diner", name: dinerLoc.name, kind: "diner", locationId: dinerLoc.id, cash: 4000, inventory: 40, price: 18, employeeIds: [], wagePerTick: 0.17, pnl: pnl(), resources: { food: 0 }, active: true },
-    { id: "biz_goods", name: goodsLoc.name, kind: "goods", locationId: goodsLoc.id, cash: 4000, inventory: 20, price: 34, employeeIds: [], wagePerTick: 0.20, pnl: pnl(), resources: { wares: 0 }, active: true },
-    { id: "biz_landlord", name: landlordLoc.name, kind: "landlord", locationId: landlordLoc.id, cash: 4000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.15, pnl: pnl(), resources: {}, active: true },
-    { id: "biz_farm", name: farmLoc.name, kind: "farm", locationId: farmLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.08, pnl: pnl(), resources: { grain: 50 }, active: true },
-    { id: "biz_mine", name: mineLoc.name, kind: "mine", locationId: mineLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.05, pnl: pnl(), resources: { materials: 24 }, active: true },
-    { id: "biz_bakery", name: bakeryLoc.name, kind: "bakery", locationId: bakeryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { food: 40 }, active: true },
-    { id: "biz_factory", name: factoryLoc.name, kind: "factory", locationId: factoryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { wares: 20 }, active: true },
+    { id: "biz_diner", name: dinerLoc.name, kind: "diner", ownerId: ownerOf(0), locationId: dinerLoc.id, cash: 4000, inventory: 40, price: DINER_MEAL_PRICE, employeeIds: [], wagePerTick: 0.17, pnl: pnl(), resources: { food: 0 }, active: true },
+    { id: "biz_goods", name: goodsLoc.name, kind: "goods", ownerId: ownerOf(1), locationId: goodsLoc.id, cash: 4000, inventory: 20, price: GOODS_PRICE, employeeIds: [], wagePerTick: 0.20, pnl: pnl(), resources: { wares: 0 }, active: true },
+    { id: "biz_landlord", name: landlordLoc.name, kind: "landlord", ownerId: ownerOf(2), locationId: landlordLoc.id, cash: 4000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.15, pnl: pnl(), resources: {}, active: true },
+    { id: "biz_farm", name: farmLoc.name, kind: "farm", ownerId: ownerOf(3), locationId: farmLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.08, pnl: pnl(), resources: { grain: 50 }, active: true },
+    { id: "biz_mine", name: mineLoc.name, kind: "mine", ownerId: ownerOf(4), locationId: mineLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.05, pnl: pnl(), resources: { materials: 24 }, active: true },
+    { id: "biz_bakery", name: bakeryLoc.name, kind: "bakery", ownerId: ownerOf(5), locationId: bakeryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { food: 40 }, active: true },
+    { id: "biz_factory", name: factoryLoc.name, kind: "factory", ownerId: ownerOf(6), locationId: factoryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { wares: 20 }, active: true },
   );
 
   // --- Homes on the left/middle columns (c = 0,1) ---

@@ -3,7 +3,7 @@
  * chosen so a resident sleeps ~at night, works the day, eats once or twice,
  * and money stays in healthy circulation across the closed economy.
  */
-import type { ResourceKind, WorkSchedule } from "../world/types";
+import type { BusinessKind, ResourceKind, WorkSchedule } from "../world/types";
 
 // Daily schedule (hour of day, 0..23)
 export const SLEEP_START_HOUR = 22;
@@ -42,7 +42,36 @@ export const VEHICLE_SPEED_MULT = 1.6; // a vehicle owner covers more ground per
 // Economy
 export const RENT_PER_DAY = 70; // resident -> landlord (fallback when a home has no rent set)
 export const BUSINESS_RENT_PER_DAY = 60; // diner/goods -> landlord
-export const SOCIAL_SPEND = 8; // resident -> social venue per visit
+export const SOCIAL_SPEND = 8; // resident -> social venue per visit (flat fallback when a venue has no price)
+
+// Retail prices & price-elastic demand (Phase 11a)
+/**
+ * The "natural" retail price each storefront is seeded with — also the anchor its
+ * resident demand is measured against. A venue may move its own price off this
+ * (the setPrice lever), but elasticity is always reckoned relative to the anchor,
+ * so a price *at* the anchor reproduces the original behaviour exactly. That's the
+ * back-compat guarantee: the no-agency baseline never moves off its anchor, so it
+ * stays byte-identical.
+ */
+export const DINER_MEAL_PRICE = 18; // resident -> diner per meal
+export const GOODS_PRICE = 34; // resident -> goods store per leisure/wares purchase
+/** Per-kind anchor retail price the price-elastic *discretionary* demand model reckons against. */
+export const RETAIL_REFERENCE_PRICE: Partial<Record<BusinessKind, number>> = {
+  diner: DINER_MEAL_PRICE,
+  goods: GOODS_PRICE,
+};
+/**
+ * Spread of resident willingness-to-pay for discretionary spend (leisure), as a
+ * fraction above the anchor. Reservations fan from the anchor (a resident who'll
+ * only buy at or below it) up to anchor*(1+spread) (one who'll pay well over). So
+ * leisure demand is full at or below the anchor and falls smoothly to ~zero by
+ * anchor*(1+spread) — giving a storefront a real raise-price-lose-volume tradeoff
+ * instead of captive demand. 0.6 lines the vanishing point up with the B2B band
+ * ceiling ({@link PRICE_MAX_MULT}). Essential meal demand is left inelastic.
+ */
+export const LEISURE_PRICE_SPREAD = 0.6;
+/** Distinct willingness-to-pay tiers spread deterministically across residents. */
+export const LEISURE_TOLERANCE_TIERS = 6;
 
 // Resident agency (Phase 3)
 export const VEHICLE_COST = 800; // resident -> goods store to buy a vehicle

@@ -59,6 +59,12 @@ export interface Business {
   id: string;
   name: string;
   kind: BusinessKind;
+  /**
+   * Resident who owns the business (Phase 10g). Each day the business's
+   * profit above its working-capital reserve is paid to this resident as
+   * personal income, so profit becomes spendable money instead of pooling.
+   */
+  ownerId: string;
   /** Building the business operates from (employees commute here). */
   locationId: string;
   cash: number;

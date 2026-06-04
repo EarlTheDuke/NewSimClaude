@@ -25,6 +25,13 @@ export interface BusinessObservation {
   cash: number;
   inventory: number;
   price: number;
+  /**
+   * The "going market rate" for this storefront — the anchor that price-elastic
+   * resident demand is reckoned against. Present only for retail kinds (diner,
+   * goods); undefined for producers and the landlord. A mind can use it to tell
+   * "I'm overpriced and shedding customers" from "I have headroom to mark up."
+   */
+  referencePrice?: number;
   employeeCount: number;
   wagePerTick: number;
   /** Revenue booked during the day that just ended. */

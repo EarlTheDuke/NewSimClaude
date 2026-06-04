@@ -12,6 +12,7 @@ import type {
 } from "../ai/types";
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
+import { RETAIL_REFERENCE_PRICE } from "./constants";
 
 /** Cumulative readings captured at the previous review, to diff into day deltas. */
 interface Bookmark {
@@ -185,6 +186,7 @@ export class BusinessAgentSystem implements System {
       cash: biz.cash,
       inventory: biz.inventory,
       price: biz.price,
+      referencePrice: RETAIL_REFERENCE_PRICE[biz.kind],
       employeeCount: biz.employeeIds.length,
       wagePerTick: biz.wagePerTick,
       dayRevenue,

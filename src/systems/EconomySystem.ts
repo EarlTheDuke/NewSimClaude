@@ -2,7 +2,14 @@ import type { System, SystemContext } from "../core/types";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import type { World } from "../world/World";
 import type { Resident } from "../world/types";
-import { RENT_PER_DAY, BUSINESS_RENT_PER_DAY, SOCIAL_SPEND } from "./constants";
+import {
+  RENT_PER_DAY,
+  BUSINESS_RENT_PER_DAY,
+  SOCIAL_SPEND,
+  RETAIL_REFERENCE_PRICE,
+  LEISURE_PRICE_SPREAD,
+  LEISURE_TOLERANCE_TIERS,
+} from "./constants";
 
 /**
  * The closed money loop. Money only ever moves via World.transfer, so the
@@ -69,16 +76,36 @@ export class EconomySystem implements System {
     const venueId = this.venueForResident(resident);
     const venue = this.world.getBusiness(venueId);
     if (!venue) return;
-    // Spend the venue's own price (its goods/leisure cost), so a business's
-    // price lever is economically live. Fall back to the flat default if a
-    // venue has no price set.
-    const cost = venue.price > 0 ? venue.price : SOCIAL_SPEND;
-    const paid = this.world.transfer(resident.id, venue.id, cost);
     resident.needs.social = 100; // company lifts the spirits even when broke
+
+    // Leisure is discretionary (Phase 11a): the resident buys only when the
+    // venue's asking price sits at or below their willingness-to-pay. At or below
+    // the anchor everyone still buys (back-compat); as a venue prices above it,
+    // buyers drop out a tier at a time, so a storefront faces a real
+    // raise-price-lose-volume tradeoff instead of captive demand.
+    const cost = venue.price > 0 ? venue.price : SOCIAL_SPEND;
+    const anchor = RETAIL_REFERENCE_PRICE[venue.kind];
+    if (anchor !== undefined && cost > this.leisureReservation(resident, anchor) + 1e-9) {
+      return; // priced past this resident's reservation — they window-shop, buy nothing
+    }
+    const paid = this.world.transfer(resident.id, venue.id, cost);
     if (paid > 0) {
       venue.pnl.revenue += paid;
       if (venue.inventory > 0) venue.inventory -= 1;
     }
+  }
+
+  /**
+   * A resident's top price for one leisure purchase. Fans deterministically from
+   * the venue's anchor (tier 0 buys only at or below it) up to anchor*(1+spread)
+   * (the top tier pays well over), spread across {@link LEISURE_TOLERANCE_TIERS}
+   * tiers by resident index. No RNG, so it is stable across saves and identical
+   * for the same resident every visit.
+   */
+  private leisureReservation(resident: Resident, anchor: number): number {
+    const idx = Number(resident.id.split("_")[1] ?? 0);
+    const tier = (idx % LEISURE_TOLERANCE_TIERS) / (LEISURE_TOLERANCE_TIERS - 1);
+    return anchor * (1 + LEISURE_PRICE_SPREAD * tier);
   }
 
   private collectRent(): void {

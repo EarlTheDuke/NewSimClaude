@@ -27,11 +27,22 @@ export class RuleBasedProvider implements DecisionProvider {
     const action: BusinessAction = {};
     const notes: string[] = [];
 
-    // Price: chase profit. A loss nudges price up; a glut of cash and stock
-    // eases it down to move inventory.
+    // Price: steer toward the going market rate, not blindly upward. A losing
+    // day *above* the reference price means we've priced past what shoppers will
+    // pay and demand has fled — ease back toward the rate to win them back.
+    // *Below* the reference there's headroom, so a loss nudges price up. A glut
+    // of stock and cash always discounts to move inventory. (Producers and the
+    // landlord carry no reference price, so they keep the plain raise-on-loss
+    // rule — unchanged from before.)
+    const ref = o.referencePrice;
     if (o.dayProfit < 0) {
-      action.setPrice = o.price * 1.1;
-      notes.push("ran a loss, raising price");
+      if (ref !== undefined && o.price > ref) {
+        action.setPrice = Math.max(ref, o.price * 0.95);
+        notes.push("lost money above the market rate, easing price toward it");
+      } else {
+        action.setPrice = o.price * 1.1;
+        notes.push("ran a loss with room to spare, nudging price up");
+      }
     } else if (o.inventory > 150 && o.dayProfit > 0) {
       action.setPrice = o.price * 0.95;
       notes.push("overstocked, easing price to sell through");
