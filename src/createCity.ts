@@ -108,6 +108,7 @@ export function createCity(options: CitySimOptions = {}): {
       provider,
       options.agenticBusinessIds ?? DEFAULT_AGENTIC,
       options.limits,
+      market,
     );
     sim.addSystem(agent);
   }

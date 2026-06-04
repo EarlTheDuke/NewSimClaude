@@ -75,6 +75,13 @@ export interface CityOptions {
    * draw no wage until a business hires them. Default 0 keeps Phase 1 intact.
    */
   unemployed?: number;
+  /**
+   * Opt in to a second, rival diner (Phase 11b). Adds `biz_diner_2` — a faithful
+   * twin of the original diner under a different owner — at the bottom-right
+   * retail node, so residents choose between two food sellers on price + distance.
+   * Off by default, so every existing seed/test stays byte-identical.
+   */
+  secondDiner?: boolean;
 }
 
 export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
@@ -115,6 +122,20 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
     { id: "biz_bakery", name: bakeryLoc.name, kind: "bakery", ownerId: ownerOf(5), locationId: bakeryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { food: 40 }, active: true },
     { id: "biz_factory", name: factoryLoc.name, kind: "factory", ownerId: ownerOf(6), locationId: factoryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { wares: 20 }, active: true },
   );
+
+  // A rival diner across town (Phase 11b), co-located with the goods store at the
+  // bottom-right node — a small strip mall, just as the factory shares the mine's
+  // node. A faithful twin of biz_diner under a distinct owner: geography (top vs
+  // bottom) splits the lunch crowd and price decides the middle. Appended last so
+  // the seven core businesses keep their owners and staff; only this scenario's
+  // residents see a reshuffled job cycle. Skipped entirely (byte-identical) when off.
+  if (options.secondDiner) {
+    const diner2Loc: Location = { id: "loc_diner_2", name: "Riverside Diner", type: "workplace", nodeId: nodeId(3, 2) };
+    locations.push(diner2Loc);
+    businesses.push(
+      { id: "biz_diner_2", name: diner2Loc.name, kind: "diner", ownerId: ownerOf(7), locationId: diner2Loc.id, cash: 4000, inventory: 40, price: DINER_MEAL_PRICE, employeeIds: [], wagePerTick: 0.17, pnl: pnl(), resources: { food: 0 }, active: true },
+    );
+  }
 
   // --- Homes on the left/middle columns (c = 0,1) ---
   const homeNodes: string[] = [];

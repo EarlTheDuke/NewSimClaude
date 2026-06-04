@@ -1,7 +1,7 @@
 import type { System, SystemContext } from "../core/types";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import type { World } from "../world/World";
-import type { Resident } from "../world/types";
+import type { Business, BusinessKind, Resident } from "../world/types";
 import {
   RENT_PER_DAY,
   BUSINESS_RENT_PER_DAY,
@@ -9,6 +9,7 @@ import {
   RETAIL_REFERENCE_PRICE,
   LEISURE_PRICE_SPREAD,
   LEISURE_TOLERANCE_TIERS,
+  STORE_TRAVEL_WEIGHT,
 } from "./constants";
 
 /**
@@ -62,7 +63,7 @@ export class EconomySystem implements System {
 
   private buyMealIfEating(resident: Resident): void {
     if (resident.activity !== "eating" || resident.needs.hunger >= 100) return;
-    const diner = this.world.getBusiness("biz_diner");
+    const diner = this.storeForResident(resident, "diner");
     if (!diner) return;
     const paid = this.world.transfer(resident.id, diner.id, diner.price);
     if (paid <= 0) return; // can't afford it; stays hungry, brain will retry
@@ -73,8 +74,7 @@ export class EconomySystem implements System {
 
   private spendIfSocializing(resident: Resident): void {
     if (resident.activity !== "socializing" || resident.needs.social >= 100) return;
-    const venueId = this.venueForResident(resident);
-    const venue = this.world.getBusiness(venueId);
+    const venue = this.storeForResident(resident, "goods");
     if (!venue) return;
     resident.needs.social = 100; // company lifts the spirits even when broke
 
@@ -128,10 +128,29 @@ export class EconomySystem implements System {
     }
   }
 
-  private venueForResident(_resident: Resident): string {
-    // Leisure/shopping happens at the general goods store, so the diner anchors
-    // the food chain and the goods store anchors the wares chain — two retail
-    // venues, each driving one production chain at comparable volume.
-    return "biz_goods";
+  /**
+   * Which store of `kind` this resident shops at (Phase 11b). Among the active
+   * storefronts of that kind, the resident picks the lowest all-in cost of a
+   * visit: the asking price plus the effort of getting there (straight-line
+   * distance from home, weighted by {@link STORE_TRAVEL_WEIGHT}). So a nearer
+   * store can hold a small premium and a rival must undercut to pull its
+   * neighbours across town. With a single store of the kind (the pre-11b norm)
+   * it returns that store unchanged — the back-compat path. Deterministic (no
+   * RNG); the lowest id breaks exact ties.
+   */
+  private storeForResident(resident: Resident, kind: BusinessKind): Business | undefined {
+    const open = this.world.businesses.filter((b) => b.kind === kind && b.active);
+    if (open.length <= 1) return open[0];
+    const home = this.world.getNode(this.world.getLocation(resident.homeId).nodeId);
+    const visitCost = (b: Business): number => {
+      const node = this.world.getNode(this.world.getLocation(b.locationId).nodeId);
+      return b.price + STORE_TRAVEL_WEIGHT * Math.hypot(node.x - home.x, node.y - home.y);
+    };
+    return open.reduce((best, b) => {
+      const delta = visitCost(b) - visitCost(best);
+      if (delta < -1e-9) return b;
+      if (delta <= 1e-9 && b.id < best.id) return b; // stable tie-break by id
+      return best;
+    });
   }
 }

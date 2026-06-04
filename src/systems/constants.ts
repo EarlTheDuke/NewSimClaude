@@ -73,6 +73,19 @@ export const LEISURE_PRICE_SPREAD = 0.6;
 /** Distinct willingness-to-pay tiers spread deterministically across residents. */
 export const LEISURE_TOLERANCE_TIERS = 6;
 
+// Storefront competition (Phase 11b)
+/**
+ * How strongly travel distance weighs against price when a resident chooses which
+ * store (of the same kind) to visit. Units: dollars of "felt cost" per world-unit
+ * of straight-line distance from home. A resident shops where (price + WEIGHT *
+ * distance) is lowest, so a nearer store can hold a small premium and a rival must
+ * undercut by roughly WEIGHT * (distance gap) to poach its neighbours. At 0.03 the
+ * ~100-unit gap between the two diners is worth ~$3 of price — enough that geography
+ * splits the town at equal prices, yet a real undercut still wins customers across
+ * it. Inert when only one store of a kind exists (no choice to make).
+ */
+export const STORE_TRAVEL_WEIGHT = 0.03;
+
 // Resident agency (Phase 3)
 export const VEHICLE_COST = 800; // resident -> goods store to buy a vehicle
 export const VEHICLE_RESALE = 500; // goods store -> resident when selling back

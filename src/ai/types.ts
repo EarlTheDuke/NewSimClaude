@@ -32,6 +32,21 @@ export interface BusinessObservation {
    * "I'm overpriced and shedding customers" from "I have headroom to mark up."
    */
   referencePrice?: number;
+  /**
+   * The average asking price of the *other* active storefronts of this kind —
+   * what the competition across town charges (Phase 11b). Present only when a
+   * rival actually exists; undefined for a sole storefront, so the single-store
+   * path is unchanged. A mind uses it to tell "I'm priced above the competition
+   * and bleeding customers to them" from "I'm the only game in town."
+   */
+  rivalPrice?: number;
+  /**
+   * The marginal input cost of one sellable unit — the wholesale price this
+   * storefront pays for the one resource it turns 1:1 into inventory (a diner's
+   * `food`, a goods store's `wares`). The floor below which a sale loses money on
+   * every unit. Present only for kinds that buy an input; undefined otherwise.
+   */
+  unitCost?: number;
   employeeCount: number;
   wagePerTick: number;
   /** Revenue booked during the day that just ended. */

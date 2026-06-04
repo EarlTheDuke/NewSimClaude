@@ -27,25 +27,43 @@ export class RuleBasedProvider implements DecisionProvider {
     const action: BusinessAction = {};
     const notes: string[] = [];
 
-    // Price: steer toward the going market rate, not blindly upward. A losing
-    // day *above* the reference price means we've priced past what shoppers will
-    // pay and demand has fled — ease back toward the rate to win them back.
-    // *Below* the reference there's headroom, so a loss nudges price up. A glut
-    // of stock and cash always discounts to move inventory. (Producers and the
-    // landlord carry no reference price, so they keep the plain raise-on-loss
-    // rule — unchanged from before.)
-    const ref = o.referencePrice;
+    // Price: steer toward the going market rate, not blindly upward. The rate is
+    // whatever the competition charges if there's a rivaling storefront of this
+    // kind, else the static reference price (the pre-11b, single-store case — so
+    // with no rival this block is byte-identical to before). A losing day *above*
+    // the rate means we've priced past what shoppers will pay and demand has fled
+    // — ease back toward the rate to win them back. *Below* the rate there's
+    // headroom, so a loss nudges price up, but a rival caps the raise at parity:
+    // matching the competition lets geography split the customers (a stable truce),
+    // whereas pricing past them just hands them the volume. A glut of stock and
+    // cash always discounts to move inventory. (Producers and the landlord carry
+    // neither a reference nor a rival, so they keep the plain raise-on-loss rule.)
+    const rate = o.rivalPrice ?? o.referencePrice;
     if (o.dayProfit < 0) {
-      if (ref !== undefined && o.price > ref) {
-        action.setPrice = Math.max(ref, o.price * 0.95);
-        notes.push("lost money above the market rate, easing price toward it");
+      if (rate !== undefined && o.price > rate) {
+        action.setPrice = Math.max(rate, o.price * 0.95);
+        notes.push(
+          o.rivalPrice !== undefined
+            ? "lost money above the rival's price, easing toward it"
+            : "lost money above the market rate, easing price toward it",
+        );
       } else {
-        action.setPrice = o.price * 1.1;
+        const up = o.price * 1.1;
+        action.setPrice = o.rivalPrice !== undefined ? Math.min(up, o.rivalPrice) : up;
         notes.push("ran a loss with room to spare, nudging price up");
       }
     } else if (o.inventory > 150 && o.dayProfit > 0) {
       action.setPrice = o.price * 0.95;
       notes.push("overstocked, easing price to sell through");
+    }
+
+    // Price-war floor (Phase 11b): with a competitor in town it can be tempting to
+    // keep undercutting, but a sale below our own input cost loses money on every
+    // unit. Once a rival exists, never let the proposed price fall below unit cost
+    // — that's the discipline that stops a price war from turning self-destructive.
+    // Gated on a rival being present so the lone-storefront path stays unchanged.
+    if (action.setPrice !== undefined && o.rivalPrice !== undefined && o.unitCost !== undefined) {
+      action.setPrice = Math.max(action.setPrice, o.unitCost);
     }
 
     // Produce: restock when the shelves run low.

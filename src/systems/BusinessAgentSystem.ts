@@ -13,6 +13,8 @@ import type {
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
 import { RETAIL_REFERENCE_PRICE } from "./constants";
+import { ARCHETYPES } from "../world/archetypes";
+import type { MarketSystem } from "./MarketSystem";
 
 /** Cumulative readings captured at the previous review, to diff into day deltas. */
 interface Bookmark {
@@ -53,6 +55,13 @@ export class BusinessAgentSystem implements System {
     private readonly provider: DecisionProvider,
     private readonly agenticBusinessIds: readonly string[],
     limits: DecisionLimits = DEFAULT_LIMITS,
+    /**
+     * The B2B price book, so a storefront's review can see its own input cost
+     * (the floor its price-war discipline reads). Optional — when absent,
+     * `unitCost` is simply omitted from the observation and behaviour is
+     * unchanged, which keeps existing direct constructions working.
+     */
+    private readonly market?: MarketSystem,
   ) {
     this.limits = limits;
   }
@@ -178,6 +187,20 @@ export class BusinessAgentSystem implements System {
     const dayProfit = biz.cash - prevCash; // cash identity for non-landlords
     const dayRent = dayRevenue - dayWages - dayProfit;
 
+    // What the competing storefronts of this kind charge, averaged. Undefined
+    // when this business is the only one of its kind (the pre-11b norm), so the
+    // observation — and every mind reading it — is unchanged without a rival.
+    const rivals = this.world.businesses.filter(
+      (b) => b.kind === biz.kind && b.active && b.id !== biz.id,
+    );
+    const rivalPrice =
+      rivals.length > 0 ? rivals.reduce((s, b) => s + b.price, 0) / rivals.length : undefined;
+
+    // The wholesale price of the one input this kind turns 1:1 into a sellable
+    // unit — its marginal cost, and the floor below which a sale loses money.
+    const consumes = ARCHETYPES[biz.kind].consumes;
+    const unitCost = consumes ? this.market?.priceBook()[consumes] : undefined;
+
     return {
       businessId: biz.id,
       name: biz.name,
@@ -187,6 +210,8 @@ export class BusinessAgentSystem implements System {
       inventory: biz.inventory,
       price: biz.price,
       referencePrice: RETAIL_REFERENCE_PRICE[biz.kind],
+      rivalPrice,
+      unitCost,
       employeeCount: biz.employeeIds.length,
       wagePerTick: biz.wagePerTick,
       dayRevenue,
