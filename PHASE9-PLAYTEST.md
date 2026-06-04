@@ -166,6 +166,38 @@ while it lasts*: the rival arm's residents are richer (min wealth +33%, $554 →
 a design choice, not a bug: accept realistic consolidation (one survivor), or tune the
 pricer/geography for a durable duopoly. Logged as **P10-6** below.
 
+### Live-config probe — what the in-browser game actually runs (2026-06-04)
+
+The re-soak above made *all 12* residents agentic. The browser app (`main.ts`) does
+not: it runs **seed 1, disasters ON, and only 4 of 12 residents agentic** (res_0..3 —
+the owners of the diner, goods store, landlord, and farm). The other 8 are "NPCs":
+they work, eat, and buy essentials, but make no life decisions — they never buy a
+vehicle, set a savings goal, or buy a luxury. Reproduced headlessly (the sim is
+deterministic on the seed) at days 30/90/180/365.
+
+**Headline: in the live config the entire B2B production base goes bankrupt within a
+year.** By day 365 farm, mine, bakery, and factory are all CLOSED (cash 0, 0 staff);
+only the three storefronts + landlord survive, the original diner a zombie at $0. A
+**disasters-OFF control rules disasters out** — the producers die either way, so the
+cause is the 4-agentic setup, *not* the disasters. (Contrast: the 12-agentic re-soak
+had **zero** producer bankruptcies.)
+
+**Why:** with only four spenders, the eight NPCs hoard their wages — one ends the year
+at ~$8–9k and **none ever buys anything aspirational** (0/8 own a vehicle) — draining
+money out of the shopping circuit. Storefront revenue falls, the stores buy fewer
+inputs, and the producers — already at floor prices with 0 staff (P10-2/P10-3) — have
+no cushion and fail. In plain terms this is **P10-1 (money pooling) re-emerging, just
+relocated from businesses to passive residents.** The "P10-1 resolved" result was
+contingent on *all* residents being agentic; the shipped demo doesn't inherit it.
+
+The four agentic owners, by contrast, thrive and recirculate: ~$750 each, all own a
+vehicle, all saving, luxuries climbing 26 → 1033 over the year. Money stayed at exactly
+$34,000 the whole run — the grant disaster never rolled in seed 1, so nothing was
+minted and conservation held even with disasters on. Net: left running a year, the live
+demo decays into a town with no producers, a $0 diner, and eight cash-hoarding NPCs.
+Logged as **P10-7**. (Caveat: a deterministic reproduction assuming a hands-off tab —
+not a read of the exact running tab; God-Mode meddling or a Load would diverge it.)
+
 ---
 
 ## Issues & ideas backlog
@@ -192,3 +224,4 @@ Status: `open` → `fixed (commit)` / `wontfix (reason)`.
 | P10-4 | soak | S2 | **Phase-10b aspirational arc is dead in a real run:** 0 vehicles, 0 luxuries, 0 savings-goals across all 3 seeds / 365d. | The rules provider gates luxury/savings on `thriving = employed && hasVehicle`; a vehicle costs $800 but residents sit at ~$100 (P10-1), so the gate never opens — the depth we built is unreachable. | Primarily a P10-1 fix (give residents disposable income). Secondarily revisit the $800 vehicle gate / `thriving` definition so the arc can start. | **resolved** (via P10-1) — re-soak shows the arc fully alive once income recovers: ~12/12 own a vehicle, ~12/12 set a savings goal, thousands of luxuries/year. No gate change needed; the P10-1 fix unlocked it for free, exactly as predicted. |
 | P10-5 | soak | S3 | **7–8/12 residents under chronic eviction pressure** (rentMissedDays > 0) at day 365. | Residents at ~$100 can't reliably cover rent ($50–70/day) plus meals/social. Symptom of P10-1; the safe-eviction backstop keeps them housed so no invariant breaks. | Follows P10-1. Until then, the re-home backstop is doing real work — worth confirming it never thrashes. | **resolved** (via P10-1) — re-soak: **0/12** under eviction pressure in both arms, every seed. With income restored the town pays its rent. |
 | P10-6 | soak | S3 | **Storefront rivalry consolidates over a full year.** Under pure rules / disasters-off, the original `biz_diner` ends at $0 and goes inactive in **all 5 seeds** by day 365; the newer `diner_2` + the goods store survive. The 90-day "truce, both survive" in `competition.test.ts` does not hold to 365 days. | Given long enough, geography + the rules pricer let one diner win the corner — a slow, deterministic shake-out, not a crash (money stays conserved; the town is *richer* for the rivalry while it lasts: resident min wealth +33% vs the no-rival arm). | **Design choice, not a bug.** Either accept realistic consolidation (one survivor) — likely fine — or, if a durable duopoly is wanted, tune the pricer/geography (e.g. a softer undercut response, or a loyalty/locality pull) so both hold. Add a long-horizon (365d) competition assertion either way. | open (decision) |
+| P10-7 | live | S2 | **The shipped in-browser config (4 of 12 residents agentic, disasters on) lets the entire B2B production base — farm, mine, bakery, factory — go bankrupt within a year.** A disasters-off control reproduces the same 4 closures, ruling out disasters and isolating the 4-agentic setup as the cause. The 12-agentic re-soak had **0** producer bankruptcies. | The 8 non-agentic NPCs hoard wages (one hits ~$9k) and never spend on vehicles/luxuries (0/8), draining money from the retail circuit. Storefront revenue falls → fewer B2B input purchases → producers (already floor-priced & 0-staff per P10-2/P10-3) have no cushion and fail. This is **P10-1 pooling relocated** from businesses to passive residents; the "resolved" P10-1 result was contingent on *all* residents being agentic. | Run the live demo with all (or most) residents agentic; or give NPCs baseline aspirational spending so they don't hoard; or make producers viable at low B2B demand (ties to labour-dependent production, P10-3). | open |
