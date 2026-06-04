@@ -140,6 +140,15 @@ export const LANDLORD_RESERVE = 4500;
 export const BUSINESS_RESERVE = 3000;
 /** Max profit a single business disburses to residents per day ($). */
 export const PROFIT_DISTRIBUTION_CAP = 900;
+/**
+ * Starting productive capital for every business (Phase 12). A dimensionless
+ * index, not money: capital is quoted relative to this baseline, and the Phase
+ * 12b capacity formula is calibrated so that a business at baseline capital
+ * produces exactly today's output — making 12a a pure no-op. Above baseline,
+ * output rises with diminishing returns; capital is bought from the factory and
+ * depreciates daily.
+ */
+export const CAPITAL_BASELINE = 100;
 /** Consecutive days of unpaid rent before a resident is downgraded to a cheaper home. */
 export const EVICTION_GRACE_DAYS = 3;
 /** Days of macro vitals retained in the ring buffer (chartable history). */

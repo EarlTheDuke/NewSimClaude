@@ -84,6 +84,15 @@ export interface Business {
   active: boolean;
   /** Consecutive day-boundaries observed below the cash floor (Phase 4c). 0/absent = solvent. */
   insolventDays?: number;
+  /**
+   * Productive capital — the equipment/plant a business owns (Phase 12). Higher
+   * capital lifts output per worker; it is bought with cash from the factory and
+   * depreciates daily. Quoted relative to `CAPITAL_BASELINE` (baseline = today's
+   * output). Inert until Phase 12b wires it into production; absent on pre-12
+   * saves, read as the baseline. Never money — like `inventory` it is a non-cash
+   * quantity, so the conservation invariant is untouched.
+   */
+  capital?: number;
 }
 
 export interface ProfitAndLoss {

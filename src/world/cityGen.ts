@@ -8,7 +8,7 @@ import type {
   Resident,
   WorkSchedule,
 } from "./types";
-import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE } from "../systems/constants";
+import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE } from "../systems/constants";
 
 /**
  * Builds the default small city, deterministically from the given RNG.
@@ -114,13 +114,13 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
 
   const pnl = () => ({ revenue: 0, wagesPaid: 0, rentCollected: 0 });
   businesses.push(
-    { id: "biz_diner", name: dinerLoc.name, kind: "diner", ownerId: ownerOf(0), locationId: dinerLoc.id, cash: 4000, inventory: 40, price: DINER_MEAL_PRICE, employeeIds: [], wagePerTick: 0.17, pnl: pnl(), resources: { food: 0 }, active: true },
-    { id: "biz_goods", name: goodsLoc.name, kind: "goods", ownerId: ownerOf(1), locationId: goodsLoc.id, cash: 4000, inventory: 20, price: GOODS_PRICE, employeeIds: [], wagePerTick: 0.20, pnl: pnl(), resources: { wares: 0 }, active: true },
-    { id: "biz_landlord", name: landlordLoc.name, kind: "landlord", ownerId: ownerOf(2), locationId: landlordLoc.id, cash: 4000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.15, pnl: pnl(), resources: {}, active: true },
-    { id: "biz_farm", name: farmLoc.name, kind: "farm", ownerId: ownerOf(3), locationId: farmLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.08, pnl: pnl(), resources: { grain: 50 }, active: true },
-    { id: "biz_mine", name: mineLoc.name, kind: "mine", ownerId: ownerOf(4), locationId: mineLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.05, pnl: pnl(), resources: { materials: 24 }, active: true },
-    { id: "biz_bakery", name: bakeryLoc.name, kind: "bakery", ownerId: ownerOf(5), locationId: bakeryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { food: 40 }, active: true },
-    { id: "biz_factory", name: factoryLoc.name, kind: "factory", ownerId: ownerOf(6), locationId: factoryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { wares: 20 }, active: true },
+    { id: "biz_diner", name: dinerLoc.name, kind: "diner", ownerId: ownerOf(0), locationId: dinerLoc.id, cash: 4000, inventory: 40, price: DINER_MEAL_PRICE, employeeIds: [], wagePerTick: 0.17, pnl: pnl(), resources: { food: 0 }, active: true, capital: CAPITAL_BASELINE },
+    { id: "biz_goods", name: goodsLoc.name, kind: "goods", ownerId: ownerOf(1), locationId: goodsLoc.id, cash: 4000, inventory: 20, price: GOODS_PRICE, employeeIds: [], wagePerTick: 0.20, pnl: pnl(), resources: { wares: 0 }, active: true, capital: CAPITAL_BASELINE },
+    { id: "biz_landlord", name: landlordLoc.name, kind: "landlord", ownerId: ownerOf(2), locationId: landlordLoc.id, cash: 4000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.15, pnl: pnl(), resources: {}, active: true, capital: CAPITAL_BASELINE },
+    { id: "biz_farm", name: farmLoc.name, kind: "farm", ownerId: ownerOf(3), locationId: farmLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.08, pnl: pnl(), resources: { grain: 50 }, active: true, capital: CAPITAL_BASELINE },
+    { id: "biz_mine", name: mineLoc.name, kind: "mine", ownerId: ownerOf(4), locationId: mineLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.05, pnl: pnl(), resources: { materials: 24 }, active: true, capital: CAPITAL_BASELINE },
+    { id: "biz_bakery", name: bakeryLoc.name, kind: "bakery", ownerId: ownerOf(5), locationId: bakeryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { food: 40 }, active: true, capital: CAPITAL_BASELINE },
+    { id: "biz_factory", name: factoryLoc.name, kind: "factory", ownerId: ownerOf(6), locationId: factoryLoc.id, cash: 3000, inventory: 0, price: 0, employeeIds: [], wagePerTick: 0.10, pnl: pnl(), resources: { wares: 20 }, active: true, capital: CAPITAL_BASELINE },
   );
 
   // A rival diner across town (Phase 11b), co-located with the goods store at the
@@ -133,7 +133,7 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
     const diner2Loc: Location = { id: "loc_diner_2", name: "Riverside Diner", type: "workplace", nodeId: nodeId(3, 2) };
     locations.push(diner2Loc);
     businesses.push(
-      { id: "biz_diner_2", name: diner2Loc.name, kind: "diner", ownerId: ownerOf(7), locationId: diner2Loc.id, cash: 4000, inventory: 40, price: DINER_MEAL_PRICE, employeeIds: [], wagePerTick: 0.17, pnl: pnl(), resources: { food: 0 }, active: true },
+      { id: "biz_diner_2", name: diner2Loc.name, kind: "diner", ownerId: ownerOf(7), locationId: diner2Loc.id, cash: 4000, inventory: 40, price: DINER_MEAL_PRICE, employeeIds: [], wagePerTick: 0.17, pnl: pnl(), resources: { food: 0 }, active: true, capital: CAPITAL_BASELINE },
     );
   }
 
