@@ -1,5 +1,5 @@
 import type { World } from "../world/World";
-import type { Activity, BusinessKind, Business, Resident } from "../world/types";
+import type { Activity, BusinessKind, Business, Resident, Location } from "../world/types";
 import type { DisasterKind } from "../systems/disasters";
 import { skyColor, ambient, windowGlow, dim, hexToRgb, type Rgb } from "./daynight";
 
@@ -33,6 +33,8 @@ const LABEL_RGB: Rgb = [174, 180, 189];
 
 const BUILDING = 26;
 const DOT_RADIUS = 5;
+/** Horizontal fan-out for buildings that share one map node (a strip mall). */
+const COLOCATE_DX = 34;
 
 /** Per-kind glyph + accent colour for the on-canvas disaster marker. */
 const DISASTER_STYLE: Record<DisasterKind, { color: string; glyph: string }> = {
@@ -99,14 +101,14 @@ export class CanvasRenderer {
     ctx.font = "10px system-ui, sans-serif";
     ctx.textAlign = "center";
     for (const loc of world.locations) {
-      const node = world.getNode(loc.nodeId);
+      const slot = this.buildingSlot(loc);
       const biz = world.businesses.find((b) => b.locationId === loc.id);
-      this.drawBuilding(node.x, node.y, biz, this.occupantsAt(loc.nodeId), a, glow);
+      this.drawBuilding(slot.x, slot.y, biz, this.occupantsAt(loc.nodeId), a, glow);
       if (biz && selected?.kind === "business" && selected.id === biz.id) {
-        this.outlineBuilding(node.x, node.y);
+        this.outlineBuilding(slot.x, slot.y);
       }
       ctx.fillStyle = dim(LABEL_RGB, Math.max(a, 0.7));
-      ctx.fillText(loc.name, node.x, node.y + BUILDING / 2 + 11);
+      ctx.fillText(loc.name, slot.x, slot.y + BUILDING / 2 + 11 + slot.line * 11);
     }
 
     // Residents — colour by activity, with shadow, heading tick, selection glow.
@@ -249,6 +251,23 @@ export class CanvasRenderer {
     return n;
   }
 
+  /**
+   * Where a building actually paints. Most nodes hold one building, which sits
+   * dead-centre on its node (dx = 0) exactly as before. When two businesses
+   * share a node — the strip mall (Maker Goods + Riverside Diner) or the
+   * factory/mine pair — they fan apart horizontally so both are visible and
+   * separately clickable, and the slot index stacks their labels so the names
+   * don't overprint. Render-only: the node itself is untouched, so every
+   * distance and all the economics are exactly as before.
+   */
+  private buildingSlot(loc: Location): { x: number; y: number; line: number } {
+    const node = this.world.getNode(loc.nodeId);
+    const siblings = this.world.locations.filter((l) => l.nodeId === loc.nodeId);
+    const i = siblings.indexOf(loc);
+    const dx = (i - (siblings.length - 1) / 2) * COLOCATE_DX;
+    return { x: node.x + dx, y: node.y, line: i };
+  }
+
   private drawBuilding(
     cx: number,
     cy: number,
@@ -359,8 +378,8 @@ export class CanvasRenderer {
     if (biz) {
       const loc = this.world.locations.find((l) => l.id === biz.locationId);
       if (loc) {
-        const node = this.world.getNode(loc.nodeId);
-        return { x: node.x, y: node.y };
+        const slot = this.buildingSlot(loc);
+        return { x: slot.x, y: slot.y };
       }
     }
     const res = this.world.residents.find((r) => r.id === targetId);
@@ -404,9 +423,9 @@ export class CanvasRenderer {
     if (best) return { kind: "resident", id: best.id };
 
     for (const loc of world.locations) {
-      const node = world.getNode(loc.nodeId);
+      const slot = this.buildingSlot(loc);
       const half = BUILDING / 2;
-      if (Math.abs(node.x - x) <= half && Math.abs(node.y - y) <= half) {
+      if (Math.abs(slot.x - x) <= half && Math.abs(slot.y - y) <= half) {
         const biz = world.businesses.find((b) => b.locationId === loc.id);
         if (biz) return { kind: "business", id: biz.id };
       }

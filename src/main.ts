@@ -31,11 +31,17 @@ const brain: BrainOption = "rules";
 const residentBrain: ResidentBrainOption = "rules";
 const agenticResidentIds = ["res_0", "res_1", "res_2", "res_3"];
 
+// A rival diner across town (Phase 11b): residents now choose between two food
+// sellers on price + distance, and both re-price under the brain — so the live
+// city shows storefront competition, not just a lone monopolist. The newcomer
+// shares the goods store's node (a strip mall) at the bottom-right.
 const { sim, world, market, macro, agent, residentAgent, events, god } = createCity({
   seed: 1,
   brain,
   residentBrain,
   agenticResidentIds,
+  agenticBusinessIds: ["biz_diner", "biz_diner_2", "biz_goods"],
+  secondDiner: true,
   disasters: true,
 });
 
