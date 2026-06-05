@@ -219,6 +219,13 @@ export class BusinessAgentSystem implements System {
       dayRent,
       dayProfit,
       unemployedCount: this.world.residents.filter((r) => r.jobId === "").length,
+      // Phase 12c — surface the two signals the invest lever reads: how much
+      // equipment this firm owns, and how hard it ran yesterday relative to
+      // what that equipment + staffing allowed. Both are undefined-safe: a
+      // pre-12 save has no capital field, and the landlord/an unstaffed firm
+      // has no utilization reading.
+      capital: biz.capital,
+      capacityUtilization: this.market?.capacityUtilizationFor(biz.id),
     };
   }
 

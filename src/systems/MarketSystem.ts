@@ -41,6 +41,16 @@ const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
 export class MarketSystem implements System {
   readonly id = "market";
   private readonly prices: Record<ResourceKind, number> = { ...BASE_RESOURCE_PRICE };
+  /**
+   * Phase 12c — how hard each business worked yesterday, as `make / capacity`
+   * in 0..1. Only populated for kinds that go through a production path (any
+   * archetype with `produces` set, i.e. everyone except the landlord) and only
+   * when capacity was positive that day. A business at ~1.0 produced every unit
+   * it could; investing in capital would lift its ceiling. Below ~1.0 it was
+   * limited by demand or input, and more equipment is dead weight. Ephemeral —
+   * recomputed each {@link produce} run, not part of the snapshot.
+   */
+  private readonly lastUtilization = new Map<string, number>();
 
   constructor(private readonly world: World) {}
 
@@ -58,6 +68,17 @@ export class MarketSystem implements System {
   /** Live resource price book — newest values. */
   priceBook(): Readonly<Record<ResourceKind, number>> {
     return this.prices;
+  }
+
+  /**
+   * Phase 12c — yesterday's capacity utilization for a business in 0..1, or
+   * undefined for kinds that don't produce (landlord) or businesses that had
+   * zero effective capacity (e.g. fully unstaffed). Read by
+   * {@link BusinessAgentSystem} to drive the invest decision: high utilization
+   * means more equipment would pay off, low means it wouldn't.
+   */
+  capacityUtilizationFor(bizId: string): number | undefined {
+    return this.lastUtilization.get(bizId);
   }
 
   /**
@@ -142,19 +163,35 @@ export class MarketSystem implements System {
       // unchanged; an empty producer makes nothing.
       const capacity = this.effectiveCapacity(biz);
 
+      let make = 0;
       if (a.produces && !a.consumes) {
         // Primary producer: make its resource from nothing, refilling to target.
         const stock = biz.resources[a.produces] ?? 0;
-        const make = Math.min(capacity, Math.max(0, a.target - stock));
+        make = Math.min(capacity, Math.max(0, a.target - stock));
         if (make > 0) biz.resources[a.produces] = stock + make;
       } else if (a.consumes) {
         const outStock = a.sellsToResidents ? biz.inventory : biz.resources[a.produces!] ?? 0;
         const have = biz.resources[a.consumes] ?? 0;
-        const make = Math.min(capacity, Math.max(0, a.target - outStock), have);
-        if (make <= 0) continue;
-        biz.resources[a.consumes] = have - make;
-        if (a.sellsToResidents) biz.inventory += make;
-        else biz.resources[a.produces!] = outStock + make;
+        make = Math.min(capacity, Math.max(0, a.target - outStock), have);
+        if (make > 0) {
+          biz.resources[a.consumes] = have - make;
+          if (a.sellsToResidents) biz.inventory += make;
+          else biz.resources[a.produces!] = outStock + make;
+        }
+      } else {
+        // Not a producer (landlord) — no utilization to record.
+        continue;
+      }
+
+      // Record how hard this business ran versus its effective capacity (Phase
+      // 12c). At ~1.0 the firm is capacity-bound and would benefit from more
+      // equipment; below ~1.0 it was limited by demand or input. Skip when
+      // capacity is zero (e.g. fully unstaffed): the ratio is undefined and
+      // "no workers" is a staffing problem, not a capital one.
+      if (capacity > 0) {
+        this.lastUtilization.set(biz.id, make / capacity);
+      } else {
+        this.lastUtilization.delete(biz.id);
       }
     }
   }
@@ -248,6 +285,10 @@ export class MarketSystem implements System {
       const v = s?.prices?.[res];
       this.prices[res] = typeof v === "number" ? v : BASE_RESOURCE_PRICE[res];
     }
+    // Utilization is derived, not persisted; wipe any stale readings from a
+    // prior run so the first review after restore reports undefined until
+    // produce() refills it.
+    this.lastUtilization.clear();
   }
 }
 

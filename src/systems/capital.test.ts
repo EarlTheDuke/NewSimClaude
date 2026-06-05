@@ -3,6 +3,24 @@ import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "../utils/serialization";
 import { CAPITAL_BASELINE } from "./constants";
+import type { BusinessObservation, DecisionProvider } from "../ai/types";
+
+/**
+ * Tiny test-only provider: captures the observation the brain receives and
+ * returns a no-op decision. Lets a test assert on what the agent layer surfaces
+ * without coupling to any real provider's pricing/hiring logic.
+ */
+function captureProvider(): { provider: DecisionProvider; seen: BusinessObservation[] } {
+  const seen: BusinessObservation[] = [];
+  const provider: DecisionProvider = {
+    id: "capture",
+    decide(req) {
+      seen.push(req.observation);
+      return { action: {}, reason: "capture" };
+    },
+  };
+  return { provider, seen };
+}
 
 /**
  * Phase 12a — the capital data model in isolation.
@@ -107,5 +125,66 @@ describe("Phase 12b — production responds to labour & capital", () => {
     sim.run(TICKS_PER_DAY);
     expect(farm.resources.grain!).toBeGreaterThan(0);
     expect(farm.resources.grain!).toBeLessThan(50);
+  });
+});
+
+/**
+ * Phase 12c step 2 — the agent's observation now carries the two signals the
+ * invest lever will read: `capital` (how much equipment the firm owns) and
+ * `capacityUtilization` (how hard it ran yesterday against its effective ceiling).
+ * Nothing acts on them yet — that arrives in 12c step 3 — but these tests pin
+ * the metric semantics so the wiring underneath the invest decision is locked.
+ */
+describe("Phase 12c step 2 — observations surface capital + utilization", () => {
+  it("a staffed producer's observation carries baseline capital and a defined utilization in [0,1]", () => {
+    const { provider, seen } = captureProvider();
+    const { sim } = createCity({ seed: 1, brain: provider, agenticBusinessIds: ["biz_farm"] });
+    sim.run(TICKS_PER_DAY);
+    expect(seen).toHaveLength(1);
+    const obs = seen[0]!;
+    expect(obs.capital).toBe(CAPITAL_BASELINE);
+    expect(obs.capacityUtilization).toBeDefined();
+    expect(obs.capacityUtilization!).toBeGreaterThanOrEqual(0);
+    expect(obs.capacityUtilization!).toBeLessThanOrEqual(1);
+  });
+
+  it("a capacity-bound producer (capital-starved) reports utilization at the ceiling (≈1)", () => {
+    const { provider, seen } = captureProvider();
+    const { sim, world } = createCity({ seed: 1, brain: provider, agenticBusinessIds: ["biz_farm"] });
+    const farm = world.getBusiness("biz_farm")!;
+    // Crater capital to a level so low the capacity formula falls well below
+    // the daily refill target — the produce step will hit the capacity cap, not
+    // the target cap. That's exactly the "needs more equipment" signal the
+    // rules provider will key off in step 3.
+    farm.capital = 1;
+    farm.resources.grain = 0;
+    sim.run(TICKS_PER_DAY);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.capacityUtilization!).toBeCloseTo(1, 3);
+  });
+
+  it("an unstaffed producer reports undefined utilization (capacity is zero, not a capital problem)", () => {
+    const { provider, seen } = captureProvider();
+    const { sim, world } = createCity({ seed: 1, brain: provider, agenticBusinessIds: ["biz_farm"] });
+    const farm = world.getBusiness("biz_farm")!;
+    for (const r of world.residents)
+      if (r.jobId === "biz_farm") {
+        r.jobId = "";
+        r.wagePerTick = 0;
+      }
+    farm.employeeIds = [];
+    sim.run(TICKS_PER_DAY);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.capacityUtilization).toBeUndefined();
+  });
+
+  it("the landlord (a non-producer) reports undefined utilization", () => {
+    const { provider, seen } = captureProvider();
+    const { sim } = createCity({ seed: 1, brain: provider, agenticBusinessIds: ["biz_landlord"] });
+    sim.run(TICKS_PER_DAY);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.capacityUtilization).toBeUndefined();
+    // Landlord still has capital seeded by 12a; only utilization is missing.
+    expect(seen[0]!.capital).toBe(CAPITAL_BASELINE);
   });
 });
