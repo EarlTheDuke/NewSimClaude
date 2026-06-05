@@ -160,6 +160,15 @@ export const INVEST_MIN_SURPLUS = 200;
  */
 export const INVEST_UTILIZATION_THRESHOLD = 0.45;
 /**
+ * Phase 14 — whether a business's stock target scales with its capital (see
+ * {@link MarketSystem}'s effectiveTarget). OFF here: the 14a seam ships as a pure
+ * no-op (effectiveTarget = the archetype target). Turned ON in 14c, paired with
+ * the maxPerDay cut, so a re-capitalised firm holds a deeper buffer and the
+ * invest loop stays live (target and capacity scale by the same factor, keeping
+ * utilization invariant to capital) instead of self-extinguishing.
+ */
+export const TARGET_CAPITAL_SCALING = false;
+/**
  * Starting productive capital for every business (Phase 12). A dimensionless
  * index, not money: capital is quoted relative to this baseline, and the Phase
  * 12b capacity formula is calibrated so that a business at baseline capital

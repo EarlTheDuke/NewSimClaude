@@ -14,6 +14,7 @@ import {
   CAPITAL_OUTPUT_ELASTICITY,
   CAPITAL_DEPRECIATION_RATE,
   LABOR_FULL_STAFF,
+  TARGET_CAPITAL_SCALING,
 } from "./constants";
 
 const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
@@ -104,7 +105,7 @@ export class MarketSystem implements System {
       // it can actually process today (its labour-/capital-limited capacity), so
       // an understaffed buyer doesn't stockpile input it can't turn into output.
       const outStock = a.sellsToResidents ? biz.inventory : biz.resources[a.produces!] ?? 0;
-      const deficit = Math.min(this.effectiveCapacity(biz), Math.max(0, a.target - outStock));
+      const deficit = Math.min(this.effectiveCapacity(biz), Math.max(0, this.effectiveTarget(biz) - outStock));
       const want = Math.max(0, deficit - (biz.resources[input] ?? 0));
       if (want <= 0) continue;
 
@@ -140,12 +141,12 @@ export class MarketSystem implements System {
       if (a.produces && !a.consumes) {
         // Primary producer: make its resource from nothing, refilling to target.
         const stock = biz.resources[a.produces] ?? 0;
-        make = Math.min(capacity, Math.max(0, a.target - stock));
+        make = Math.min(capacity, Math.max(0, this.effectiveTarget(biz) - stock));
         if (make > 0) biz.resources[a.produces] = stock + make;
       } else if (a.consumes) {
         const outStock = a.sellsToResidents ? biz.inventory : biz.resources[a.produces!] ?? 0;
         const have = biz.resources[a.consumes] ?? 0;
-        make = Math.min(capacity, Math.max(0, a.target - outStock), have);
+        make = Math.min(capacity, Math.max(0, this.effectiveTarget(biz) - outStock), have);
         if (make > 0) {
           biz.resources[a.consumes] = have - make;
           if (a.sellsToResidents) biz.inventory += make;
@@ -190,9 +191,33 @@ export class MarketSystem implements System {
     const max = ARCHETYPES[biz.kind].maxPerDay;
     if (max <= 0) return 0;
     const laborFactor = Math.min(1, biz.employeeIds.length / LABOR_FULL_STAFF);
+    return Math.floor(max * laborFactor * this.capitalFactor(biz));
+  }
+
+  /**
+   * The Cobb-Douglas capital multiplier shared by capacity and the stock target
+   * (Phase 14): `(capital / baseline) ^ elasticity`, exactly 1 at
+   * {@link CAPITAL_BASELINE}. Below-baseline capital yields a factor < 1.
+   */
+  private capitalFactor(biz: Business): number {
     const capital = biz.capital ?? CAPITAL_BASELINE;
-    const capitalFactor = Math.pow(capital / CAPITAL_BASELINE, CAPITAL_OUTPUT_ELASTICITY);
-    return Math.floor(max * laborFactor * capitalFactor);
+    return Math.pow(capital / CAPITAL_BASELINE, CAPITAL_OUTPUT_ELASTICITY);
+  }
+
+  /**
+   * A business's desired output stock level. With {@link TARGET_CAPITAL_SCALING}
+   * off (Phase 14a) this is exactly the archetype `target` — a pure no-op. On
+   * (14c) it scales the buffer up with capital by the SAME {@link capitalFactor}
+   * that capacity uses, so target and capacity move in lock-step: utilization
+   * (`make / capacity`) stays invariant to capital, so the invest loop is
+   * demand-driven, not self-driven. Floored at the baseline target — capital
+   * scaling can only deepen the buffer, never shrink a storefront's survival
+   * stock. Integer and deterministic.
+   */
+  private effectiveTarget(biz: Business): number {
+    const target = ARCHETYPES[biz.kind].target;
+    if (!TARGET_CAPITAL_SCALING) return target;
+    return Math.floor(target * Math.max(1, this.capitalFactor(biz)));
   }
 
   /**
