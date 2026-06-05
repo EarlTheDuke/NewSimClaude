@@ -111,6 +111,22 @@ export const PRICE_MAX_MULT = 1.6;
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;
 /**
+ * The utilization neutral band the pricer treats as "balanced" (Phase 14). Above
+ * {@link PRICE_UTIL_HIGH} a producer is over-worked → price nudges up; below
+ * {@link PRICE_UTIL_LOW} it's slack → price nudges down; in between, price drifts
+ * back to base. The band was [0.3, 0.6] when the chain ran at ~0.4 utilization;
+ * the Phase 14 capacity cut moves the operating point to ~0.75–0.85, so the band
+ * is recentred there — otherwise the now-hotter (but healthy) utilization would
+ * read as "over-worked" and firm every input price above base, squeezing
+ * storefront margins. The band is widened/raised (not just shifted): the LOW edge
+ * stays at 0.3 so a quiet, leisure-light chain (~0.55 util at neutral demand)
+ * doesn't deflate to the floor, while the HIGH edge rises to 0.92 so the new
+ * ~0.6–0.85 operating range reads as balanced and prices only firm on genuine
+ * near-stockout scarcity (util > 0.92).
+ */
+export const PRICE_UTIL_HIGH = 0.92;
+export const PRICE_UTIL_LOW = 0.3;
+/**
  * Restoring force (Phase 10f, fixes P9-9). When a resource's utilization sits in
  * the neutral band — neither over- nor under-worked — its price drifts this
  * fraction of the way back toward base each day. Without it the price has no

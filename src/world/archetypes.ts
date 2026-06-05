@@ -23,19 +23,24 @@ export interface Archetype {
   maxPerDay: number;
 }
 
-// maxPerDay is right-sized so each chain's real daily throughput (food chain
-// ~26 units/day, wares chain ~12 units/day) lands inside the pricing model's
-// neutral band — prices settle near base instead of pinning to a bound. target
-// is the small output buffer each business refills toward; kept lean so the
-// chain procures steadily every day (smooth utilization = stable prices) rather
-// than in lumpy bursts off a large stockpile.
+// Phase 14: maxPerDay is sized TIGHT — just above each chain's real daily
+// drawdown — so steady-state utilization runs ~0.85 and demand presses against
+// capacity. That's what makes investment productive: as wealth-elastic demand
+// grows, capacity binds and a firm reinvests to chase it (the Solow engine). The
+// pre-14 calibration left ~75% slack (util ~0.4), so investing was pointless and
+// the invest lever self-extinguished. `target` is the inventory buffer (≥ peak
+// demand and ≥ maxPerDay) so a busy day doesn't empty the shelves; storefronts
+// are the tightest link so they bind — and fund investment — first, and the chain
+// then deepens demand-end-backward. These numbers are calibrated empirically
+// (14a probe) and validated in the soak; capacity is the only thing the invest
+// lever raises, so prices read utilization against effectiveCapacity, not maxPerDay.
 export const ARCHETYPES: Record<BusinessKind, Archetype> = {
-  farm: { produces: "grain", sellsToResidents: false, target: 50, maxPerDay: 50 },
-  mine: { produces: "materials", sellsToResidents: false, target: 24, maxPerDay: 24 },
-  bakery: { consumes: "grain", produces: "food", sellsToResidents: false, target: 40, maxPerDay: 45 },
-  factory: { consumes: "materials", produces: "wares", sellsToResidents: false, target: 20, maxPerDay: 24 },
-  diner: { consumes: "food", sellsToResidents: true, target: 40, maxPerDay: 45 },
-  goods: { consumes: "wares", sellsToResidents: true, target: 20, maxPerDay: 24 },
+  farm: { produces: "grain", sellsToResidents: false, target: 50, maxPerDay: 36 },
+  mine: { produces: "materials", sellsToResidents: false, target: 24, maxPerDay: 22 },
+  bakery: { consumes: "grain", produces: "food", sellsToResidents: false, target: 40, maxPerDay: 35 },
+  factory: { consumes: "materials", produces: "wares", sellsToResidents: false, target: 24, maxPerDay: 22 },
+  diner: { consumes: "food", sellsToResidents: true, target: 40, maxPerDay: 34 },
+  goods: { consumes: "wares", sellsToResidents: true, target: 24, maxPerDay: 21 },
   landlord: { sellsToResidents: false, target: 0, maxPerDay: 0 },
 };
 

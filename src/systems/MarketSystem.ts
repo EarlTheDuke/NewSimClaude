@@ -8,6 +8,8 @@ import {
   PRICE_MIN_MULT,
   PRICE_MAX_MULT,
   PRICE_ADJUST_FRACTION,
+  PRICE_UTIL_HIGH,
+  PRICE_UTIL_LOW,
   PRICE_REVERT_FRACTION,
   PRICE_REVERT_SNAP,
   CAPITAL_BASELINE,
@@ -261,9 +263,9 @@ export class MarketSystem implements System {
       const utilization = cap > 0 ? sold[res] / cap : 0;
       const base = BASE_RESOURCE_PRICE[res];
       let p = this.prices[res];
-      if (utilization > 0.6) {
+      if (utilization > PRICE_UTIL_HIGH) {
         p *= 1 + PRICE_ADJUST_FRACTION;
-      } else if (utilization < 0.3) {
+      } else if (utilization < PRICE_UTIL_LOW) {
         p *= 1 - PRICE_ADJUST_FRACTION;
       } else {
         p += (base - p) * PRICE_REVERT_FRACTION;
