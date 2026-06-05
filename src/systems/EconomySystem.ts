@@ -27,7 +27,16 @@ import {
  */
 export class EconomySystem implements System {
   readonly id = "economy";
-  constructor(private readonly world: World) {}
+  /**
+   * @param wealthElasticity how strongly consumption grows with wealth (Phase
+   * 13). Defaults to the live-game {@link WEALTH_ELASTICITY}; the CEO benchmark
+   * injects its own frozen value so its scores don't drift when the live knob is
+   * tuned in 13c.
+   */
+  constructor(
+    private readonly world: World,
+    private readonly wealthElasticity: number = WEALTH_ELASTICITY,
+  ) {}
 
   update(ctx: SystemContext): void {
     for (const resident of this.world.residents) {
@@ -74,7 +83,7 @@ export class EconomySystem implements System {
     // as before. Each unit is its own transfer, so the loop simply stops when the
     // resident runs out of cash or the diner runs out of stock; over-ordering is
     // structurally impossible.
-    const units = consumptionUnits(resident);
+    const units = consumptionUnits(resident, this.wealthElasticity);
     for (let k = 0; k < units; k++) {
       const paid = this.world.transfer(resident.id, diner.id, diner.price);
       if (paid <= 0) break; // can't afford the next one; stays hungry, brain will retry
@@ -99,7 +108,7 @@ export class EconomySystem implements System {
     // resident buys more units in the visit (Phase 13) — each its own transfer,
     // gated identically; at baseline wealth (or keystone off) it is one unit, so
     // the body below runs exactly once, byte-identical to before.
-    const units = consumptionUnits(resident);
+    const units = consumptionUnits(resident, this.wealthElasticity);
     for (let k = 0; k < units; k++) {
       const cost = venue.price > 0 ? venue.price : SOCIAL_SPEND;
       const anchor = RETAIL_REFERENCE_PRICE[venue.kind];

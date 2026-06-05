@@ -220,8 +220,13 @@ export const WEALTH_BASELINE = 500;
  * exactly one unit per visit, exactly like today, so Phase 13a ships as a pure
  * no-op. Raised toward ~1.0 in 13b, where a resident sitting on twice the
  * baseline (~$1000) then orders ~twice as much per visit.
+ *
+ * Phase 13b: engaged at 1.0 (linear) — the keystone is ON. A resident's order
+ * scales with how far their cash sits above subsistence, capped at
+ * {@link WEALTH_DEMAND_CAP}. 13c will likely temper this toward ~0.5
+ * (diminishing returns) once the soak shows how hard the rich tail pushes GDP.
  */
-export const WEALTH_ELASTICITY = 0;
+export const WEALTH_ELASTICITY = 1;
 /**
  * Hard ceiling on units bought in a single visit, so one runaway-rich resident
  * can't drain a storefront's shelves in a single tick. Bounds the blast radius.
@@ -242,3 +247,12 @@ export const WEALTH_ROUND_TIERS = 6;
 export const BENCH_START_CAPITAL = 50_000;
 /** Fixed-length scenario horizon: how many turns (sim-days) a CEO run lasts. */
 export const BENCH_TURNS = 42;
+/**
+ * The wealth-elasticity the CEO benchmark runs at — frozen *separately* from the
+ * live-game {@link WEALTH_ELASTICITY} so re-tuning the city-wide knob (13c) never
+ * silently moves historical CEO scores. The benchmark wants this ON: a CEO who
+ * keeps residents employed and recirculates dividends lifts their wealth above
+ * the baseline, which raises their orders and makes the storefront capacity-
+ * bound — so good stewardship shows up as a cleaner net-worth gap.
+ */
+export const BENCH_WEALTH_ELASTICITY = 1;

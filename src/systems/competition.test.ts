@@ -77,7 +77,12 @@ describe("Phase 11b storefront competition", () => {
   // --- Where the town shops: price + distance (brain off, prices fixed) ----
   describe("customers split on price and distance", () => {
     function twoDiners(diner2Price: number, days = 30) {
-      const { sim, world } = createCity({ seed: 1, secondDiner: true }); // brain off: prices stay put
+      // wealthElasticity 0: these tests measure how geography + price split a
+      // FIXED pool of food demand. With wealth-elastic demand on, a price cut
+      // leaves residents richer and they buy more — a real effect, but one that
+      // confounds the price-inelasticity claim, so it is exercised separately in
+      // elasticity.test (Phase 13b). Here we hold demand neutral.
+      const { sim, world } = createCity({ seed: 1, secondDiner: true, wealthElasticity: 0 }); // brain off
       world.getBusiness("biz_diner_2")!.price = diner2Price;
       sim.run(TICKS_PER_DAY * days);
       return { d1: world.getBusiness("biz_diner")!, d2: world.getBusiness("biz_diner_2")! };
@@ -98,7 +103,7 @@ describe("Phase 11b storefront competition", () => {
       expect(meals(d2)).toBeGreaterThan(meals(d1));
     });
 
-    it("total meals are unchanged by the split — demand for food is inelastic", () => {
+    it("total meals are unchanged by the split — demand for food is price-inelastic", () => {
       const even = twoDiners(DINER_MEAL_PRICE);
       const cut = twoDiners(16);
       const totalEven = meals(even.d1) + meals(even.d2);

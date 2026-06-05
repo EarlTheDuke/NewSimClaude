@@ -115,7 +115,11 @@ describe("MarketSystem (Phase 4 B2B layer)", () => {
       // snaps to it, instead of freezing wherever an early-ramp transient left
       // it — the old bug that ran the city at a persistent low-grade deflation.
       for (const seed of [1, 2, 7]) {
-        const { sim, market } = createCity({ seed });
+        // Pin demand neutral (keystone off): P9-9 is about the price *restoring
+        // force*, which is orthogonal to wealth-elastic demand. With the knob on,
+        // higher demand legitimately firms prices above base (covered separately
+        // in elasticity.test) — that would mask the reversion mechanism here.
+        const { sim, market } = createCity({ seed, wealthElasticity: 0 });
         sim.run(TICKS_PER_DAY * 120);
         for (const r of RESOURCES) {
           expect(market.priceBook()[r]).toBeCloseTo(BASE_RESOURCE_PRICE[r], 6);

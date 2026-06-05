@@ -22,7 +22,7 @@
  */
 import { createCity, type BrainOption } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
-import { BENCH_START_CAPITAL, BENCH_TURNS } from "../systems/constants";
+import { BENCH_START_CAPITAL, BENCH_TURNS, BENCH_WEALTH_ELASTICITY } from "../systems/constants";
 
 export interface CeoBenchConfig {
   seed: number;
@@ -95,6 +95,9 @@ function setupScenario(config: CeoBenchConfig): {
     brain: config.brain,
     agenticBusinessIds: [targetId],
     disasters: config.disasters ?? false,
+    // Freeze the benchmark's demand elasticity so live-knob tuning (13c) never
+    // drifts historical CEO scores.
+    wealthElasticity: BENCH_WEALTH_ELASTICITY,
   });
 
   const ceo = world.getBusiness(targetId);

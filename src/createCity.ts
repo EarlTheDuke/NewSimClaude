@@ -50,6 +50,13 @@ export interface CitySimOptions extends CityOptions {
    * object to tune them. Off by default, so pre-Phase-6 runs are unchanged.
    */
   disasters?: boolean | EventSystemOptions;
+  /**
+   * Override how strongly consumption grows with wealth (Phase 13). Defaults to
+   * the live-game `WEALTH_ELASTICITY`; the CEO benchmark passes its own frozen
+   * `BENCH_WEALTH_ELASTICITY` so its scores stay reproducible when the live knob
+   * is re-tuned.
+   */
+  wealthElasticity?: number;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -96,7 +103,7 @@ export function createCity(options: CitySimOptions = {}): {
   if (events) sim.addSystem(events);
   sim.addSystem(new BrainSystem(world));
   sim.addSystem(new MovementSystem(world));
-  sim.addSystem(new EconomySystem(world));
+  sim.addSystem(new EconomySystem(world, options.wealthElasticity));
   sim.addSystem(market);
 
   let agent: BusinessAgentSystem | undefined;

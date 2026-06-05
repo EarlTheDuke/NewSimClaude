@@ -103,15 +103,16 @@ describe("Phase 11a price-elastic leisure demand", () => {
   });
 });
 
-describe("Phase 13a — wealth-elastic consumption (inert no-op scaffold)", () => {
-  // consumptionUnits is the pure, RNG-free core of "wants grow with wealth". At
-  // the shipped default (WEALTH_ELASTICITY = 0) it returns 1 for everyone — the
-  // byte-identity guarantee. These tests pass an explicit elasticity to exercise
-  // the curve that 13b will turn on city-wide.
+describe("Phase 13 — wealth-elastic consumption (wants grow with wealth)", () => {
+  // consumptionUnits is the pure, RNG-free core: the richer a resident, the
+  // bigger their order. Phase 13b ships WEALTH_ELASTICITY = 1, so the default-arg
+  // call engages; an explicit 0 is the hard off switch the frozen-baseline tests
+  // use. Tests pass an explicit elasticity to pin the curve precisely.
   describe("consumptionUnits()", () => {
-    it("returns 1 for any wealth at the shipped default (the keystone is off)", () => {
-      expect(consumptionUnits({ id: "res_0", money: WEALTH_BASELINE })).toBe(1);
-      expect(consumptionUnits({ id: "res_3", money: 100_000 })).toBe(1); // rich, but knob off
+    it("is ON at the shipped default, with an explicit off switch that returns 1", () => {
+      expect(consumptionUnits({ id: "res_0", money: 1000 })).toBe(2); // default knob (1.0): rich -> 2
+      expect(consumptionUnits({ id: "res_0", money: WEALTH_BASELINE })).toBe(1); // at baseline -> 1
+      expect(consumptionUnits({ id: "res_3", money: 100_000 }, 0)).toBe(1); // explicit off -> 1
     });
 
     it("buys exactly one at or below the baseline even with elasticity on", () => {
@@ -150,23 +151,37 @@ describe("Phase 13a — wealth-elastic consumption (inert no-op scaffold)", () =
     });
   });
 
-  it("ships inert: every resident starts at WEALTH_BASELINE (drift guard)", () => {
-    // The whole no-op rests on the pivot equalling the seeded starting money. If
-    // cityGen ever changes the $500 start, this fails loudly so WEALTH_BASELINE
+  it("every resident starts at WEALTH_BASELINE — the pivot drift guard", () => {
+    // The whole mechanism rests on the pivot equalling the seeded starting money.
+    // If cityGen ever changes the $500 start, this fails loudly so WEALTH_BASELINE
     // gets updated in lockstep.
     const { world } = createCity({ seed: 1 });
     for (const r of world.residents) expect(r.money).toBe(WEALTH_BASELINE);
   });
 
-  it("leaves the no-agency baseline byte-identical: same seed -> identical world after 30 days", () => {
-    // EconomySystem stays RNG-free (the loop draws nothing from ctx.rng), so the
-    // seeded stream is untouched and a 13a city reproduces exactly. The cross-check
-    // against the pre-13a numbers is the rest of this suite (and city/macro/soak)
-    // staying green.
+  it("stays deterministic with the keystone on: same seed -> identical world after 30 days", () => {
+    // consumptionUnits is pure and draws nothing from ctx.rng, so EconomySystem
+    // stays RNG-free and a wealth-elastic city still reproduces exactly.
     const a = createCity({ seed: 1 });
     const b = createCity({ seed: 1 });
     a.sim.run(THIRTY_DAYS);
     b.sim.run(THIRTY_DAYS);
     expect(a.world.serialize()).toEqual(b.world.serialize());
+  });
+
+  it("13b: lifts storefront revenue above the keystone-off baseline (the demand ceiling rose)", () => {
+    // The whole point: once residents bank a surplus above $500 they order more,
+    // so the same seeded city books more consumption with the knob on than off
+    // (probed at ~+22% total storefront revenue over 90 brain-off days).
+    const storefrontRevenue = (wealthElasticity: number) => {
+      const { sim, world } = createCity({ seed: 1, wealthElasticity });
+      sim.run(TICKS_PER_DAY * 60);
+      return (
+        world.getBusiness("biz_diner")!.pnl.revenue + world.getBusiness("biz_goods")!.pnl.revenue
+      );
+    };
+    const off = storefrontRevenue(0);
+    const on = storefrontRevenue(1); // the shipped default
+    expect(on).toBeGreaterThan(off * 1.05); // a clear, real lift — not noise
   });
 });
