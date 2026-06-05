@@ -10,6 +10,7 @@ export const DEFAULT_LIMITS: DecisionLimits = {
   maxPriceChangeFraction: 0.25,
   maxHirePerReview: 2,
   maxProducePerReview: 200,
+  maxInvestPerReview: 500,
 };
 
 /**

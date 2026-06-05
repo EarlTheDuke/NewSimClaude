@@ -59,6 +59,22 @@ export interface BusinessObservation {
   dayProfit: number;
   /** Residents currently available to hire (jobId === ""). */
   unemployedCount: number;
+  /**
+   * Current capital stock — equipment owned by the business. Output scales with
+   * capital via 12b's `capitalFactor`; a mind uses this to tell "I'm
+   * capital-light, investing will lift my output" from "I have plenty of
+   * equipment, more won't help." Present only for kinds with capital
+   * (producers); undefined otherwise.
+   */
+  capital?: number;
+  /**
+   * How fully this producer ran on the day that just ended, 0..1 — production
+   * actually delivered divided by `effectiveCapacity`. Near 1.0 means the
+   * business is shipping everything it can make and capital investment would
+   * pay off; near 0 means it has slack and investment is dead weight. Present
+   * only for producer kinds; undefined otherwise.
+   */
+  capacityUtilization?: number;
 }
 
 /**
@@ -73,6 +89,13 @@ export interface BusinessAction {
   hire?: number;
   /** Units of inventory to produce (added to stock on hand). */
   produce?: number;
+  /**
+   * Cash to spend buying capital goods (equipment) wholesale from the factory
+   * this review. Raises future output via 12b's `capitalFactor`. Routed through
+   * {@link DecisionLimits.maxInvestPerReview} *and* a business-reserve floor —
+   * over-investing into insolvency is on the provider to avoid.
+   */
+  invest?: number;
 }
 
 /**
@@ -89,6 +112,8 @@ export interface DecisionLimits {
   maxHirePerReview: number;
   /** Max units produced per review. */
   maxProducePerReview: number;
+  /** Max cash a business may spend on capital goods in one review. */
+  maxInvestPerReview: number;
 }
 
 /** A provider's verdict: what to do, and why. */
