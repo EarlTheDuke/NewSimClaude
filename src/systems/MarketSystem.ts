@@ -1,7 +1,7 @@
 import type { System, SystemContext } from "../core/types";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import type { World } from "../world/World";
-import type { ResourceKind } from "../world/types";
+import type { Business, ResourceKind } from "../world/types";
 import { ARCHETYPES, PRODUCER_OF } from "../world/archetypes";
 import {
   BASE_RESOURCE_PRICE,
@@ -13,6 +13,10 @@ import {
   LANDLORD_RESERVE,
   BUSINESS_RESERVE,
   PROFIT_DISTRIBUTION_CAP,
+  CAPITAL_BASELINE,
+  CAPITAL_OUTPUT_ELASTICITY,
+  CAPITAL_DEPRECIATION_RATE,
+  LABOR_FULL_STAFF,
 } from "./constants";
 
 const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
@@ -25,8 +29,9 @@ const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
  *      moves only via {@link World.transfer}, so the economy stays closed.
  *   2. Production — primary producers make their resource from nothing;
  *      processors turn inputs 1:1 into outputs; storefronts turn inputs into
- *      resident-sellable inventory. All demand-driven (refill toward target)
- *      and capped at maxPerDay, so the chain self-sizes to resident demand.
+ *      resident-sellable inventory. All demand-driven (refill toward target) and
+ *      capped at each business's labour-/capital-limited capacity (Phase 12b),
+ *      so the chain self-sizes to resident demand.
  *   3. Pricing — each resource's price nudges toward its supply/demand balance,
  *      bounded so it can never run away.
  *
@@ -45,6 +50,7 @@ export class MarketSystem implements System {
     const sold: Record<ResourceKind, number> = { grain: 0, materials: 0, food: 0, wares: 0 };
     this.procure(sold);
     this.produce();
+    this.depreciate();
     this.distributeProfits();
     this.adjustPrices(sold);
   }
@@ -75,9 +81,11 @@ export class MarketSystem implements System {
       const input = a.consumes;
 
       // How much output is the business short of its target? That, minus input
-      // already on hand, is what it needs to buy to refill.
+      // already on hand, is what it needs to buy to refill — but never more than
+      // it can actually process today (its labour-/capital-limited capacity), so
+      // an understaffed buyer doesn't stockpile input it can't turn into output.
       const outStock = a.sellsToResidents ? biz.inventory : biz.resources[a.produces!] ?? 0;
-      const deficit = Math.min(a.maxPerDay, Math.max(0, a.target - outStock));
+      const deficit = Math.min(this.effectiveCapacity(biz), Math.max(0, a.target - outStock));
       const want = Math.max(0, deficit - (biz.resources[input] ?? 0));
       if (want <= 0) continue;
 
@@ -128,21 +136,72 @@ export class MarketSystem implements System {
     for (const biz of this.world.businesses) {
       if (!biz.active) continue;
       const a = ARCHETYPES[biz.kind];
+      // The day's real ceiling — maxPerDay bent by how well-staffed and
+      // well-equipped this business is (Phase 12b). At baseline capital with at
+      // least one worker this is exactly maxPerDay, so the seeded city is
+      // unchanged; an empty producer makes nothing.
+      const capacity = this.effectiveCapacity(biz);
 
       if (a.produces && !a.consumes) {
         // Primary producer: make its resource from nothing, refilling to target.
         const stock = biz.resources[a.produces] ?? 0;
-        const make = Math.min(a.maxPerDay, Math.max(0, a.target - stock));
+        const make = Math.min(capacity, Math.max(0, a.target - stock));
         if (make > 0) biz.resources[a.produces] = stock + make;
       } else if (a.consumes) {
         const outStock = a.sellsToResidents ? biz.inventory : biz.resources[a.produces!] ?? 0;
         const have = biz.resources[a.consumes] ?? 0;
-        const make = Math.min(a.maxPerDay, Math.max(0, a.target - outStock), have);
+        const make = Math.min(capacity, Math.max(0, a.target - outStock), have);
         if (make <= 0) continue;
         biz.resources[a.consumes] = have - make;
         if (a.sellsToResidents) biz.inventory += make;
         else biz.resources[a.produces!] = outStock + make;
       }
+    }
+  }
+
+  /**
+   * A business's real daily production ceiling (Phase 12b) — what the flat
+   * `maxPerDay` becomes once labour and capital are taken into account:
+   *
+   *   capacity = maxPerDay × laborFactor(staff) × capitalFactor(capital)
+   *
+   * laborFactor gates on staffing — no workers means no output (the fix for
+   * empty producers shipping full output, P10-3) — and saturates at
+   * {@link LABOR_FULL_STAFF}, so the seeded city, where every producer has at
+   * least one worker, sits at factor 1. capitalFactor scales with equipment with
+   * diminishing returns (Cobb-Douglas), and is exactly 1 at {@link CAPITAL_BASELINE}
+   * (read for pre-12 saves where the field is absent). So a fully-staffed,
+   * baseline-capital business returns its old `maxPerDay` unchanged — 12b is a
+   * pure no-op for the default town, and only an *under*staffed or *re*capitalised
+   * business produces differently. Floored to keep production integer and the
+   * chain deterministic.
+   */
+  private effectiveCapacity(biz: Business): number {
+    const max = ARCHETYPES[biz.kind].maxPerDay;
+    if (max <= 0) return 0;
+    const laborFactor = Math.min(1, biz.employeeIds.length / LABOR_FULL_STAFF);
+    const capital = biz.capital ?? CAPITAL_BASELINE;
+    const capitalFactor = Math.pow(capital / CAPITAL_BASELINE, CAPITAL_OUTPUT_ELASTICITY);
+    return Math.floor(max * laborFactor * capitalFactor);
+  }
+
+  /**
+   * Capital wears out (Phase 12b). Only the stock *above* {@link CAPITAL_BASELINE}
+   * depreciates: the baseline plant is treated as maintained out of ordinary
+   * operating costs, so a city where nobody invests never erodes below baseline,
+   * and the seeded no-op city — sitting exactly at baseline — never moves at all.
+   * The excess a business buys with the invest lever (Phase 12c) decays a fixed
+   * fraction per day, so holding a high capital level takes recurring re-investment
+   * (the Solow "run to stand still"). Touches the capital quantity only, never
+   * cash, so money stays conserved.
+   */
+  private depreciate(): void {
+    for (const biz of this.world.businesses) {
+      if (!biz.active) continue;
+      const capital = biz.capital ?? CAPITAL_BASELINE;
+      if (capital <= CAPITAL_BASELINE) continue;
+      const excess = capital - CAPITAL_BASELINE;
+      biz.capital = CAPITAL_BASELINE + excess * (1 - CAPITAL_DEPRECIATION_RATE);
     }
   }
 
@@ -158,7 +217,12 @@ export class MarketSystem implements System {
   private adjustPrices(sold: Record<ResourceKind, number>): void {
     for (const res of RESOURCES) {
       const producer = this.world.getBusiness(PRODUCER_OF[res]);
-      const cap = producer ? ARCHETYPES[producer.kind].maxPerDay : 0;
+      // Measure how hard the producer worked against its *effective* capacity,
+      // not the flat maxPerDay (Phase 12b) — otherwise an understaffed producer's
+      // brisk-but-small output would read as a slow day and the price would sag
+      // when it should firm up. At baseline this equals maxPerDay, so prices are
+      // unchanged for the seeded city.
+      const cap = producer ? this.effectiveCapacity(producer) : 0;
       const utilization = cap > 0 ? sold[res] / cap : 0;
       const base = BASE_RESOURCE_PRICE[res];
       let p = this.prices[res];

@@ -24,8 +24,10 @@ describe("Phase 12a — capital data model (inert no-op slice)", () => {
     const { sim, world } = createCity({ seed: 1 });
     const start = world.totalMoney();
     sim.run(TICKS_PER_DAY * 30);
-    // No system reads or writes capital yet, so every business must still sit at
-    // exactly the baseline — a regression guard that 12a stayed a pure no-op.
+    // Production now *reads* capital (12b), but nothing *writes* it in the default
+    // city — no business invests, and only above-baseline capital depreciates — so
+    // every business must still sit at exactly the baseline. A regression guard
+    // that 12b stayed a pure no-op for the seeded town.
     for (const b of world.businesses) expect(b.capital).toBe(CAPITAL_BASELINE);
     // ...and the closed loop still balances to the cent.
     expect(world.totalMoney()).toBeCloseTo(start, 6);
@@ -51,5 +53,59 @@ describe("Phase 12a — capital data model (inert no-op slice)", () => {
     for (const b of snap.businesses) delete b.capital;
     expect(() => world.restore(snap)).not.toThrow();
     expect(world.businesses.every((b) => b.capital === undefined)).toBe(true);
+  });
+});
+
+/**
+ * Phase 12b — production now bends with labour and capital. For the seeded city
+ * (every producer staffed, capital at baseline) the formula returns exactly the
+ * old maxPerDay, so these tests pin the *new* behaviour at the edges: the labour
+ * gate that fixes empty producers (P10-3), capital depreciation, and output
+ * tracking the capital factor.
+ */
+describe("Phase 12b — production responds to labour & capital", () => {
+  it("a producer with no staff produces nothing (P10-3 fix)", () => {
+    const idle = createCity({ seed: 1 });
+    const idleFarm = idle.world.getBusiness("biz_farm")!;
+    idleFarm.employeeIds = [];
+    for (const r of idle.world.residents)
+      if (r.jobId === "biz_farm") {
+        r.jobId = "";
+        r.wagePerTick = 0;
+      }
+    idleFarm.resources.grain = 0;
+    idle.sim.run(TICKS_PER_DAY);
+    expect(idleFarm.resources.grain).toBe(0);
+
+    const staffed = createCity({ seed: 1 });
+    const staffedFarm = staffed.world.getBusiness("biz_farm")!;
+    expect(staffedFarm.employeeIds.length).toBeGreaterThan(0);
+    staffedFarm.resources.grain = 0;
+    staffed.sim.run(TICKS_PER_DAY);
+    expect(staffedFarm.resources.grain!).toBeGreaterThan(0);
+  });
+
+  it("above-baseline capital depreciates toward baseline; baseline capital is untouched", () => {
+    const { sim, world } = createCity({ seed: 1 });
+    const factory = world.getBusiness("biz_factory")!;
+    const diner = world.getBusiness("biz_diner")!;
+    factory.capital = 200;
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 3);
+    expect(factory.capital!).toBeLessThan(200);
+    expect(factory.capital!).toBeGreaterThan(CAPITAL_BASELINE);
+    expect(diner.capital).toBe(CAPITAL_BASELINE);
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("output tracks the capital factor: a capital-starved producer is capacity-limited", () => {
+    const { sim, world } = createCity({ seed: 1 });
+    const farm = world.getBusiness("biz_farm")!;
+    expect(farm.employeeIds.length).toBeGreaterThan(0);
+    farm.capital = 10;
+    farm.resources.grain = 0;
+    sim.run(TICKS_PER_DAY);
+    expect(farm.resources.grain!).toBeGreaterThan(0);
+    expect(farm.resources.grain!).toBeLessThan(50);
   });
 });

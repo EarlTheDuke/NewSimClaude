@@ -149,6 +149,38 @@ export const PROFIT_DISTRIBUTION_CAP = 900;
  * depreciates daily.
  */
 export const CAPITAL_BASELINE = 100;
+/**
+ * Phase 12b — how steeply a business's daily output ceiling bends with its
+ * equipment. Capacity scales as (capital / CAPITAL_BASELINE) ^ this exponent —
+ * the textbook "capital share" of a Cobb-Douglas production function. Below 1 it
+ * encodes diminishing returns: at 0.3, doubling a business's capital lifts its
+ * ceiling by only 2^0.3 ≈ 23%, and the next doubling adds less again. At exactly
+ * baseline capital the factor is 1 (today's output), so a freshly-seeded city is
+ * unchanged — which is what keeps 12b a no-op for the default town.
+ */
+export const CAPITAL_OUTPUT_ELASTICITY = 0.3;
+/**
+ * Phase 12b — the fraction of a business's *above-baseline* capital that wears
+ * out each day (maintenance/obsolescence). Only the stock bought on top of the
+ * baseline depreciates; the baseline plant is treated as maintained out of
+ * ordinary operating costs, so a city where nobody invests never erodes below
+ * baseline (and the seeded no-op city, sitting exactly at baseline, never moves).
+ * This is the Solow "run to stand still": holding a high capital level takes
+ * recurring re-investment to replace what wears out, so investment is an ongoing
+ * decision, not a one-off. Reduces the capital quantity only, never cash, so the
+ * conservation invariant is untouched. Tuned for real in Phase 12e.
+ */
+export const CAPITAL_DEPRECIATION_RATE = 0.01;
+/**
+ * Phase 12b — the head-count at which a business counts as "fully staffed" for
+ * production. Output scales with min(1, employees / this): with no workers a
+ * business makes nothing (the fix for empty producers shipping full output,
+ * P10-3), and it reaches its full ceiling once staffed to this level. Set to 1
+ * because the seeded city gives every producer at least one worker, so the labour
+ * factor sits at 1 there and 12b stays a pure no-op for the default town. Raising
+ * it — so head-count, not mere presence, drives output — is a Phase 12e lever.
+ */
+export const LABOR_FULL_STAFF = 1;
 /** Consecutive days of unpaid rent before a resident is downgraded to a cheaper home. */
 export const EVICTION_GRACE_DAYS = 3;
 /** Days of macro vitals retained in the ring buffer (chartable history). */
