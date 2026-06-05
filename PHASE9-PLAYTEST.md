@@ -273,3 +273,17 @@ Status: `open` → `fixed (commit)` / `wontfix (reason)`.
   - **Deferred to Phase 14 (capacity calibration):** make demand press against capacity so capital-deepening compounds — e.g. scale a business's `target` (and/or `maxPerDay`) with its capital, so a well-capitalised firm genuinely stocks & sells more and utilization runs hot. The optional realism axes (wealth-lifted `leisureReservation`; eat-out-more `BrainSystem` thresholds) move there too. Kept `WEALTH_ELASTICITY = 1` (stable across the soak; the feared rich-tail explosion never materialised, so no re-tune).
 
 **Invariants & risks.** Conservation (every unit a capped transfer) · determinism (pure, RNG-free; no new draws — the decisive win over the rejected stochastic-rounding design) · `WEALTH_BASELINE` must track cityGen's $500 start (pinned by a test) · inventory starvation / GDP over-shoot from the rich tail → bound by `WEALTH_DEMAND_CAP` + diminishing-returns elasticity, watched in the 13c soak · units 2..N are discretionary splurge (needs already satisfied) — keep the loop confined to EconomySystem · the 12-agent live config showed a non-monotonic goods-revenue dip at e=1 (agentic resident behaviour interacts with higher demand) — a 13c tuning/interaction item to watch in the soak.
+
+---
+
+## Phase 14 — Productivity engine (attempted 2026-06-05; **deferred** — needs a real capacity rebalance)
+
+**Goal:** turn 13c's *transient* capital-deepening into a *sustained* Solow productivity engine. **Tried, measured, and reverted** — back to the clean 13c state, no code shipped. Recording the finding so the next attempt starts informed.
+
+**What was tried (both reverted):**
+- **Scale stock `target` with capital** (`effectiveTarget = target × capitalFactor`, so a better-equipped firm stocks & sells more; utilization stays meaningful as capital grows, so the lever should stop self-extinguishing). Sound in principle, byte-identical at baseline — but **no measurable effect**: the lever barely fires (`investedDays ≈ 3–4 / 365`), so capital never deepens enough for target-scaling to bite. Chicken-and-egg.
+- **Lower the invest trigger** `INVEST_UTILIZATION_THRESHOLD` 0.45 → 0.30 to force the lever. **Still barely fired** (3 → 4).
+
+**Root cause (the real blocker):** the economy runs at **~25–50% capacity utilization — ~75% slack everywhere**. With that much headroom, investing in *more* capacity is genuinely unwarranted (it sits idle), so no trigger-tuning or target-scaling makes investment productive. Confirmed by a demand sweep: utilization stays ~0.49 even at **3× demand** (only ~0.60 at 5×).
+
+**What it actually needs (a proper future phase, not a slice):** recalibrate the **whole supply chain's base capacity (`maxPerDay` per archetype) downward** so demand presses against capacity (utilization runs ~0.85). Only then does investing (raising the ceiling) translate into more output sold. This is a **chain-wide rebalance**: it breaks the Phase-12a no-op baseline, will cause stockouts until every archetype is re-tuned, and needs heavy soak validation — high value, high risk. Pair it with the reverted `target × capital` scaling (which becomes useful once the lever fires often). **In the meantime, 13c's demand-driven GDP growth (consumption ~doubles/year) stands as the keystone's realized payoff.** Alternatively, pursue North-Star **#2 (business entry)** next instead — likely a cleaner win than the capacity rebalance.

@@ -10,3 +10,6 @@ coverage/
 # Phase 9 playthrough runtime artifacts (the saved city + per-turn command)
 playthrough.save.json
 play.command.json
+
+# Personal Claude Code permission overrides (machine-local; never commit)
+.claude/settings.local.json
