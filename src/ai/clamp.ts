@@ -43,6 +43,12 @@ export function clampAction(
     out.produce = Math.trunc(clamp(action.produce, 0, limits.maxProducePerReview));
   }
 
+  if (action.invest !== undefined && Number.isFinite(action.invest)) {
+    // Phase 12c — pure per-review cap. The cash-vs-reserve floor is applied
+    // later in BusinessAgentSystem.apply(), where current cash is known.
+    out.invest = clamp(action.invest, 0, limits.maxInvestPerReview);
+  }
+
   return out;
 }
 

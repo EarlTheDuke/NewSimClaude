@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "../utils/serialization";
-import { CAPITAL_BASELINE } from "./constants";
-import type { BusinessObservation, DecisionProvider } from "../ai/types";
+import { BUSINESS_RESERVE, CAPITAL_BASELINE } from "./constants";
+import type { BusinessAction, BusinessObservation, DecisionProvider } from "../ai/types";
+import { DEFAULT_LIMITS } from "../ai/clamp";
 
 /**
  * Tiny test-only provider: captures the observation the brain receives and
@@ -186,5 +187,107 @@ describe("Phase 12c step 2 — observations surface capital + utilization", () =
     expect(seen[0]!.capacityUtilization).toBeUndefined();
     // Landlord still has capital seeded by 12a; only utilization is missing.
     expect(seen[0]!.capital).toBe(CAPITAL_BASELINE);
+  });
+});
+
+/**
+ * Phase 12c step 3 — the invest lever actually moves money and equipment.
+ * A request is clamped twice: first by {@link DEFAULT_LIMITS.maxInvestPerReview}
+ * (static, pre-known) and then by the runtime cash-vs-reserve floor (so an
+ * aggressive request can't bankrupt the firm). The cash flows to the factory
+ * via {@link World.transfer}, and capital rises one-for-one with what actually
+ * moved — total money is invariant across any invest run.
+ */
+function fixedActionProvider(action: BusinessAction): DecisionProvider {
+  return {
+    id: "fixed",
+    decide: () => ({ action, reason: "fixed" }),
+  };
+}
+
+describe("Phase 12c step 3 — invest lever wiring", () => {
+  // Note on what these tests assert: the day-boundary tick runs *every*
+  // economic system (rent, procurement, profit distribution, agent review),
+  // so raw cash deltas across `sim.run(TICKS_PER_DAY)` reflect a whole day's
+  // flows — not just the invest move. The reliable signals are (a) the
+  // agent decision log, which records exactly what the lever applied,
+  // (b) the business's `capital` field (only the invest lever mutates it
+  // for a baseline-capital firm), and (c) `world.totalMoney()`, which the
+  // invest must never disturb.
+  it("an invest request moves money to the factory and raises capital one-for-one", () => {
+    const want = 200;
+    const provider = fixedActionProvider({ invest: want });
+    const { sim, world, agent } = createCity({
+      seed: 1,
+      brain: provider,
+      agenticBusinessIds: ["biz_diner"],
+    });
+    const diner = world.getBusiness("biz_diner")!;
+    diner.cash = 50_000; // well above reserve — only the per-review cap could bind
+    const capitalBefore = diner.capital!;
+    const totalBefore = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY);
+
+    expect(agent!.decisions()[0]!.action.invest).toBeCloseTo(want, 6);
+    expect(diner.capital!).toBeCloseTo(capitalBefore + want, 6);
+    expect(world.totalMoney()).toBeCloseTo(totalBefore, 6);
+  });
+
+  it("a request over `maxInvestPerReview` is clamped to the per-review cap", () => {
+    const cap = DEFAULT_LIMITS.maxInvestPerReview;
+    const provider = fixedActionProvider({ invest: cap * 10 });
+    const { sim, world, agent } = createCity({
+      seed: 1,
+      brain: provider,
+      agenticBusinessIds: ["biz_diner"],
+    });
+    const diner = world.getBusiness("biz_diner")!;
+    diner.cash = 100_000; // headroom non-binding
+    const capitalBefore = diner.capital!;
+    const totalBefore = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY);
+
+    expect(agent!.decisions()[0]!.action.invest).toBeCloseTo(cap, 6);
+    expect(diner.capital!).toBeCloseTo(capitalBefore + cap, 6);
+    expect(world.totalMoney()).toBeCloseTo(totalBefore, 6);
+  });
+
+  it("an under-reserve business invests nothing (reserve floor guards solvency)", () => {
+    // Drain the diner to zero so daily revenue can't lift it anywhere near
+    // BUSINESS_RESERVE by the time the agent reviews — headroom is zero, the
+    // invest lever skips, and capital sits unchanged regardless of the request.
+    const provider = fixedActionProvider({ invest: DEFAULT_LIMITS.maxInvestPerReview });
+    const { sim, world, agent } = createCity({
+      seed: 1,
+      brain: provider,
+      agenticBusinessIds: ["biz_diner"],
+    });
+    const diner = world.getBusiness("biz_diner")!;
+    diner.cash = 0;
+    const capitalBefore = diner.capital!;
+    const totalBefore = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY);
+
+    expect(diner.cash).toBeLessThan(BUSINESS_RESERVE); // confirm setup held
+    expect(agent!.decisions()[0]!.action.invest ?? 0).toBe(0);
+    expect(diner.capital!).toBe(capitalBefore);
+    expect(world.totalMoney()).toBeCloseTo(totalBefore, 6);
+  });
+
+  it("money is conserved across a multi-day, multi-business invest run", () => {
+    // The keystone invariant — even with the lever firing every day on two
+    // different businesses, total money must not drift by a cent.
+    const provider = fixedActionProvider({ invest: 50 });
+    const { sim, world } = createCity({
+      seed: 1,
+      brain: provider,
+      agenticBusinessIds: ["biz_diner", "biz_goods"],
+    });
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 30);
+    expect(world.totalMoney()).toBeCloseTo(start, 4);
   });
 });

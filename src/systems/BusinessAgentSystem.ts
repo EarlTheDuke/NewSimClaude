@@ -12,7 +12,7 @@ import type {
 } from "../ai/types";
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
-import { RETAIL_REFERENCE_PRICE } from "./constants";
+import { BUSINESS_RESERVE, CAPITAL_BASELINE, RETAIL_REFERENCE_PRICE } from "./constants";
 import { ARCHETYPES } from "../world/archetypes";
 import type { MarketSystem } from "./MarketSystem";
 
@@ -139,6 +139,9 @@ export class BusinessAgentSystem implements System {
     if (clamped.setPrice !== undefined) biz.price = clamped.setPrice;
     if (clamped.produce !== undefined) biz.inventory += clamped.produce;
     if (clamped.hire !== undefined && clamped.hire !== 0) this.applyHire(biz, clamped.hire);
+    if (clamped.invest !== undefined && clamped.invest > 0) {
+      clamped.invest = this.applyInvest(biz, clamped.invest);
+    }
 
     this.log.push({
       day,
@@ -149,6 +152,29 @@ export class BusinessAgentSystem implements System {
       reason: decision.reason,
       usage: decision.usage,
     });
+  }
+
+  /**
+   * Phase 12c — buy capital goods from the factory and book them as equipment.
+   * The request has already been clamped to {@link DecisionLimits.maxInvestPerReview};
+   * this step adds the cash-aware floor that no static clamp can do — never
+   * spend below {@link BUSINESS_RESERVE}, so an aggressive pricer can't drive a
+   * firm into insolvency on a single review. Money moves only via
+   * {@link World.transfer} (so the conservation invariant holds — investment
+   * doesn't create or destroy a cent) and capital rises one-for-one with the
+   * cash that actually moved. The factory is the canonical seller (the plan's
+   * B2B routing — sends money to the producer that would otherwise starve in
+   * the P10-7 die-off). Returns the amount actually invested, so the decision
+   * log records what hit the world rather than what was asked for.
+   */
+  private applyInvest(biz: Business, requested: number): number {
+    const headroom = Math.max(0, biz.cash - BUSINESS_RESERVE);
+    const want = Math.min(requested, headroom);
+    if (want <= 0) return 0;
+    const moved = this.world.transfer(biz.id, "biz_factory", want);
+    if (moved <= 0) return 0;
+    biz.capital = (biz.capital ?? CAPITAL_BASELINE) + moved;
+    return moved;
   }
 
   /** Move residents in/out of the jobless pool. Deterministic ordering. */
