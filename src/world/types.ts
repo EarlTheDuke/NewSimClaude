@@ -93,6 +93,15 @@ export interface Business {
    * quantity, so the conservation invariant is untouched.
    */
   capital?: number;
+  /**
+   * Cumulative cash this business has spent on capital goods via the invest
+   * lever (Phase 12d) — its running investment expenditure. {@link MacroSystem}
+   * differences it day-over-day into the investment component of GDP
+   * (GDP = Consumption + Investment). Absent until the firm first invests, read
+   * as 0. Never money itself — it only *records* spend that already moved via
+   * {@link World.transfer}, so the conservation invariant is untouched.
+   */
+  capitalInvested?: number;
 }
 
 export interface ProfitAndLoss {

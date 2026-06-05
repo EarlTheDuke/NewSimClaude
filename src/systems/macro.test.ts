@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "../utils/serialization";
-import { MACRO_HISTORY_DAYS, BANKRUPT_GRACE_DAYS } from "./constants";
+import { MACRO_HISTORY_DAYS, BANKRUPT_GRACE_DAYS, CAPITAL_BASELINE } from "./constants";
+import type { DecisionProvider } from "../ai/types";
 
 describe("MacroSystem (Phase 4d vitals)", () => {
   it("records exactly one sample per day, numbered from 1", () => {
@@ -71,5 +72,60 @@ describe("MacroSystem (Phase 4d vitals)", () => {
     original.sim.run(TICKS_PER_DAY);
     loaded.sim.run(TICKS_PER_DAY);
     expect(loaded.macro.latest()).toEqual(original.macro.latest());
+  });
+});
+
+/** A test-only provider that pulls one fixed lever (invest) every review. */
+function fixedInvest(amount: number): DecisionProvider {
+  return { id: "fixed", decide: () => ({ action: { invest: amount }, reason: "buy equipment" }) };
+}
+
+describe("MacroSystem (Phase 12d — GDP = consumption + investment)", () => {
+  it("the seeded city books zero investment, so GDP is pure consumption (a 12d no-op)", () => {
+    const { sim, macro } = createCity({ seed: 1 });
+    sim.run(TICKS_PER_DAY * 10);
+    // Nobody invests with the brain off, so every day's investment term is 0 and
+    // GDP collapses to consumption — the metric is unchanged from pre-12d.
+    for (const s of macro.history()) {
+      expect(s.investment).toBe(0);
+      expect(s.gdp).toBe(s.consumption);
+    }
+  });
+
+  it("books a day's capital spend as investment, and GDP = consumption + investment", () => {
+    const { sim, world, macro } = createCity({
+      seed: 1,
+      brain: fixedInvest(200),
+      agenticBusinessIds: ["biz_diner"],
+    });
+    const diner = world.getBusiness("biz_diner")!;
+    diner.cash = 50_000; // clear the reserve floor so the lever actually fires
+    const startMoney = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY); // day 1: the agent reviews at the boundary and invests
+
+    const s = macro.latest()!;
+    expect(s.investment).toBeGreaterThan(0);
+    // The booked investment equals the capital the diner actually gained today
+    // (depreciation only touches above-baseline stock from the *next* day).
+    expect(s.investment).toBeCloseTo((diner.capital ?? CAPITAL_BASELINE) - CAPITAL_BASELINE, 6);
+    expect(s.gdp).toBeCloseTo(s.consumption + s.investment, 6);
+    expect(s.totalMoney).toBeCloseTo(startMoney, 6); // investment is a transfer, not new money
+  });
+
+  it("capital stock climbs as a business keeps investing; money stays conserved", () => {
+    const { sim, world, macro } = createCity({
+      seed: 1,
+      brain: fixedInvest(100),
+      agenticBusinessIds: ["biz_diner"],
+    });
+    world.getBusiness("biz_diner")!.cash = 100_000; // cushion lasts the whole run
+    const startMoney = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY * 20);
+
+    const h = macro.history();
+    expect(h[h.length - 1]!.totalCapital).toBeGreaterThan(h[0]!.totalCapital); // capital deepened
+    expect(world.totalMoney()).toBeCloseTo(startMoney, 4); // conserved to the cent
   });
 });

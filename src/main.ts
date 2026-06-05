@@ -6,7 +6,7 @@ import { CanvasRenderer, type Pick, type DisasterMarker } from "./render/CanvasR
 import { ARCHETYPES } from "./world/archetypes";
 import type { ResourceKind } from "./world/types";
 import type { DisasterKind } from "./systems/disasters";
-import { GRANT_AMOUNT, MOVE_SPEED, VEHICLE_SPEED_MULT } from "./systems/constants";
+import { CAPITAL_BASELINE, GRANT_AMOUNT, MOVE_SPEED, VEHICLE_SPEED_MULT } from "./systems/constants";
 import { compareExperiments, formatComparison } from "./experiment/harness";
 import { summarizeCost } from "./ai/cost";
 
@@ -293,6 +293,8 @@ function renderInspector(): void {
         .map(([k, v]) => `${k} ${v}`)
         .join(", ") || "—";
     const insolvent = b.insolventDays ?? 0;
+    const util = market.capacityUtilizationFor(b.id);
+    const utilStr = util !== undefined ? `${(util * 100).toFixed(0)}%` : "—";
     const net = b.pnl.revenue + b.pnl.rentCollected - b.pnl.wagesPaid;
     inspectorEl.innerHTML = `
       <h2>${b.name}</h2>
@@ -301,6 +303,7 @@ function renderInspector(): void {
       <p>chain: ${chain}</p>
       <p>resources: ${stock}</p>
       <p>employees: ${b.employeeIds.length} · wage ${b.wagePerTick.toFixed(2)}/tick</p>
+      <p>capital: ${(b.capital ?? CAPITAL_BASELINE).toFixed(0)} · utilization: ${utilStr}</p>
       ${insolvent > 0 ? `<p class="warn">insolvent ${insolvent}d</p>` : ""}
       <p class="pnl">revenue ${money(b.pnl.revenue)} · wages ${money(b.pnl.wagesPaid)} · rent ${money(b.pnl.rentCollected)} · net ${money(net)}</p>
     `;
@@ -320,6 +323,7 @@ function renderTrace(): void {
       if (e.action.setPrice !== undefined) levers.push(`price→${money(e.action.setPrice)}`);
       if (e.action.hire) levers.push(e.action.hire > 0 ? `+${e.action.hire} hire` : `${e.action.hire} layoff`);
       if (e.action.produce) levers.push(`+${e.action.produce} stock`);
+      if (e.action.invest) levers.push(`+${money(e.action.invest)} invest`);
       const act = levers.length > 0 ? levers.join(", ") : "hold";
       const cost = e.usage?.costUsd !== undefined ? ` · $${e.usage.costUsd.toFixed(4)}` : "";
       const lat = e.usage?.latencyMs !== undefined ? ` · ${Math.round(e.usage.latencyMs)}ms` : "";
@@ -407,8 +411,10 @@ function renderMacro(): void {
   if (latest) {
     vitalsEl.innerHTML = [
       vitalCard("GDP / day", money(latest.gdp), history.map((s) => s.gdp), "#58a6ff"),
+      vitalCard("Investment / day", money(latest.investment), history.map((s) => s.investment), "#a371f7"),
       vitalCard("Payroll / day", money(latest.payroll), history.map((s) => s.payroll), "#2ea043"),
       vitalCard("Rent / day", money(latest.rent), history.map((s) => s.rent), "#d29922"),
+      vitalCard("Capital stock", latest.totalCapital.toFixed(0), history.map((s) => s.totalCapital), "#56d4dd"),
       vitalCard("Avg price", money2(latest.avgResourcePrice), history.map((s) => s.avgResourcePrice), "#e15bc8"),
       vitalCard("Total money", money(latest.totalMoney), history.map((s) => s.totalMoney), "#9aa0a6"),
       vitalCard("Unemployed", String(latest.unemployed), history.map((s) => s.unemployed), "#e1a35b"),

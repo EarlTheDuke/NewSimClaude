@@ -2,7 +2,7 @@ import type { System, SystemContext } from "../core/types";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import type { World } from "../world/World";
 import { ARCHETYPES } from "../world/archetypes";
-import { MACRO_HISTORY_DAYS } from "./constants";
+import { MACRO_HISTORY_DAYS, CAPITAL_BASELINE } from "./constants";
 import type { MarketSystem } from "./MarketSystem";
 
 /** One sim-day's macro vitals — a single point on every chartable curve. */
@@ -11,8 +11,16 @@ export interface MacroSample {
   day: number;
   /** Total money across residents + businesses (the conservation invariant). */
   totalMoney: number;
-  /** Final consumption that day: resident spend at storefronts (a GDP proxy). */
+  /**
+   * Output that day by the expenditure approach: consumption + investment
+   * (Phase 12d). Before the invest lever this was consumption alone; in a city
+   * where nobody invests the two are identical, so the number is unchanged there.
+   */
   gdp: number;
+  /** Final consumption that day: resident spend at storefronts. */
+  consumption: number;
+  /** Investment that day: business spend on capital goods via the invest lever. */
+  investment: number;
   /** Cash distributed to residents that day (wages + dividends). */
   payroll: number;
   /** Rent collected that day. */
@@ -23,6 +31,13 @@ export interface MacroSample {
   activeBusinesses: number;
   /** Mean of the four resource prices. */
   avgResourcePrice: number;
+  /**
+   * Productive capital stock across all businesses (sum of each firm's
+   * `capital`, a dimensionless index where {@link CAPITAL_BASELINE} = today's
+   * output). Climbs as businesses invest; flat at baseline where nobody does.
+   * Not a dollar figure.
+   */
+  totalCapital: number;
 }
 
 /** Running cumulative totals, differenced into per-day flows. */
@@ -30,6 +45,7 @@ interface Cumulative {
   consumption: number;
   payroll: number;
   rent: number;
+  investment: number;
 }
 
 /**
@@ -45,7 +61,7 @@ interface Cumulative {
 export class MacroSystem implements System {
   readonly id = "macro";
   private samples: MacroSample[] = [];
-  private prev: Cumulative = { consumption: 0, payroll: 0, rent: 0 };
+  private prev: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0 };
 
   constructor(
     private readonly world: World,
@@ -55,23 +71,34 @@ export class MacroSystem implements System {
   update(ctx: SystemContext): void {
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
 
-    const cum: Cumulative = { consumption: 0, payroll: 0, rent: 0 };
+    const cum: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0 };
+    let totalCapital = 0;
     for (const b of this.world.businesses) {
       cum.payroll += b.pnl.wagesPaid;
       cum.rent += b.pnl.rentCollected;
+      cum.investment += b.capitalInvested ?? 0;
       if (ARCHETYPES[b.kind].sellsToResidents) cum.consumption += b.pnl.revenue;
+      totalCapital += b.capital ?? CAPITAL_BASELINE;
     }
 
+    // Day-over-day flows. GDP by expenditure = consumption + investment; in the
+    // seeded city investment is 0, so gdp == consumption and the metric stays
+    // byte-identical to its pre-12d (consumption-only) self.
+    const consumption = cum.consumption - this.prev.consumption;
+    const investment = cum.investment - this.prev.investment;
     const prices = Object.values(this.market.priceBook());
     const sample: MacroSample = {
       day: ctx.totalTicks / TICKS_PER_DAY,
       totalMoney: this.world.totalMoney(),
-      gdp: cum.consumption - this.prev.consumption,
+      gdp: consumption + investment,
+      consumption,
+      investment,
       payroll: cum.payroll - this.prev.payroll,
       rent: cum.rent - this.prev.rent,
       unemployed: this.world.residents.filter((r) => r.jobId === "").length,
       activeBusinesses: this.world.businesses.filter((b) => b.active).length,
       avgResourcePrice: prices.reduce((s, p) => s + p, 0) / prices.length,
+      totalCapital,
     };
     this.prev = cum;
 
@@ -97,7 +124,12 @@ export class MacroSystem implements System {
     const s = state as { samples?: MacroSample[]; prev?: Cumulative } | undefined;
     this.samples = Array.isArray(s?.samples) ? s!.samples.map((x) => ({ ...x })) : [];
     this.prev = s?.prev
-      ? { consumption: s.prev.consumption, payroll: s.prev.payroll, rent: s.prev.rent }
-      : { consumption: 0, payroll: 0, rent: 0 };
+      ? {
+          consumption: s.prev.consumption,
+          payroll: s.prev.payroll,
+          rent: s.prev.rent,
+          investment: s.prev.investment ?? 0, // pre-12d saves carry no investment baseline
+        }
+      : { consumption: 0, payroll: 0, rent: 0, investment: 0 };
   }
 }

@@ -174,6 +174,10 @@ export class BusinessAgentSystem implements System {
     const moved = this.world.transfer(biz.id, "biz_factory", want);
     if (moved <= 0) return 0;
     biz.capital = (biz.capital ?? CAPITAL_BASELINE) + moved;
+    // Book the expenditure so MacroSystem can count it as the investment term in
+    // GDP (Phase 12d). Pure bookkeeping of cash that already moved above — no
+    // money is created, so conservation is untouched.
+    biz.capitalInvested = (biz.capitalInvested ?? 0) + moved;
     return moved;
   }
 
