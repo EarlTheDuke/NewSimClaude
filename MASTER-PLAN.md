@@ -1,5 +1,10 @@
 # CityWithLifeClaude — Master Development Plan
 
+> **Status update (2026-06-04):** Phases 0–8 of this plan **shipped as v1.0**. This document
+> remains the standing **architecture & guiding-principles** reference, but it is no longer the
+> active to-do list. For *what we build next*, the compass is **[NORTH-STAR.md](NORTH-STAR.md)**
+> (post-v1 direction); routine progress lives in **[PHASE9-PLAYTEST.md](PHASE9-PLAYTEST.md)**.
+
 **Version:** 1.0 (high-level)
 **Date:** 2026-06-01
 **Status:** Planning — no code written yet
