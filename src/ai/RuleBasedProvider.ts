@@ -4,6 +4,7 @@ import type {
   DecisionProvider,
   DecisionRequest,
 } from "./types";
+import { BUSINESS_RESERVE } from "../systems/constants";
 
 /**
  * The deterministic control mind, and the safety net.
@@ -79,6 +80,28 @@ export class RuleBasedProvider implements DecisionProvider {
     } else if (o.cash < 200 && o.employeeCount > 1) {
       action.hire = -1;
       notes.push("cash low, laying off 1");
+    }
+
+    // Invest (Phase 12c): buy equipment when the firm is *capacity-bound* —
+    // utilization sitting near the ceiling, so more machines would actually
+    // pay off — AND recently profitable AND sitting on a cushion well above
+    // its working-capital reserve. Plain-English: "I'm slammed, I'm earning,
+    // and I have headroom — buy more equipment so I can ship more tomorrow."
+    // The per-review cap and the cash-vs-reserve floor live downstream in
+    // BusinessAgentSystem.apply(), so the provider can ask freely and trust
+    // the clamps. A capital-light firm with low utilization gets nothing
+    // from more equipment, so this rule keeps the lever off in that case.
+    if (
+      o.capacityUtilization !== undefined &&
+      o.capacityUtilization > 0.85 &&
+      o.dayProfit > 50 &&
+      o.cash > BUSINESS_RESERVE * 1.5
+    ) {
+      // Ask for half the cushion above reserve; the static per-review cap
+      // shrinks it further. Half (not all) leaves room for the next day's
+      // operating needs without putting growth ahead of solvency.
+      action.invest = (o.cash - BUSINESS_RESERVE) / 2;
+      notes.push("capacity-bound + profitable, investing in equipment");
     }
 
     return {

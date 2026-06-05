@@ -55,6 +55,15 @@ describe("clampAction", () => {
     expect(clampAction({}, 14, DEFAULT_LIMITS)).toEqual({});
     expect(clampAction({ setPrice: NaN, hire: Infinity }, 14, DEFAULT_LIMITS)).toEqual({});
   });
+
+  it("clamps invest to [0, maxInvestPerReview] (Phase 12c)", () => {
+    expect(clampAction({ invest: -50 }, 14, DEFAULT_LIMITS).invest).toBe(0);
+    expect(clampAction({ invest: 50 }, 14, DEFAULT_LIMITS).invest).toBe(50);
+    expect(clampAction({ invest: 999_999 }, 14, DEFAULT_LIMITS).invest).toBe(
+      DEFAULT_LIMITS.maxInvestPerReview,
+    );
+    expect(clampAction({ invest: NaN }, 14, DEFAULT_LIMITS).invest).toBeUndefined();
+  });
 });
 
 describe("RuleBasedProvider", () => {
@@ -103,6 +112,47 @@ describe("RuleBasedProvider", () => {
 
   it("always gives a reason", () => {
     expect(rules.decide(req()).reason.length).toBeGreaterThan(0);
+  });
+
+  // Phase 12c — the invest heuristic.
+  //
+  // The rule fires only when all three conditions hold: the firm is
+  // capacity-bound (utilization near 1.0), recently profitable, and sitting on
+  // a cash cushion well above its working-capital reserve. Missing any one of
+  // those leaves the lever off — capital is dead weight if there's slack
+  // capacity, and an under-cushioned firm shouldn't compound risk.
+  const investContext = {
+    capacityUtilization: 0.95,
+    dayProfit: 200,
+    cash: 10_000,
+  };
+
+  it("invests when capacity-bound, profitable, and cash-cushioned", () => {
+    const d = rules.decide(req(investContext));
+    expect(d.action.invest).toBeGreaterThan(0);
+    expect(d.reason).toMatch(/invest/i);
+  });
+
+  it("does NOT invest when not capacity-bound (slack capacity)", () => {
+    const d = rules.decide(req({ ...investContext, capacityUtilization: 0.4 }));
+    expect(d.action.invest).toBeUndefined();
+  });
+
+  it("does NOT invest when capacityUtilization is undefined (non-producer)", () => {
+    const d = rules.decide(req({ ...investContext, capacityUtilization: undefined }));
+    expect(d.action.invest).toBeUndefined();
+  });
+
+  it("does NOT invest when not recently profitable", () => {
+    const d = rules.decide(req({ ...investContext, dayProfit: -10 }));
+    expect(d.action.invest).toBeUndefined();
+  });
+
+  it("does NOT invest when cash is barely above reserve (no cushion)", () => {
+    // BUSINESS_RESERVE is 3000 (per systems/constants), so any cash under 4500
+    // fails the 1.5x cushion test even if the other two signals are green.
+    const d = rules.decide(req({ ...investContext, cash: 3500 }));
+    expect(d.action.invest).toBeUndefined();
   });
 });
 
