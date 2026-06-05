@@ -204,6 +204,39 @@ export const LUXURY_COST = 150;
 /** Upper bound a resident may set as their savings-goal buffer. */
 export const MAX_SAVINGS_GOAL = 2000;
 
+// Wealth-elastic consumption — "wants grow with wealth" (Phase 13)
+/**
+ * The wealth pivot: the cash level at which a resident's basket is exactly one
+ * of each, like today. It equals the seeded starting balance every resident
+ * begins with (cityGen gives each resident $500), so at the start of a run — and
+ * for anyone who hasn't yet banked a surplus — nothing changes. Real-world terms:
+ * subsistence. At or below it you order one plate; above it your order grows.
+ * A test pins this to the actual starting money so the two can never silently drift.
+ */
+export const WEALTH_BASELINE = 500;
+/**
+ * How steeply a richer resident's order grows — the keystone's master knob, and
+ * the real-world income-elasticity of demand. 0 = OFF: every resident buys
+ * exactly one unit per visit, exactly like today, so Phase 13a ships as a pure
+ * no-op. Raised toward ~1.0 in 13b, where a resident sitting on twice the
+ * baseline (~$1000) then orders ~twice as much per visit.
+ */
+export const WEALTH_ELASTICITY = 0;
+/**
+ * Hard ceiling on units bought in a single visit, so one runaway-rich resident
+ * can't drain a storefront's shelves in a single tick. Bounds the blast radius.
+ */
+export const WEALTH_DEMAND_CAP = 4;
+/**
+ * Deterministic rounding "phases" (mirrors {@link LEISURE_TOLERANCE_TIERS}). The
+ * unit count is a real number (e.g. 1.5 units); rather than round it with
+ * randomness — which would perturb the seeded stream and desync the city — we
+ * spread the fractional unit across the population by resident index, so ~half a
+ * tier buys one and half buys two. The AGGREGATE tracks the real elasticity
+ * smoothly while every individual resident stays perfectly reproducible. NO RNG.
+ */
+export const WEALTH_ROUND_TIERS = 6;
+
 // CEO benchmark (Phase 10d)
 /** Capital the benchmarked CEO's storefront is seeded with at scenario start ($). */
 export const BENCH_START_CAPITAL = 50_000;

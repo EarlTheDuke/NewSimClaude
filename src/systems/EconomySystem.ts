@@ -10,6 +10,10 @@ import {
   LEISURE_PRICE_SPREAD,
   LEISURE_TOLERANCE_TIERS,
   STORE_TRAVEL_WEIGHT,
+  WEALTH_BASELINE,
+  WEALTH_ELASTICITY,
+  WEALTH_DEMAND_CAP,
+  WEALTH_ROUND_TIERS,
 } from "./constants";
 
 /**
@@ -65,11 +69,20 @@ export class EconomySystem implements System {
     if (resident.activity !== "eating" || resident.needs.hunger >= 100) return;
     const diner = this.storeForResident(resident, "diner");
     if (!diner) return;
-    const paid = this.world.transfer(resident.id, diner.id, diner.price);
-    if (paid <= 0) return; // can't afford it; stays hungry, brain will retry
-    resident.needs.hunger = 100;
-    diner.pnl.revenue += paid;
-    diner.inventory = Math.max(0, diner.inventory - 1);
+    // A richer resident orders more in one sitting (Phase 13); at baseline wealth
+    // — or with the keystone off (WEALTH_ELASTICITY 0) — this is exactly one meal,
+    // as before. Each unit is its own transfer, so the loop simply stops when the
+    // resident runs out of cash or the diner runs out of stock; over-ordering is
+    // structurally impossible.
+    const units = consumptionUnits(resident);
+    for (let k = 0; k < units; k++) {
+      const paid = this.world.transfer(resident.id, diner.id, diner.price);
+      if (paid <= 0) break; // can't afford the next one; stays hungry, brain will retry
+      if (k === 0) resident.needs.hunger = 100; // one meal sates hunger; the rest are splurge
+      diner.pnl.revenue += paid;
+      diner.inventory = Math.max(0, diner.inventory - 1);
+      if (diner.inventory === 0) break; // shelves empty — later visitors get fewer
+    }
   }
 
   private spendIfSocializing(resident: Resident): void {
@@ -82,16 +95,22 @@ export class EconomySystem implements System {
     // venue's asking price sits at or below their willingness-to-pay. At or below
     // the anchor everyone still buys (back-compat); as a venue prices above it,
     // buyers drop out a tier at a time, so a storefront faces a real
-    // raise-price-lose-volume tradeoff instead of captive demand.
-    const cost = venue.price > 0 ? venue.price : SOCIAL_SPEND;
-    const anchor = RETAIL_REFERENCE_PRICE[venue.kind];
-    if (anchor !== undefined && cost > this.leisureReservation(resident, anchor) + 1e-9) {
-      return; // priced past this resident's reservation — they window-shop, buy nothing
-    }
-    const paid = this.world.transfer(resident.id, venue.id, cost);
-    if (paid > 0) {
+    // raise-price-lose-volume tradeoff instead of captive demand. A richer
+    // resident buys more units in the visit (Phase 13) — each its own transfer,
+    // gated identically; at baseline wealth (or keystone off) it is one unit, so
+    // the body below runs exactly once, byte-identical to before.
+    const units = consumptionUnits(resident);
+    for (let k = 0; k < units; k++) {
+      const cost = venue.price > 0 ? venue.price : SOCIAL_SPEND;
+      const anchor = RETAIL_REFERENCE_PRICE[venue.kind];
+      if (anchor !== undefined && cost > this.leisureReservation(resident, anchor) + 1e-9) {
+        break; // priced past this resident's reservation — they window-shop, buy nothing
+      }
+      const paid = this.world.transfer(resident.id, venue.id, cost);
+      if (paid <= 0) break; // out of cash for the next unit
       venue.pnl.revenue += paid;
       if (venue.inventory > 0) venue.inventory -= 1;
+      if (venue.inventory === 0) break; // shelves empty
     }
   }
 
@@ -153,4 +172,32 @@ export class EconomySystem implements System {
       return best;
     });
   }
+}
+
+/**
+ * How many units a resident buys in a single eating/socializing visit —
+ * "wants grow with wealth" (Phase 13). At or below {@link WEALTH_BASELINE} (the
+ * seeded starting balance) everyone buys exactly one, exactly like today; the
+ * richer a resident is, the bigger their order, up to {@link WEALTH_DEMAND_CAP}.
+ *
+ * Pure and RNG-free: the real-valued multiplier `ratio ^ elasticity` is turned
+ * into an integer by a per-resident phase offset — the same deterministic
+ * id-index {@link EconomySystem.leisureReservation} relies on — so the fractional
+ * unit is spread across the population (aggregate demand tracks the elasticity
+ * smoothly) without ever touching the seeded RNG stream. With `elasticity` at 0
+ * it short-circuits to 1: a hard global off switch, and the byte-identity
+ * guarantee for Phase 13a. `elasticity` defaults to the shipped
+ * {@link WEALTH_ELASTICITY}; callers in tests pass an explicit value to exercise
+ * the curve before the city-wide knob is turned up in 13b.
+ */
+export function consumptionUnits(
+  resident: Pick<Resident, "id" | "money">,
+  elasticity: number = WEALTH_ELASTICITY,
+): number {
+  if (elasticity === 0) return 1;
+  const ratio = Math.max(0, resident.money) / WEALTH_BASELINE;
+  const mult = Math.min(WEALTH_DEMAND_CAP, Math.max(1, Math.pow(ratio, elasticity)));
+  const idx = Number(resident.id.split("_")[1] ?? 0);
+  const phase = (idx % WEALTH_ROUND_TIERS) / WEALTH_ROUND_TIERS;
+  return Math.floor(mult + phase);
 }
