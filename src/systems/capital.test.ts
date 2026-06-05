@@ -328,23 +328,16 @@ describe("Phase 12c step 5 — rules-brain invest in a live sim", () => {
     }
   });
 
-  it("documents the seeded city's blocker: distribute-before-review drains cushion before invest can fire", () => {
-    // What this test pins: under the current system ordering, distribute runs
-    // *before* the agent reviews. The diner sees its cash drained to reserve
-    // every day (distribution caps at $900/day but always drains *something*
-    // above reserve), and the heuristic's "dayProfit > 50" check therefore
-    // sees a distribution-dominated negative number. The lever is silent even
-    // in an engineered cushion scenario — capital stays at where we put it.
+  it("13c reorder fires the invest lever: a capacity-bound, profitable firm reinvests (was the seeded city's blocker)", () => {
+    // The Phase 13c reorder moved profit distribution to a DistributionSystem that
+    // runs *after* the agent review (it used to run inside MarketSystem, before
+    // it). So the agent now sees its full day's surplus when it decides, instead
+    // of cash already drained to reserve. That was the blocker that pinned
+    // investedDays at 0 and capital at baseline — it is gone.
     //
-    // This isn't a bug in the lever; it's the cost of the existing system
-    // order. Real growth requires either (a) reordering invest-before-
-    // distribute (a 12e/12d candidate), (b) a different "I'm profitable"
-    // signal that strips out the distribution drain, or (c) a benchmark
-    // scenario that turns distribution off. All three are 12e questions.
-    //
-    // Until then, the lever ships *capable* (proven by the step-3/4 tests),
-    // but inert under default dynamics. Locking the current behaviour here
-    // means we'll *notice* when 12e changes it.
+    // A capital-starved diner (low capital => capacity-bound, high utilization)
+    // sitting on a fat cushion now ploughs surplus into equipment, and money
+    // stays conserved (invest is a transfer to the factory; nothing is minted).
     const { sim, world, agent } = createCity({
       seed: 1,
       brain: "rules",
@@ -352,14 +345,16 @@ describe("Phase 12c step 5 — rules-brain invest in a live sim", () => {
     });
     const diner = world.getBusiness("biz_diner")!;
     diner.cash = 50_000;
-    diner.capital = 30; // capacity-bound by design
+    diner.capital = 30; // capacity-bound by design (low capital -> utilization at the ceiling)
     const startCapital = diner.capital;
+    const startMoney = world.totalMoney();
 
     sim.run(TICKS_PER_DAY * 30);
 
     const investedDays = agent!.decisions().filter((d) => (d.action.invest ?? 0) > 0).length;
-    expect(investedDays).toBe(0); // the heuristic never fires under steady-state distribute order
-    expect(diner.capital).toBe(startCapital); // ...so capital is exactly where we left it
+    expect(investedDays).toBeGreaterThan(0); // the lever fires now (was locked at 0 pre-13c)
+    expect(diner.capital!).toBeGreaterThan(startCapital); // capital actually deepened
+    expect(world.totalMoney()).toBeCloseTo(startMoney, 3); // conservation still holds
   });
 
   it("the reserve floor protects solvency: a low-cash diner doesn't get invested into bankruptcy", () => {
@@ -382,5 +377,38 @@ describe("Phase 12c step 5 — rules-brain invest in a live sim", () => {
     // The firm survived (didn't disappear) and didn't go negative.
     expect(diner.active).toBe(true);
     expect(diner.cash).toBeGreaterThanOrEqual(-1e-6);
+  });
+});
+
+/**
+ * Phase 13c — the invest loop closes end-to-end. With the reorder (the agent
+ * reviews before the daily dividend) and the demand keystone on, a full agentic
+ * city now books real investment over a year and ends with more capital than it
+ * started: the Phase 12 engine is no longer inert. (Capital-deepening is modest
+ * in the current calibration — utilization structurally peaks ~0.5, so businesses
+ * are never hard capacity-bound; pushing toward a true Solow engine is a later
+ * capacity-calibration phase. What this pins is that the lever fires, capital
+ * responds, and conservation holds.)
+ */
+describe("Phase 13c — the invest loop closes", () => {
+  it("a sustained agentic year books investment, deepens capital, and conserves money", () => {
+    const { sim, world, agent } = createCity({
+      seed: 1,
+      brain: "rules",
+      residentBrain: "rules",
+      agenticBusinessIds: ["biz_diner", "biz_goods", "biz_farm", "biz_factory", "biz_mine", "biz_bakery"],
+      agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
+    });
+    const startMoney = world.totalMoney();
+    const capital = () => world.businesses.reduce((s, b) => s + (b.capital ?? CAPITAL_BASELINE), 0);
+    const startCapital = capital();
+
+    sim.run(TICKS_PER_DAY * 365);
+
+    const investedDays = agent!.decisions().filter((d) => (d.action.invest ?? 0) > 0).length;
+    expect(investedDays).toBeGreaterThan(0); // the lever fired during the year (was 0 pre-13c)
+    expect(capital()).toBeGreaterThan(startCapital); // capital deepened above baseline
+    expect(world.totalMoney()).toBeCloseTo(startMoney, 2); // the closed economy still balances
+    for (const b of world.businesses) expect(b.active).toBe(true); // nobody collapsed
   });
 });

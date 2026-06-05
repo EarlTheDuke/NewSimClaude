@@ -141,6 +141,25 @@ export const BUSINESS_RESERVE = 3000;
 /** Max profit a single business disburses to residents per day ($). */
 export const PROFIT_DISTRIBUTION_CAP = 900;
 /**
+ * Phase 13c — the invest lever fires only when a capacity-bound business has at
+ * least this much profit sitting above its reserve at review time. After the 13c
+ * reorder the agent reviews *before* the daily dividend, so cash-above-reserve is
+ * the day's undistributed operating profit: this keeps the lever off on a thin
+ * day and lets it engage on a fat one. Tuned alongside the elasticity in the soak.
+ */
+export const INVEST_MIN_SURPLUS = 200;
+/**
+ * Phase 13c — the daily-capacity utilization a business must clear to count as
+ * "busy enough that more equipment pays off." Utilization here is the day's
+ * production as a fraction of the labour-/capital-limited ceiling; because each
+ * business refills to a fixed stock target it can always reach, utilization in
+ * this model tops out near ~0.5 rather than 1.0, so the trigger sits below that
+ * practical ceiling. (Raising the ceiling toward a true 1.0 — so demand presses
+ * hard against capacity and capital-deepening compounds — is a later
+ * capacity-calibration phase; see the Phase 13c notes.)
+ */
+export const INVEST_UTILIZATION_THRESHOLD = 0.45;
+/**
  * Starting productive capital for every business (Phase 12). A dimensionless
  * index, not money: capital is quoted relative to this baseline, and the Phase
  * 12b capacity formula is calibrated so that a business at baseline capital

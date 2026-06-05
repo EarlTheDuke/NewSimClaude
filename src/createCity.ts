@@ -6,6 +6,7 @@ import { BrainSystem } from "./systems/BrainSystem";
 import { MovementSystem } from "./systems/MovementSystem";
 import { EconomySystem } from "./systems/EconomySystem";
 import { MarketSystem } from "./systems/MarketSystem";
+import { DistributionSystem } from "./systems/DistributionSystem";
 import { EventSystem, type EventSystemOptions } from "./systems/EventSystem";
 import { GodMode } from "./systems/GodMode";
 import { NeedsSystem } from "./systems/NeedsSystem";
@@ -119,6 +120,14 @@ export function createCity(options: CitySimOptions = {}): {
     );
     sim.addSystem(agent);
   }
+
+  // Profit distribution runs AFTER the business agent (Phase 13c): a business
+  // reviews its day with its full operating profit still in hand, so it can
+  // reinvest part in equipment before the rest flows out as the daily dividend —
+  // the change that finally fires the dormant invest lever. With no agent this
+  // sits right where distribution always ran (just after the market), so the
+  // brain-off baseline is byte-identical.
+  sim.addSystem(new DistributionSystem(world));
 
   let residentAgent: ResidentAgentSystem | undefined;
   const residentBrain = options.residentBrain ?? "off";

@@ -114,20 +114,22 @@ describe("RuleBasedProvider", () => {
     expect(rules.decide(req()).reason.length).toBeGreaterThan(0);
   });
 
-  // Phase 12c — the invest heuristic.
+  // Phase 12c invest heuristic, fired by the 13c reorder.
   //
-  // The rule fires only when all three conditions hold: the firm is
-  // capacity-bound (utilization near 1.0), recently profitable, and sitting on
-  // a cash cushion well above its working-capital reserve. Missing any one of
-  // those leaves the lever off — capital is dead weight if there's slack
-  // capacity, and an under-cushioned firm shouldn't compound risk.
+  // The rule fires when two conditions hold: the firm is capacity-bound
+  // (utilization above INVEST_UTILIZATION_THRESHOLD) AND it is sitting on a real
+  // surplus above its working-capital reserve. After the 13c reorder the agent
+  // reviews *before* the daily dividend, so that surplus is the day's operating
+  // profit — the old separate "dayProfit > 50" gate was always distribution-
+  // dominated and has been removed. A slack-capacity or under-cushioned firm
+  // still gets nothing.
   const investContext = {
     capacityUtilization: 0.95,
     dayProfit: 200,
     cash: 10_000,
   };
 
-  it("invests when capacity-bound, profitable, and cash-cushioned", () => {
+  it("invests when capacity-bound and sitting on a surplus", () => {
     const d = rules.decide(req(investContext));
     expect(d.action.invest).toBeGreaterThan(0);
     expect(d.reason).toMatch(/invest/i);
@@ -143,15 +145,11 @@ describe("RuleBasedProvider", () => {
     expect(d.action.invest).toBeUndefined();
   });
 
-  it("does NOT invest when not recently profitable", () => {
-    const d = rules.decide(req({ ...investContext, dayProfit: -10 }));
-    expect(d.action.invest).toBeUndefined();
-  });
-
-  it("does NOT invest when cash is barely above reserve (no cushion)", () => {
-    // BUSINESS_RESERVE is 3000 (per systems/constants), so any cash under 4500
-    // fails the 1.5x cushion test even if the other two signals are green.
-    const d = rules.decide(req({ ...investContext, cash: 3500 }));
+  it("does NOT invest when cash is barely above reserve (no surplus to deploy)", () => {
+    // BUSINESS_RESERVE is 3000; the lever needs cash above reserve +
+    // INVEST_MIN_SURPLUS (200) = 3200, so a firm at 3100 stays put even when
+    // capacity-bound.
+    const d = rules.decide(req({ ...investContext, cash: 3100 }));
     expect(d.action.invest).toBeUndefined();
   });
 });

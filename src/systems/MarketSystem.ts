@@ -10,9 +10,6 @@ import {
   PRICE_ADJUST_FRACTION,
   PRICE_REVERT_FRACTION,
   PRICE_REVERT_SNAP,
-  LANDLORD_RESERVE,
-  BUSINESS_RESERVE,
-  PROFIT_DISTRIBUTION_CAP,
   CAPITAL_BASELINE,
   CAPITAL_OUTPUT_ELASTICITY,
   CAPITAL_DEPRECIATION_RATE,
@@ -61,7 +58,8 @@ export class MarketSystem implements System {
     this.procure(sold);
     this.produce();
     this.depreciate();
-    this.distributeProfits();
+    // Profit distribution moved out to DistributionSystem (Phase 13c) so it runs
+    // *after* the business agent — letting a firm reinvest before paying dividends.
     this.adjustPrices(sold);
   }
 
@@ -125,31 +123,6 @@ export class MarketSystem implements System {
       biz.resources[input] = (biz.resources[input] ?? 0) + bought;
       producer.pnl.revenue += paid;
       sold[input] += bought;
-    }
-  }
-
-  /**
-   * Profit distribution — the feedback that keeps the closed loop alive. Each
-   * day every business pays cash above its working-capital reserve back to
-   * residents (evenly, as wages/dividends), capped per business. In a closed
-   * supply chain B2B transfers net to zero, so any per-business surplus would
-   * otherwise pool forever in one holder (the rent-collecting landlord, a busy
-   * diner). Returning it to people who re-spend it at the shops recirculates the
-   * money instead of letting it stagnate. The transfer cap already prevents a
-   * business from paying out cash it doesn't have.
-   */
-  private distributeProfits(): void {
-    const residents = this.world.residents;
-    if (residents.length === 0) return;
-    for (const biz of this.world.businesses) {
-      if (!biz.active) continue;
-      const reserve = biz.kind === "landlord" ? LANDLORD_RESERVE : BUSINESS_RESERVE;
-      const budget = Math.min(biz.cash - reserve, PROFIT_DISTRIBUTION_CAP);
-      if (budget <= 0) continue;
-      const share = budget / residents.length;
-      for (const r of residents) {
-        biz.pnl.wagesPaid += this.world.transfer(biz.id, r.id, share);
-      }
     }
   }
 

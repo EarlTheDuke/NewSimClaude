@@ -4,7 +4,11 @@ import type {
   DecisionProvider,
   DecisionRequest,
 } from "./types";
-import { BUSINESS_RESERVE } from "../systems/constants";
+import {
+  BUSINESS_RESERVE,
+  INVEST_MIN_SURPLUS,
+  INVEST_UTILIZATION_THRESHOLD,
+} from "../systems/constants";
 
 /**
  * The deterministic control mind, and the safety net.
@@ -82,26 +86,26 @@ export class RuleBasedProvider implements DecisionProvider {
       notes.push("cash low, laying off 1");
     }
 
-    // Invest (Phase 12c): buy equipment when the firm is *capacity-bound* —
-    // utilization sitting near the ceiling, so more machines would actually
-    // pay off — AND recently profitable AND sitting on a cushion well above
-    // its working-capital reserve. Plain-English: "I'm slammed, I'm earning,
-    // and I have headroom — buy more equipment so I can ship more tomorrow."
-    // The per-review cap and the cash-vs-reserve floor live downstream in
-    // BusinessAgentSystem.apply(), so the provider can ask freely and trust
-    // the clamps. A capital-light firm with low utilization gets nothing
-    // from more equipment, so this rule keeps the lever off in that case.
+    // Invest (Phase 12c, fired by 13c): buy equipment when the firm is
+    // *capacity-bound* — utilization near the ceiling, so more machines would
+    // actually pay off — AND it turned a real profit today. After the 13c reorder
+    // the agent reviews *before* the daily dividend, so cash above reserve is the
+    // day's undistributed operating profit; a fat day clears INVEST_MIN_SURPLUS, a
+    // thin one doesn't. Plain-English: "I'm slammed and I earned well today, so I'll
+    // plough half of today's takings back into equipment and pay the rest out."
+    // (The old `dayProfit > 50` gate is gone: under the pre-13c ordering the
+    // dividend drained cash to reserve *before* review, so that signal was always
+    // distribution-dominated and negative and the lever never fired.) The per-review
+    // cap and the reserve floor downstream in BusinessAgentSystem.apply() still
+    // bound the ask, so the provider can request freely and trust the clamps.
     if (
       o.capacityUtilization !== undefined &&
-      o.capacityUtilization > 0.85 &&
-      o.dayProfit > 50 &&
-      o.cash > BUSINESS_RESERVE * 1.5
+      o.capacityUtilization > INVEST_UTILIZATION_THRESHOLD &&
+      o.cash > BUSINESS_RESERVE + INVEST_MIN_SURPLUS
     ) {
-      // Ask for half the cushion above reserve; the static per-review cap
-      // shrinks it further. Half (not all) leaves room for the next day's
-      // operating needs without putting growth ahead of solvency.
+      // Reinvest half of today's surplus; the rest flows out as the dividend.
       action.invest = (o.cash - BUSINESS_RESERVE) / 2;
-      notes.push("capacity-bound + profitable, investing in equipment");
+      notes.push("capacity-bound + profitable, reinvesting half the day's surplus");
     }
 
     return {
