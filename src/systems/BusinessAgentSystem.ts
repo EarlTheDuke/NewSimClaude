@@ -12,7 +12,7 @@ import type {
 } from "../ai/types";
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
-import { BUSINESS_RESERVE, CAPITAL_BASELINE, MAX_WAGE_MULT, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR } from "./constants";
+import { BUSINESS_RESERVE, CAPITAL_BASELINE, MAX_WAGE_MULT, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY } from "./constants";
 import { ARCHETYPES, desiredHeadcount } from "../world/archetypes";
 import type { MarketSystem } from "./MarketSystem";
 
@@ -62,6 +62,13 @@ export class BusinessAgentSystem implements System {
      * unchanged, which keeps existing direct constructions working.
      */
     private readonly market?: MarketSystem,
+    /**
+     * The effective brand-demand elasticity for this city (Phase 17) — surfaced in
+     * the observation so a mind knows whether marketing pays here. Defaults to the
+     * live {@link BRAND_DEMAND_ELASTICITY}; the CEO bench passes its frozen 0, which
+     * keeps the rules brain from spending on a dead lever (preserving rules>off).
+     */
+    private readonly brandElasticity: number = BRAND_DEMAND_ELASTICITY,
   ) {
     this.limits = limits;
   }
@@ -138,11 +145,11 @@ export class BusinessAgentSystem implements System {
     const clamped = clampAction(decision.action, biz.price, this.limits);
     if (clamped.setPrice !== undefined) biz.price = clamped.setPrice;
     if (clamped.hire !== undefined && clamped.hire !== 0) this.applyHire(biz, clamped.hire);
+    if (clamped.brand !== undefined && clamped.brand > 0) {
+      clamped.brand = this.applyBrand(biz, clamped.brand); // Phase 17 — brand takes its slice first
+    }
     if (clamped.invest !== undefined && clamped.invest > 0) {
       clamped.invest = this.applyInvest(biz, clamped.invest);
-    }
-    if (clamped.brand !== undefined && clamped.brand > 0) {
-      clamped.brand = this.applyBrand(biz, clamped.brand); // Phase 17
     }
     if (clamped.setWage !== undefined) this.applySetWage(biz, clamped.setWage);
     if (clamped.setPayout !== undefined) biz.payoutRate = clamped.setPayout; // Phase 16
@@ -316,6 +323,7 @@ export class BusinessAgentSystem implements System {
       capacityUtilization: this.market?.capacityUtilizationFor(biz.id),
       brand: biz.brand,
       brandSpent: biz.brandSpent,
+      brandElasticity: this.brandElasticity,
     };
   }
 

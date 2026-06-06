@@ -9,6 +9,7 @@ import {
   INVEST_MIN_SURPLUS,
   INVEST_UTILIZATION_THRESHOLD,
   MAX_WAGE_MULT,
+  BRAND_SURPLUS_FRACTION,
 } from "../systems/constants";
 
 /**
@@ -83,6 +84,26 @@ export class RuleBasedProvider implements DecisionProvider {
     } else if (o.cash < 200 && o.employeeCount > 1) {
       action.hire = -1;
       notes.push("cash low, laying off 1");
+    }
+
+    // Brand (Phase 17d): grow demand when capacity-bound + profitable. GOODS-ONLY —
+    // only the goods storefront has a demand hook (meals are inelastic), so a
+    // producer/diner brand spend can never pay back; the rules CEO must not burn cash
+    // on a dead lever. Gated on a live brand elasticity (o.brandElasticity > 0) so the
+    // frozen CEO bench — where marketing has no payoff — never spends on it (which keeps
+    // the sacred rules>off ordering). Brand takes its slice of the surplus BEFORE invest
+    // so the two levers split the cash-minus-reserve pool instead of fighting over it.
+    if (
+      o.kind === "goods" &&
+      o.referencePrice !== undefined &&
+      o.brandElasticity !== undefined &&
+      o.brandElasticity > 0 &&
+      o.capacityUtilization !== undefined &&
+      o.capacityUtilization > INVEST_UTILIZATION_THRESHOLD &&
+      o.cash > BUSINESS_RESERVE + INVEST_MIN_SURPLUS
+    ) {
+      action.brand = (o.cash - BUSINESS_RESERVE) * BRAND_SURPLUS_FRACTION;
+      notes.push("capacity-bound + profitable, spending on brand to grow demand");
     }
 
     // Invest (Phase 12c, fired by 13c): buy equipment when the firm is

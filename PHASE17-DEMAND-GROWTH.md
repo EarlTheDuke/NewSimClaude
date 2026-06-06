@@ -277,3 +277,28 @@ Per slice: `npm run typecheck && npm run test:run && npm run build` green; throw
 ## Rollback (overall)
 
 Each slice defaults to a no-op: `brand`/`brandSpent` absent ⇒ `?? BRAND_BASELINE` ⇒ `brandFactor ≡ 1` ⇒ Hook A `lift = 0`; the decay block skips at/below baseline; the rules heuristic doesn't exist until 17d. Revert any slice by leaving `BRAND_DEMAND_ELASTICITY = 0` (and, for 17d, removing the heuristic) ⇒ today's behaviour, byte-identical.
+
+## Status (as built — 2026-06-06)
+
+- **17a–17c shipped + green** (byte-identical seam → Hook A reservation lift → lever
+  surface). Brand is a real, conserved, bench-protected CEO lever (action + clamp +
+  `applyBrand` → landlord sink + observation + Claude tool).
+- **17d shipped + green (303 tests): the lever is ENGAGED.** `BRAND_DEMAND_ELASTICITY = 0.3`
+  live; the rules brain spends on brand goods-only, gated on a *live* `o.brandElasticity`
+  so the frozen CEO bench (elasticity 0) never spends on a dead lever — **`rules > off`
+  holds.** Hook A grows demand (proven in 17b + the engagement); the bench enriches the
+  lever with the coefficient frozen. The invest-loop (`capital.test`) and dividend
+  (`distribution.test`) tests are isolated from the new brand confounder via
+  `brandElasticity: 0` — the same freeze discipline as the bench + the leisure test.
+- **DoD limitation (real blocker — reported, not yet solved):** full *multi-year
+  compounding* (a goods storefront sustains utilization > 0.45 and grows capital in
+  year 2+) is **NOT** achieved. A 3-year full-agentic probe (seeds 1 & 7) shows the brand
+  engine fires in year 1 (goods brand + capital build) then **decays to baseline** — the
+  same self-extinguishing seen in 13c/14c. The root cause is **upstream of brand**: under
+  the demand-shifted economy the supply chain breaks (the factory bankrupts on the P10-3
+  labour drain — self-healed by business-entry, `producingKinds` stays 6/6 and the 3-year
+  soak passes), and goods utilization self-poisons as its own capital grows. **Brand
+  successfully pulls demand, but sustained compounding additionally needs the
+  supply-chain/labour fix + a capital-discounted utilization signal** — a deeper follow-up
+  (a dedicated supply-chain phase, or folded into Phase 18 credit). **Phase 16 slices 3+4
+  remain parked behind that** (retain-to-reinvest only compounds once the engine sustains).

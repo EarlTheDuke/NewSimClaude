@@ -424,6 +424,7 @@ describe("Phase 13c — the invest loop closes", () => {
       seed: 1,
       brain: "rules",
       residentBrain: "rules",
+      brandElasticity: 0, // Phase 17 — isolate the invest loop from the brand demand confounder
       agenticBusinessIds: ["biz_diner", "biz_goods", "biz_farm", "biz_factory", "biz_mine", "biz_bakery"],
       agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
     });

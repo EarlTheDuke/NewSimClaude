@@ -174,6 +174,15 @@ describe("RuleBasedProvider", () => {
     expect(d.action.setWage!).toBeLessThan(0.18);
     expect(d.action.setWage!).toBeGreaterThanOrEqual(0.1); // never below base
   });
+
+  // Phase 17d — the brand heuristic: goods-only, gated on a LIVE brand elasticity so
+  // the frozen CEO bench (elasticity 0) never spends on a dead lever (preserving rules>off).
+  it("spends on brand only for a goods store with live brand elasticity (Phase 17d)", () => {
+    const ctx = { kind: "goods" as const, referencePrice: 34, capacityUtilization: 0.95, cash: 10_000 };
+    expect(rules.decide(req({ ...ctx, brandElasticity: 0.3 })).action.brand).toBeGreaterThan(0); // live → fires
+    expect(rules.decide(req({ ...ctx, brandElasticity: 0 })).action.brand).toBeUndefined(); // frozen bench → no spend
+    expect(rules.decide(req({ ...ctx, kind: "factory", brandElasticity: 0.3 })).action.brand).toBeUndefined(); // non-goods → dead lever
+  });
 });
 
 describe("MockProvider", () => {

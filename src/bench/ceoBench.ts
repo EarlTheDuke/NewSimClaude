@@ -27,6 +27,7 @@ import {
   BENCH_TURNS,
   BENCH_WEALTH_ELASTICITY,
   BENCH_OWNER_DIVIDEND_SHARE,
+  BENCH_BRAND_DEMAND_ELASTICITY,
   CAPITAL_BASELINE,
 } from "../systems/constants";
 import type {
@@ -124,6 +125,7 @@ function setupScenario(config: CeoBenchConfig): {
     // stays a clean skill signal (all profit stays in the firm).
     wealthElasticity: BENCH_WEALTH_ELASTICITY,
     ownerDividendShare: BENCH_OWNER_DIVIDEND_SHARE,
+    brandElasticity: BENCH_BRAND_DEMAND_ELASTICITY,
     residentBrain: config.residentBrain ?? "off",
     agenticResidentIds: config.agenticResidentIds,
   });

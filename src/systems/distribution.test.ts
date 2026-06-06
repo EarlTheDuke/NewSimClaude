@@ -19,6 +19,7 @@ describe("Phase 15 C — owner dividend", () => {
       seed: 1,
       brain: "rules",
       residentBrain: "rules",
+      brandElasticity: 0, // Phase 17 — isolate the dividend from the brand demand confounder
       agenticBusinessIds: ["biz_diner", "biz_goods", "biz_farm", "biz_factory", "biz_mine", "biz_bakery"],
       agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
     });
@@ -52,6 +53,7 @@ describe("Phase 15 C — owner dividend", () => {
         brain: "rules",
         residentBrain: "rules",
         ownerDividendShare,
+        brandElasticity: 0, // Phase 17 — isolate the dividend from the brand demand confounder
         agenticBusinessIds: ["biz_diner", "biz_goods", "biz_farm", "biz_factory", "biz_mine", "biz_bakery"],
         agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
       });

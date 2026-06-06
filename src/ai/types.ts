@@ -104,6 +104,13 @@ export interface BusinessObservation {
   brand?: number;
   /** Cumulative cash this firm has spent on brand (Phase 17); absent ⇒ 0. */
   brandSpent?: number;
+  /**
+   * How strongly brand lifts willingness-to-pay in this firm's market (Phase 17) —
+   * the live demand elasticity, surfaced so a mind knows whether marketing pays here.
+   * 0 (e.g. the frozen CEO bench) means brand spend has no demand payoff. Absent on
+   * pre-17 observations.
+   */
+  brandElasticity?: number;
 }
 
 /**

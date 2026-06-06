@@ -318,7 +318,7 @@ export const CAPITAL_DEPRECIATION_RATE = 0.01;
  * never seeded ⇒ a no-spend city sits at baseline forever (byte-identical to pre-17).
  */
 export const BRAND_BASELINE = 100; // demand-capital scale, twin of CAPITAL_BASELINE
-export const BRAND_DEMAND_ELASTICITY = 0; // Hook A master knob. OFF (17a-17c); ~0.3 live in 17d.
+export const BRAND_DEMAND_ELASTICITY = 0.3; // Hook A master knob. Live since 17d (bench frozen at 0).
 export const BRAND_UNITS_ELASTICITY = 0; // Hook B (units/visit) — OFF for all of Phase 17.
 export const BRAND_DEPRECIATION_RATE = 0.01; // daily decay of above-baseline brand (≈ capital)
 export const BRAND_PER_DOLLAR = 1; // cash -> stock; keeps brand on the capital scale
