@@ -45,3 +45,11 @@ Green on all three before committing. Throwaway/debug harnesses MUST be deleted 
 - **Do not port, fork, or copy `CityWithLifeGrok`** — inspiration only, never a code source.
 - Proceed phase by phase, checkpointing each sub-phase; gate high-risk work (e.g. logistics
   trucks) behind a feature flag that defaults OFF.
+
+## Autonomy
+When given a phase or task, execute it end-to-end without pausing for approval:
+- Make the reasonable default choice and proceed; note the choice, don't ask.
+- Each slice: flag-gated/byte-identical, verify typecheck + test:run + build GREEN, commit, push, continue.
+- Only stop to ask when: (a) a sacred invariant can't hold, (b) a direction/architecture fork
+  has no clear default, (c) an irreversible or external action, or (d) tests can't go green
+  after a genuine attempt. Otherwise: keep going.
