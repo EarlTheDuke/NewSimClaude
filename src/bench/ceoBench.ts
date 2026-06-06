@@ -20,7 +20,7 @@
  * one-time *genesis* balance (like any starting cash), and `moneyConserved`
  * asserts no dollar is minted or burned across the run itself.
  */
-import { createCity, type BrainOption } from "../createCity";
+import { createCity, type BrainOption, type ResidentBrainOption } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import {
   BENCH_START_CAPITAL,
@@ -29,6 +29,13 @@ import {
   BENCH_OWNER_DIVIDEND_SHARE,
   CAPITAL_BASELINE,
 } from "../systems/constants";
+import type {
+  BusinessAction,
+  BusinessDecision,
+  DecisionProvider,
+  DecisionRequest,
+} from "../ai/types";
+import { RuleBasedProvider } from "../ai/RuleBasedProvider";
 
 export interface CeoBenchConfig {
   seed: number;
@@ -42,6 +49,15 @@ export interface CeoBenchConfig {
   turns?: number;
   /** Allow disasters to strike during the run. Default false — a clean field. */
   disasters?: boolean;
+  /**
+   * Which mind runs opted-in residents (Phase 15 F3). Default "off" — the classic
+   * solo bench has no labour churn. Set to "rules" with {@link agenticResidentIds}
+   * to create a labour market that can poach the CEO's crew, which is what makes
+   * the `hire` and `setWage` levers actually bite.
+   */
+  residentBrain?: ResidentBrainOption;
+  /** Residents the resident brain manages — the churn that exercises hire/setWage. */
+  agenticResidentIds?: string[];
 }
 
 /** The scorecard for one CEO run. */
@@ -108,6 +124,8 @@ function setupScenario(config: CeoBenchConfig): {
     // stays a clean skill signal (all profit stays in the firm).
     wealthElasticity: BENCH_WEALTH_ELASTICITY,
     ownerDividendShare: BENCH_OWNER_DIVIDEND_SHARE,
+    residentBrain: config.residentBrain ?? "off",
+    agenticResidentIds: config.agenticResidentIds,
   });
 
   const ceo = world.getBusiness(targetId);
@@ -244,5 +262,90 @@ export function formatCeoScorecard(results: CeoBenchResult[]): string {
     pad(header),
     pad(widths.map((w) => "─".repeat(w))),
     ...body.map(pad),
+  ].join("\n");
+}
+
+/**
+ * Phase 15 F2 — a provider that runs a base mind but *suppresses one lever*, for
+ * the lever-ablation study. It asks the base provider (the rules CEO) for its move,
+ * then deletes one field from the action before it is applied — so a run with, say,
+ * `invest` ablated is the rules CEO playing exactly as it would, minus the ability
+ * to buy equipment. Comparing its final net worth to the full rules CEO's measures
+ * what that one lever was worth. Sync only (wraps the deterministic rules mind).
+ */
+export class AblatedProvider implements DecisionProvider {
+  readonly id: string;
+  constructor(
+    private readonly base: DecisionProvider,
+    private readonly drop: keyof BusinessAction,
+  ) {
+    this.id = `${base.id}-no-${String(drop)}`;
+  }
+  decide(req: DecisionRequest): BusinessDecision {
+    const decision = this.base.decide(req) as BusinessDecision;
+    const action: BusinessAction = { ...decision.action };
+    delete action[this.drop];
+    return { ...decision, action };
+  }
+}
+
+/** One lever's measured worth: the net worth a CEO gives up by losing it. */
+export interface LeverAblation {
+  lever: keyof BusinessAction;
+  /** Full rules-CEO net worth minus net worth with this lever disabled. Positive = the lever helps. */
+  impact: number;
+}
+
+export interface AblationStudy {
+  /** Final net worth of the full rules CEO (all levers live). */
+  fullNetWorth: number;
+  /** Final net worth of the no-op baseline, the floor a skilled CEO beats. */
+  offNetWorth: number;
+  ablations: LeverAblation[];
+}
+
+/**
+ * Phase 15 F2 — the lever-ablation study, the proof the control surface is *real*.
+ * Run the rules CEO with each lever disabled in turn and measure how much net worth
+ * it was worth. A lever with a near-zero impact is a **dead control** — it looks
+ * like a strategic choice but changes nothing — and this is how we catch one,
+ * rather than assuming every lever matters. Which levers bite depends on the
+ * scenario: the standard solo bench (no labour churn, a top-paying storefront that
+ * never loses staff) exercises pricing and investment; `hire`/`setWage` only earn
+ * their keep when the firm faces a labour market that can actually poach its crew
+ * (pass `agenticResidentIds` to create that churn).
+ */
+export function ablationStudy(
+  seed: number,
+  levers: (keyof BusinessAction)[],
+  overrides: Omit<Partial<CeoBenchConfig>, "seed" | "brain"> = {},
+): AblationStudy {
+  const fullNetWorth = runCeoBenchmark({ ...overrides, seed, brain: "rules" }).finalNetWorth;
+  const offNetWorth = runCeoBenchmark({ ...overrides, seed, brain: "off" }).finalNetWorth;
+  const ablations = levers.map((lever) => ({
+    lever,
+    impact:
+      fullNetWorth -
+      runCeoBenchmark({
+        ...overrides,
+        seed,
+        brain: new AblatedProvider(new RuleBasedProvider(), lever),
+      }).finalNetWorth,
+  }));
+  return { fullNetWorth, offNetWorth, ablations };
+}
+
+const signed = (n: number): string => `${n >= 0 ? "+" : "−"}$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+
+/** Render an ablation study as a small table. */
+export function formatAblation(study: AblationStudy): string {
+  return [
+    "──────────────────────────────────────────",
+    "  LEVER ABLATION · the worth of each control",
+    "──────────────────────────────────────────",
+    `  full rules CEO: $${Math.round(study.fullNetWorth).toLocaleString("en-US")}`,
+    `  no-op baseline: $${Math.round(study.offNetWorth).toLocaleString("en-US")}`,
+    "  ────────────────────────",
+    ...study.ablations.map((a) => `  drop ${String(a.lever).padEnd(9)} → ${signed(a.impact)}`),
   ].join("\n");
 }

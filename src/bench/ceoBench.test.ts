@@ -4,6 +4,7 @@ import {
   runCeoBenchmarkAsync,
   compareCeoBrains,
   formatCeoScorecard,
+  ablationStudy,
 } from "./ceoBench";
 import { BENCH_START_CAPITAL, BENCH_TURNS } from "../systems/constants";
 
@@ -79,6 +80,34 @@ describe("CEO benchmark (Phase 10d)", () => {
     it("the rules CEO outperforms the no-op baseline on final net worth", () => {
       const [off, rules] = compareCeoBrains(SEED, ["off", "rules"]);
       expect(rules!.finalNetWorth).toBeGreaterThan(off!.finalNetWorth);
+    });
+  });
+
+  describe("lever ablation (Phase 15 F2)", () => {
+    it("measures each control's worth and catches a dormant lever", () => {
+      // A churn scenario — a diner CEO with a live labour market around it — gives
+      // the CEO real pricing power and a capacity decision to get right or wrong.
+      const study = ablationStudy(SEED, ["setPrice", "invest", "hire", "setWage"], {
+        targetBusinessId: "biz_diner",
+        residentBrain: "rules",
+        agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
+      });
+      const impact = (lever: "setPrice" | "invest" | "hire" | "setWage") =>
+        study.ablations.find((a) => a.lever === lever)!.impact;
+
+      // setPrice and invest each move net worth by a real margin — they are genuine
+      // strategic controls, not decoration. (The *sign* is context-dependent: a good
+      // CEO prices up but invests only when capacity-bound; investing into slack
+      // demand actually costs net worth here, which is the realistic lesson.)
+      expect(Math.abs(impact("setPrice"))).toBeGreaterThan(100);
+      expect(Math.abs(impact("invest"))).toBeGreaterThan(100);
+
+      // hire/setWage read ~0 here: the A3 hiring cap keeps staffing static (nothing
+      // can poach a fully-crewed firm), so these recovery levers stay dormant until
+      // the disruption that business entry/exit (slice D) introduces. Reading a
+      // dormant control as ~0 is exactly the signal this harness exists to surface.
+      expect(Math.abs(impact("hire"))).toBeLessThan(100);
+      expect(Math.abs(impact("setWage"))).toBeLessThan(100);
     });
   });
 

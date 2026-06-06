@@ -18,6 +18,8 @@ import {
   runCeoBenchmark,
   runCeoBenchmarkAsync,
   formatCeoScorecard,
+  ablationStudy,
+  formatAblation,
   type CeoBenchResult,
 } from "./ceoBench";
 import { ClaudeDecisionProvider } from "../ai/ClaudeDecisionProvider";
@@ -43,6 +45,10 @@ async function main(): Promise<void> {
   }
 
   console.log(formatCeoScorecard(results));
+
+  // Phase 15 F2 — show what each lever is actually worth to the rules CEO.
+  console.log("\n" + formatAblation(ablationStudy(SEED, ["setPrice", "invest", "hire", "setWage"])));
+
   if (!wantClaude) {
     console.log(
       "\nTip: pass --claude to pit the live LM-as-CEO against these baselines (needs ANTHROPIC_API_KEY).",
