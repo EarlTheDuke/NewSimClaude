@@ -53,7 +53,11 @@ export class DistributionSystem implements System {
     for (const biz of this.world.businesses) {
       if (!biz.active) continue;
       const reserve = biz.kind === "landlord" ? LANDLORD_RESERVE : BUSINESS_RESERVE;
-      const budget = Math.min(biz.cash - reserve, PROFIT_DISTRIBUTION_CAP);
+      // Phase 16 — the firm pays out only `payoutRate` of its capped surplus; the
+      // rest is retained as cash to reinvest. Default 1.0 ⇒ full distribution,
+      // byte-identical to pre-Phase-16.
+      const payoutRate = biz.payoutRate ?? 1;
+      const budget = Math.min(biz.cash - reserve, PROFIT_DISTRIBUTION_CAP) * payoutRate;
       if (budget <= 0) continue;
 
       // Owner's dividend first (Phase 15 C): a share λ of the day's profit goes to

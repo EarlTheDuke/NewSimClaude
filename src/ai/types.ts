@@ -127,6 +127,14 @@ export interface BusinessAction {
    * economy — so the conservation invariant is untouched.
    */
   setWage?: number;
+  /**
+   * Proposed fraction of the day's distributable surplus to pay out as dividends
+   * + recirculation (Phase 16); the rest is retained as cash — working capital the
+   * firm can reinvest. Clamped to [0,1]. The firm's {@link Business.payoutRate}
+   * defaults to 1.0 (full distribution), so until a mind lowers it the economy is
+   * byte-identical. Moves no cash itself.
+   */
+  setPayout?: number;
 }
 
 /**

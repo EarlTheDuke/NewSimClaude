@@ -142,6 +142,7 @@ export class BusinessAgentSystem implements System {
       clamped.invest = this.applyInvest(biz, clamped.invest);
     }
     if (clamped.setWage !== undefined) this.applySetWage(biz, clamped.setWage);
+    if (clamped.setPayout !== undefined) biz.payoutRate = clamped.setPayout; // Phase 16
 
     this.log.push({
       day,

@@ -67,3 +67,22 @@ describe("Phase 15 C — owner dividend", () => {
     expect(ownerGap(undefined)).toBeGreaterThan(ownerGap(0)); // undefined = the live share
   });
 });
+
+describe("Phase 16 — retain vs distribute (payoutRate)", () => {
+  it("a low payoutRate retains surplus instead of distributing it; default 1.0 unchanged + conserved", () => {
+    const run = (payoutRate: number | undefined) => {
+      const { sim, world } = createCity({ seed: 1 });
+      const goods = world.getBusiness("biz_goods")!;
+      goods.cash = 50_000; // genesis surplus, so there is plenty to distribute or retain
+      if (payoutRate !== undefined) goods.payoutRate = payoutRate;
+      const startMoney = world.totalMoney();
+      sim.run(TICKS_PER_DAY * 30);
+      return { cash: goods.cash, money: world.totalMoney(), startMoney };
+    };
+    const retained = run(0); // keep all surplus
+    const distributed = run(undefined); // default = full distribution (drains the capped surplus daily)
+    expect(retained.cash).toBeGreaterThan(distributed.cash + 10_000);
+    expect(retained.money).toBeCloseTo(retained.startMoney, 2); // closed economy still balances
+    expect(distributed.money).toBeCloseTo(distributed.startMoney, 2);
+  });
+});

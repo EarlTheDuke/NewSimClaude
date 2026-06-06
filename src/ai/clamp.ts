@@ -55,6 +55,11 @@ export function clampAction(
     out.setWage = clamp(action.setWage, limits.minWagePerTick, limits.maxWagePerTick);
   }
 
+  if (action.setPayout !== undefined && Number.isFinite(action.setPayout)) {
+    // Phase 16 — fraction of the distributable surplus to pay out (rest retained).
+    out.setPayout = clamp(action.setPayout, 0, 1);
+  }
+
   return out;
 }
 

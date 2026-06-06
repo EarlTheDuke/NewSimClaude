@@ -88,6 +88,13 @@ export interface Business {
   baseWagePerTick?: number;
   /** Running P&L since the start of the run. */
   pnl: ProfitAndLoss;
+  /**
+   * Fraction of its daily distributable surplus this firm pays out (dividends +
+   * recirculation); the rest is retained as cash to reinvest (Phase 16). Set by
+   * the `setPayout` lever; read by DistributionSystem. Undefined ⇒ 1.0 (full
+   * distribution) — byte-identical to pre-Phase-16.
+   */
+  payoutRate?: number;
   /** B2B resource stock on hand, keyed by resource (Phase 4). */
   resources: Partial<Record<ResourceKind, number>>;
   /** False once the business has gone bankrupt; it stops trading. */
