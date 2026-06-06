@@ -175,7 +175,8 @@ export class ClaudeDecisionProvider implements DecisionProvider {
       const utilStr = util !== undefined ? `, running at ${Math.round(util * 100)}% of capacity${util > 0.9 ? " (capacity-bound — more equipment would pay off)" : ""}` : "";
       lines.push(`Equipment (capital) ${round(o.capital)}${utilStr}.`);
     }
-    lines.push(`Yesterday: revenue ${round(o.dayRevenue)}, wages ${round(o.dayWages)}, rent ${round(o.dayRent)}, net ${round(o.dayProfit)}.`);
+    const distNote = o.dayDistributed !== undefined ? `, distributed ${round(o.dayDistributed)}` : "";
+    lines.push(`Yesterday: revenue ${round(o.dayRevenue)}, wages ${round(o.dayWages)}, rent/COGS ${round(o.dayRent)}${distNote}, net cash ${round(o.dayProfit)}.`);
     lines.push(`Choose this day's plan.`);
     return lines.join(" ");
   }

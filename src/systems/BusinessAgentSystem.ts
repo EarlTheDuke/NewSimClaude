@@ -235,13 +235,14 @@ export class BusinessAgentSystem implements System {
 
   private observe(biz: Business, day: number): BusinessObservation {
     const mark = this.marks.get(biz.id);
-    const prevPnl = mark?.pnl ?? { revenue: 0, wagesPaid: 0, rentCollected: 0 };
+    const prevPnl = mark?.pnl ?? { revenue: 0, wagesPaid: 0, rentCollected: 0, distributed: 0 };
     const prevCash = mark?.cash ?? biz.cash;
 
     const dayRevenue = biz.pnl.revenue - prevPnl.revenue;
     const dayWages = biz.pnl.wagesPaid - prevPnl.wagesPaid;
+    const dayDistributed = biz.pnl.distributed - prevPnl.distributed;
     const dayProfit = biz.cash - prevCash; // cash identity for non-landlords
-    const dayRent = dayRevenue - dayWages - dayProfit;
+    const dayRent = dayRevenue - dayWages - dayDistributed - dayProfit;
 
     // What the competing storefronts of this kind charge, averaged. Undefined
     // when this business is the only one of its kind (the pre-11b norm), so the
@@ -276,6 +277,7 @@ export class BusinessAgentSystem implements System {
       dayWages,
       dayRent,
       dayProfit,
+      dayDistributed,
       unemployedCount: this.world.residents.filter((r) => r.jobId === "").length,
       // Phase 12c — surface the two signals the invest lever reads: how much
       // equipment this firm owns, and how hard it ran yesterday relative to

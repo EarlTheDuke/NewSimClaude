@@ -65,12 +65,19 @@ export interface BusinessObservation {
   understaffed: boolean;
   /** Revenue booked during the day that just ended. */
   dayRevenue: number;
-  /** Wages paid during the day that just ended. */
+  /** Wages paid to staff during the day that just ended — labour cost only; the profit payout is {@link dayDistributed}. */
   dayWages: number;
-  /** Rent paid (negative cash) during the day that just ended. */
+  /** Rent + cost-of-goods paid during the day that just ended. */
   dayRent: number;
-  /** Net cash change over the day that just ended (revenue - wages - rent). */
+  /** Net cash change over the day that just ended (revenue − wages − rent/COGS − distribution). */
   dayProfit: number;
+  /**
+   * Profit paid out to residents/owner as dividends + recirculation during the
+   * day (Phase 16). Separate from {@link dayWages} so the wage signal is a true
+   * labour cost, not one inflated by the distribution pump. Undefined-safe for
+   * pre-Phase-16 mock observations.
+   */
+  dayDistributed?: number;
   /** Residents currently available to hire (jobId === ""). */
   unemployedCount: number;
   /**

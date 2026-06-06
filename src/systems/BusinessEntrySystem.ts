@@ -108,7 +108,7 @@ export class BusinessEntrySystem implements System {
       employeeIds: [],
       wagePerTick: wage,
       baseWagePerTick: wage,
-      pnl: { revenue: 0, wagesPaid: 0, rentCollected: 0 },
+      pnl: { revenue: 0, wagesPaid: 0, rentCollected: 0, distributed: 0 },
       resources: produces ? { [produces]: 0 } : {},
       active: true,
       capital: CAPITAL_BASELINE,

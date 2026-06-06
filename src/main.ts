@@ -311,7 +311,7 @@ function renderInspector(): void {
     const insolvent = b.insolventDays ?? 0;
     const util = market.capacityUtilizationFor(b.id);
     const utilStr = util !== undefined ? `${(util * 100).toFixed(0)}%` : "—";
-    const net = b.pnl.revenue + b.pnl.rentCollected - b.pnl.wagesPaid;
+    const net = b.pnl.revenue + b.pnl.rentCollected - b.pnl.wagesPaid - b.pnl.distributed;
     inspectorEl.innerHTML = `
       <h2>${b.name}</h2>
       <p class="tag">${b.kind}${b.active ? "" : " · CLOSED"}</p>
@@ -321,7 +321,7 @@ function renderInspector(): void {
       <p>employees: ${b.employeeIds.length} · wage ${b.wagePerTick.toFixed(2)}/tick</p>
       <p>capital: ${(b.capital ?? CAPITAL_BASELINE).toFixed(0)} · utilization: ${utilStr}</p>
       ${insolvent > 0 ? `<p class="warn">insolvent ${insolvent}d</p>` : ""}
-      <p class="pnl">revenue ${money(b.pnl.revenue)} · wages ${money(b.pnl.wagesPaid)} · rent ${money(b.pnl.rentCollected)} · net ${money(net)}</p>
+      <p class="pnl">revenue ${money(b.pnl.revenue)} · wages ${money(b.pnl.wagesPaid)} · rent ${money(b.pnl.rentCollected)} · dist ${money(b.pnl.distributed)} · net ${money(net)}</p>
     `;
   }
 }

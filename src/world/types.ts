@@ -116,8 +116,17 @@ export interface Business {
 
 export interface ProfitAndLoss {
   revenue: number;
+  /** Wages paid to staff (labour cost only). Profit payouts live in {@link distributed}. */
   wagesPaid: number;
   rentCollected: number;
+  /**
+   * Profit paid out to residents/owner as dividends + even recirculation by the
+   * DistributionSystem (Phase 16). Tracked separately from {@link wagesPaid} so a
+   * firm's labour cost isn't conflated with its profit payout — which keeps the CEO
+   * observation's wage signal a clean labour cost. Never money itself; it only
+   * records cash that already moved via World.transfer (conservation untouched).
+   */
+  distributed: number;
 }
 
 /**

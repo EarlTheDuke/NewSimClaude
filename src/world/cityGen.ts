@@ -113,7 +113,7 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
   const factoryLoc: Location = { id: "loc_factory", name: "Ironworks Factory", type: "workplace", nodeId: nodeId(2, 1) };
   locations.push(dinerLoc, goodsLoc, landlordLoc, farmLoc, mineLoc, bakeryLoc, factoryLoc);
 
-  const pnl = () => ({ revenue: 0, wagesPaid: 0, rentCollected: 0 });
+  const pnl = () => ({ revenue: 0, wagesPaid: 0, rentCollected: 0, distributed: 0 });
   businesses.push(
     { id: "biz_diner", name: dinerLoc.name, kind: "diner", ownerId: ownerOf(0), locationId: dinerLoc.id, cash: 4000, inventory: 40, price: DINER_MEAL_PRICE, employeeIds: [], wagePerTick: 0.17, pnl: pnl(), resources: { food: 0 }, active: true, capital: CAPITAL_BASELINE },
     { id: "biz_goods", name: goodsLoc.name, kind: "goods", ownerId: ownerOf(1), locationId: goodsLoc.id, cash: 4000, inventory: 20, price: GOODS_PRICE, employeeIds: [], wagePerTick: 0.20, pnl: pnl(), resources: { wares: 0 }, active: true, capital: CAPITAL_BASELINE },

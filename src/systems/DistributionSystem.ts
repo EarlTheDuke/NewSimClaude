@@ -11,8 +11,9 @@ import {
 /**
  * Profit distribution — the feedback that keeps the closed loop alive (was a step
  * inside {@link MarketSystem} through Phase 13b; split out in 13c). Each day every
- * business pays cash above its working-capital reserve back to residents (evenly,
- * as wages/dividends), capped per business. In a closed supply chain B2B transfers
+ * business pays cash above its working-capital reserve back to residents (the
+ * owner's dividend + an even recirculation, recorded in `pnl.distributed`, NOT as
+ * wages), capped per business. In a closed supply chain B2B transfers
  * net to zero, so any per-business surplus would otherwise pool forever in one
  * holder (the rent-collecting landlord, a busy diner). Returning it to people who
  * re-spend it at the shops recirculates the money instead of letting it stagnate.
@@ -62,7 +63,7 @@ export class DistributionSystem implements System {
       // branch is skipped and the split is the old even payout, byte-identical.
       const ownerCut = budget * this.ownerDividendShare;
       if (ownerCut > 0) {
-        biz.pnl.wagesPaid += this.world.transfer(biz.id, biz.ownerId, ownerCut);
+        biz.pnl.distributed += this.world.transfer(biz.id, biz.ownerId, ownerCut);
       }
 
       // The rest recirculates evenly to all residents — the closed economy's
@@ -70,7 +71,7 @@ export class DistributionSystem implements System {
       const share = (budget - ownerCut) / residents.length;
       if (share > 0) {
         for (const r of residents) {
-          biz.pnl.wagesPaid += this.world.transfer(biz.id, r.id, share);
+          biz.pnl.distributed += this.world.transfer(biz.id, r.id, share);
         }
       }
     }

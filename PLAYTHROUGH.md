@@ -135,10 +135,12 @@ firm-deaths) — but in this stationary, single-firm, recapitalized bench they s
        profit` (`BusinessAgentSystem.ts:244`) goes wrong as a result.
      - likely the **rules CEO's own decisions** — it sees wages > revenue every single
        day, which plausibly explains why it never pushes price up to the $42 optimum.
-   - **Fix:** don't add distribution to `wagesPaid`. Either drop the tally on those two
-     lines, or add a dedicated `pnl.distributed` field. Touches the `Business.pnl` type,
-     serialization, the CEO observation, and any test asserting `wagesPaid` — re-baseline
-     deliberately; the bench net-worth ordering must still hold.
+   - **FIXED ✅** — added `pnl.distributed`; `DistributionSystem` now tallies the owner
+     dividend + recirculation there, not in `wagesPaid`. The CEO observation reports real
+     wages (~$170/day vs the old ~$1,045) plus a separate `dayDistributed` signal, and
+     `dayRent` nets distribution out (reads as rent+COGS). The rules brain reads
+     `dayProfit` (cash, unchanged), so the bench baselines held — 292 tests green, net
+     worth on the play-by-play identical ($26,805).
 
 2. **🐞 / design — the demand cliff is a knife-edge.** With only 12 residents across 6
    reservation tiers, demand drops in chunky steps; the profit-optimal price ($42) is one
