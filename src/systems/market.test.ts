@@ -164,4 +164,72 @@ describe("MarketSystem (Phase 4 B2B layer)", () => {
       }
     });
   });
+
+  // Phase 15 (B) — producer cost-plus floor. A processor must never be forced to
+  // sell its output below what it pays for inputs + labour, or it bleeds to
+  // bankruptcy and starves the chain (P10-7). The floor is the reservation price
+  // that prevents that. It bites hardest for *processors* (who pay for an input);
+  // a primary producer over free resources is dominated by the flat band floor.
+  describe("Phase 15 (B) — producer cost-plus floor", () => {
+    it("floors a staffed processor's output above its input cost and the band floor", () => {
+      const { world, market } = createCity({ seed: 1 });
+      const factory = world.getBusiness("biz_factory")!;
+      const bakery = world.getBusiness("biz_bakery")!;
+      expect(factory.employeeIds.length).toBeGreaterThan(0);
+      expect(bakery.employeeIds.length).toBeGreaterThan(0);
+
+      // The wares floor sits above the flat band floor (the cost-plus markup is
+      // doing real work) AND above what the factory pays for materials, so the
+      // factory can never be priced into selling wares below its input cost.
+      expect(market.costFloorFor("wares")).toBeGreaterThan(
+        BASE_RESOURCE_PRICE.wares * PRICE_MIN_MULT,
+      );
+      expect(market.costFloorFor("wares")).toBeGreaterThan(market.priceBook().materials);
+      // Same story for the bakery (food over grain).
+      expect(market.costFloorFor("food")).toBeGreaterThan(
+        BASE_RESOURCE_PRICE.food * PRICE_MIN_MULT,
+      );
+      expect(market.costFloorFor("food")).toBeGreaterThan(market.priceBook().grain);
+      // ...yet held under the band ceiling, so the storefront downstream still
+      // keeps a margin over what it pays its supplier.
+      expect(market.costFloorFor("wares")).toBeLessThan(
+        BASE_RESOURCE_PRICE.wares * PRICE_MAX_MULT,
+      );
+    });
+
+    it("falls back to the band floor for an unstaffed primary producer (no input, no wage)", () => {
+      const { world, market } = createCity({ seed: 1 });
+      const mine = world.getBusiness("biz_mine")!;
+      mine.employeeIds = [];
+      // A primary producer buys no inputs; with no staff it has no wage cost
+      // either, so its floor is exactly the flat band floor — cost-plus correctly
+      // inert. (When producers go unstaffed under agentic play the chain's failure
+      // is a *labour* drain, addressed by the Phase 15 A+E labour market, not by
+      // this pricing floor.)
+      expect(market.costFloorFor("materials")).toBeCloseTo(
+        BASE_RESOURCE_PRICE.materials * PRICE_MIN_MULT,
+        6,
+      );
+    });
+
+    it("never trades a staffed processor's output below its input over a 100-day run", () => {
+      // The B2B-margin invariant the floor guarantees: with producers staffed (no
+      // agentic drain here), output price >= input price every single day — a
+      // processor is never underwater on the resource it buys. Without the floor a
+      // low-utilization transient can sag the output to the band floor, below the
+      // input, and that is the P10-7 bleed.
+      const { sim, world, market } = createCity({ seed: 1 });
+      for (let d = 0; d < 100; d++) {
+        sim.run(TICKS_PER_DAY);
+        const factory = world.getBusiness("biz_factory")!;
+        const bakery = world.getBusiness("biz_bakery")!;
+        if (factory.employeeIds.length > 0) {
+          expect(market.priceBook().wares).toBeGreaterThanOrEqual(market.priceBook().materials);
+        }
+        if (bakery.employeeIds.length > 0) {
+          expect(market.priceBook().food).toBeGreaterThanOrEqual(market.priceBook().grain);
+        }
+      }
+    });
+  });
 });

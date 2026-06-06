@@ -10,6 +10,13 @@ export const SLEEP_START_HOUR = 22;
 export const WAKE_HOUR = 7;
 export const WORK_START_HOUR = 9;
 export const WORK_END_HOUR = 17;
+/**
+ * Ticks a full-time worker is on shift in a day — the nominal 9–17 (8h × 60).
+ * Used as the cost basis for a producer's per-unit wage cost (Phase 15 B). Real
+ * resident schedules vary slightly (different start/end, days off), so this is a
+ * typical-day approximation — all a pricing *floor* needs.
+ */
+export const WORK_TICKS_PER_DAY = (WORK_END_HOUR - WORK_START_HOUR) * 60;
 
 /**
  * Fallback work pattern for any resident missing one — e.g. a pre-10a save
@@ -111,17 +118,20 @@ export const PRICE_MAX_MULT = 1.6;
 /**
  * Phase 15 (B) — whether a producer's resource price is floored at its *cost of
  * production* (input + wages) plus a margin, instead of the flat band floor
- * base*{@link PRICE_MIN_MULT}. OFF here: B1 ships the floor seam as a pure no-op
- * (the floor stays the old band floor, byte-identical). Turned ON in B2.
+ * base*{@link PRICE_MIN_MULT}. ON (B2): the floor is the cost-plus reservation
+ * price computed in {@link MarketSystem}'s priceFloor; B1 shipped the seam as a
+ * pure no-op with this off.
  *
  * Real-world: a supplier won't keep selling below its own cost — it goes broke.
  * Today's price-discovery loop has no such reservation, so on a long agentic run
  * a B2B producer's resource price can sag below what the firm pays for inputs and
  * wages, draining its cash until it goes bankrupt and starves the storefronts of
  * supply (P10-7). A cost-plus floor is the upstream fix that keeps the whole
- * supply chain solvent — the first, highest-leverage slice of Phase 15.
+ * supply chain solvent — the first, highest-leverage slice of Phase 15. It is the
+ * money-in that lets a producer afford the competitive wage the labour market
+ * (A) needs it to pay.
  */
-export const PRODUCER_COST_FLOOR = false;
+export const PRODUCER_COST_FLOOR = true;
 /**
  * Phase 15 (B) — the gross markup a producer adds over its unit cost (input +
  * labour) when {@link PRODUCER_COST_FLOOR} is on. A *fractional* markup, so the
@@ -129,7 +139,7 @@ export const PRODUCER_COST_FLOOR = false;
  * and leave a thin operating surplus (so the firm can fund a competitive wage and
  * the odd capital purchase) without squeezing the storefront that buys from it —
  * the floor is additionally capped below base*{@link PRICE_MAX_MULT} so a
- * storefront always keeps a margin over what it pays. Unused until B2.
+ * storefront always keeps a margin over what it pays.
  */
 export const PRODUCER_COST_PLUS_MARGIN = 0.15;
 /** Max single-day price move, as a fraction of the current price. */

@@ -12,6 +12,9 @@ import {
   PRICE_UTIL_LOW,
   PRICE_REVERT_FRACTION,
   PRICE_REVERT_SNAP,
+  PRODUCER_COST_FLOOR,
+  PRODUCER_COST_PLUS_MARGIN,
+  WORK_TICKS_PER_DAY,
   CAPITAL_BASELINE,
   CAPITAL_OUTPUT_ELASTICITY,
   CAPITAL_DEPRECIATION_RATE,
@@ -80,6 +83,18 @@ export class MarketSystem implements System {
    */
   capacityUtilizationFor(bizId: string): number | undefined {
     return this.lastUtilization.get(bizId);
+  }
+
+  /**
+   * The current cost-of-production floor for a resource (Phase 15, B) — the
+   * lowest price its producer's output may trade at. Read-only observability
+   * (parallels {@link capacityUtilizationFor}); the UI can surface "this firm
+   * can't profitably sell below X," and tests assert the floor binds. Equals the
+   * flat band floor when {@link PRODUCER_COST_FLOOR} is off or the producer is
+   * unstaffed (no wage cost to cover).
+   */
+  costFloorFor(res: ResourceKind): number {
+    return this.priceFloor(res, this.world.getBusiness(PRODUCER_OF[res]));
   }
 
   /**
@@ -245,15 +260,44 @@ export class MarketSystem implements System {
   /**
    * The lower bound a resource's market price may not fall below (Phase 15, B).
    * With {@link PRODUCER_COST_FLOOR} off this is the flat band floor
-   * base*{@link PRICE_MIN_MULT} — exactly today's behaviour, so the B1 seam is a
-   * pure no-op. On (B2) it becomes the producer's cost of production (input +
-   * wages) plus a margin, so price discovery can never drive a producer's revenue
-   * below its own costs and bankrupt the upstream chain (P10-7). Real-world: the
-   * reservation price a supplier won't sell beneath, the discipline that keeps the
-   * B2B supply chain solvent.
+   * base*{@link PRICE_MIN_MULT} — exactly today's behaviour, so the B1 seam was a
+   * pure no-op. On (B2) it becomes the producer's *cost of production* plus a
+   * margin, so price discovery can never drive a producer's revenue below its own
+   * costs and bankrupt the upstream chain (P10-7):
+   *
+   *   floor = (unitInputCost + unitWageCost) × (1 + margin)
+   *
+   * - unitInputCost: a processor turns one input unit into one output unit, so
+   *   its per-unit input cost is just that input's live market price; a primary
+   *   producer (farm/mine) buys nothing, so zero.
+   * - unitWageCost: the day's wage bill (posted wage/tick × head-count × an 8h
+   *   shift) spread over the day's production ceiling (effectiveCapacity). When a
+   *   producer is unstaffed there's no capacity to price against, so the band
+   *   floor stands.
+   *
+   * The result is clamped into [band floor, base*MAX*0.99]: never below today's
+   * floor, and held a hair under the band ceiling so the storefront that buys
+   * this resource always keeps a sliver of margin over what it pays. Real-world:
+   * the reservation price a supplier won't sell beneath — the discipline that
+   * keeps the B2B chain solvent, and the money-in that lets a producer afford a
+   * competitive wage (slice A). Pure: reads prices/staffing/capital, moves no
+   * cash, uses no RNG.
    */
-  private priceFloor(res: ResourceKind): number {
-    return BASE_RESOURCE_PRICE[res] * PRICE_MIN_MULT;
+  private priceFloor(res: ResourceKind, producer: Business | undefined): number {
+    const base = BASE_RESOURCE_PRICE[res];
+    const bandFloor = base * PRICE_MIN_MULT;
+    if (!PRODUCER_COST_FLOOR || !producer || !producer.active) return bandFloor;
+
+    const a = ARCHETYPES[producer.kind];
+    const inputCost = a.consumes ? this.prices[a.consumes] : 0;
+    const capacity = this.effectiveCapacity(producer);
+    const wageCost =
+      capacity > 0
+        ? (producer.wagePerTick * producer.employeeIds.length * WORK_TICKS_PER_DAY) / capacity
+        : 0;
+
+    const costPlus = (inputCost + wageCost) * (1 + PRODUCER_COST_PLUS_MARGIN);
+    return clamp(costPlus, bandFloor, base * PRICE_MAX_MULT * 0.99);
   }
 
   /**
@@ -277,16 +321,21 @@ export class MarketSystem implements System {
       const cap = producer ? this.effectiveCapacity(producer) : 0;
       const utilization = cap > 0 ? sold[res] / cap : 0;
       const base = BASE_RESOURCE_PRICE[res];
+      const floor = this.priceFloor(res, producer);
       let p = this.prices[res];
       if (utilization > PRICE_UTIL_HIGH) {
         p *= 1 + PRICE_ADJUST_FRACTION;
       } else if (utilization < PRICE_UTIL_LOW) {
         p *= 1 - PRICE_ADJUST_FRACTION;
       } else {
-        p += (base - p) * PRICE_REVERT_FRACTION;
-        if (Math.abs(base - p) <= base * PRICE_REVERT_SNAP) p = base;
+        // Neutral band: drift back toward base — or toward the cost floor when
+        // that sits above base (a high-input or high-wage producer), so the
+        // revert doesn't fight the floor and churn against the clamp.
+        const revertTarget = Math.max(base, floor);
+        p += (revertTarget - p) * PRICE_REVERT_FRACTION;
+        if (Math.abs(revertTarget - p) <= base * PRICE_REVERT_SNAP) p = revertTarget;
       }
-      this.prices[res] = clamp(p, this.priceFloor(res), base * PRICE_MAX_MULT);
+      this.prices[res] = clamp(p, floor, base * PRICE_MAX_MULT);
     }
   }
 
