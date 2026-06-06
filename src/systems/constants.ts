@@ -210,12 +210,21 @@ export const INVEST_MIN_SURPLUS = 200;
  */
 export const INVEST_UTILIZATION_THRESHOLD = 0.45;
 /**
- * Phase 14 — whether a business's stock target scales with its capital (see
- * {@link MarketSystem}'s effectiveTarget). OFF here: the 14a seam ships as a pure
- * no-op (effectiveTarget = the archetype target). Turned ON in 14c, paired with
- * the maxPerDay cut, so a re-capitalised firm holds a deeper buffer and the
- * invest loop stays live (target and capacity scale by the same factor, keeping
- * utilization invariant to capital) instead of self-extinguishing.
+ * Whether a business's stock target scales with its capital (see
+ * {@link MarketSystem}'s effectiveTarget). OFF: the 14a seam is a pure no-op
+ * (effectiveTarget = the archetype target).
+ *
+ * The 14a/14c theory was that scaling the target up with capital keeps
+ * utilization invariant (target and capacity rise together) so the invest loop
+ * doesn't self-extinguish. Phase 15 E3 measured it empirically on a 2-year
+ * full-agentic run, now that producers actually survive (B) and head-count drives
+ * output (E2): turning it ON was *worse* — it pulled a firm into insolvency
+ * earlier and left capital lower, not higher. So it stays OFF. The invest loop
+ * fires and deepens capital materially anyway (≈3× baseline over the first year,
+ * now that removing the produce exploit unmasked utilization), then decays slowly
+ * over multiple years as depreciation outpaces a maturing city's reinvestment —
+ * a real (not self-sustaining) productivity engine, with multi-year firm churn
+ * handled by business entry/exit (slice D) rather than by inflating buffers.
  */
 export const TARGET_CAPITAL_SCALING = false;
 /**

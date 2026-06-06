@@ -406,14 +406,17 @@ describe("Phase 12c step 5 — rules-brain invest in a live sim", () => {
 });
 
 /**
- * Phase 13c — the invest loop closes end-to-end. With the reorder (the agent
- * reviews before the daily dividend) and the demand keystone on, a full agentic
- * city now books real investment over a year and ends with more capital than it
- * started: the Phase 12 engine is no longer inert. (Capital-deepening is modest
- * in the current calibration — utilization structurally peaks ~0.5, so businesses
- * are never hard capacity-bound; pushing toward a true Solow engine is a later
- * capacity-calibration phase. What this pins is that the lever fires, capital
- * responds, and conservation holds.)
+ * Phase 13c — the invest loop closes end-to-end, and Phase 15 makes it bite. With
+ * the reorder (the agent reviews before the daily dividend), the demand keystone
+ * on, the produce exploit gone (so utilization is no longer masked), head-count
+ * driving output (E2), and producers surviving agentic play (B), a full agentic
+ * city books real investment over a year and ends with capital deepened
+ * *materially* above baseline — the Phase 12 engine is firing, not inert. (It's a
+ * real engine, not a perpetual-motion one: capital peaks then decays over multiple
+ * years as depreciation outpaces a maturing city's reinvestment; multi-year firm
+ * churn is handled by business entry/exit, slice D. What this pins is that the
+ * lever fires, capital deepens materially, the labour market holds, and
+ * conservation never breaks.)
  */
 describe("Phase 13c — the invest loop closes", () => {
   it("a sustained agentic year books investment, deepens capital, and conserves money", () => {
@@ -432,7 +435,7 @@ describe("Phase 13c — the invest loop closes", () => {
 
     const investedDays = agent!.decisions().filter((d) => (d.action.invest ?? 0) > 0).length;
     expect(investedDays).toBeGreaterThan(0); // the lever fired during the year (was 0 pre-13c)
-    expect(capital()).toBeGreaterThan(startCapital); // capital deepened above baseline
+    expect(capital()).toBeGreaterThan(startCapital * 1.5); // capital deepened MATERIALLY (~3x in practice), not a token blip
     expect(world.totalMoney()).toBeCloseTo(startMoney, 2); // the closed economy still balances
     for (const b of world.businesses) expect(b.active).toBe(true); // nobody collapsed
     // Phase 15 A+E: the labour market holds — every producer keeps a crew instead
