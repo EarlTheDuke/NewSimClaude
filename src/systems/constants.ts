@@ -179,6 +179,16 @@ export const PRICE_REVERT_SNAP = 0.005;
 export const BANKRUPT_CASH_FLOOR = 1;
 export const BANKRUPT_GRACE_DAYS = 5;
 /**
+ * Phase 15 D — on bankruptcy, hand the firm's residual cash to its owner (recouped
+ * equity) and write off its non-cash stock, instead of freezing a dead husk that
+ * holds money out of circulation forever. The residual is small by construction (a
+ * firm only bankrupts once its cash is under {@link BANKRUPT_CASH_FLOOR}), but over
+ * a long run of creative destruction those scraps would otherwise pile up in
+ * corpses. Money moves only via {@link World.transfer}, so the closed economy is
+ * untouched. ON — the husk is settled, not frozen.
+ */
+export const RECYCLE_BANKRUPT_ASSETS = true;
+/**
  * Profit distribution keeps the closed economy alive. In a closed loop, resident
  * shop-spending must equal total business wages, so any per-business surplus
  * would otherwise pool forever in one holder (a rent-collecting landlord, a

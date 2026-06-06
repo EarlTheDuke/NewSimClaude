@@ -88,8 +88,30 @@ describe("LifecycleSystem — invariants", () => {
 
     sim.run(TICKS_PER_DAY * (BANKRUPT_GRACE_DAYS + 2));
 
-    // Bankruptcy freezes cash and eviction moves no money — totals are untouched.
+    // Bankruptcy liquidates the husk to its owner (here ~$0) and eviction moves no
+    // money — every dollar still moves only via transfer, so totals are untouched.
     expect(world.getBusiness("biz_farm")!.active).toBe(false);
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("liquidates a bankrupt firm's residual cash to its owner — the husk isn't frozen (Phase 15 D)", () => {
+    const { sim, world } = createCity({ seed: 1 });
+    world.getBusiness("biz_bakery")!.active = false; // strand the farm: cut its only buyer
+    const farm = world.getBusiness("biz_farm")!;
+    // Strip its crew (so no wage drain races the residual to zero) and park a small
+    // residual below the bankruptcy floor, so the husk reaches bankruptcy still
+    // holding cash to recoup.
+    for (const id of farm.employeeIds) world.getResident(id)!.jobId = "";
+    farm.employeeIds = [];
+    farm.cash = 0.5;
+    const start = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY * (BANKRUPT_GRACE_DAYS + 1));
+
+    expect(farm.active).toBe(false);
+    // The husk is emptied (0.5 → 0), not frozen at its dying balance — proof the
+    // residual was handed off, not stranded — and the closed economy still balances.
+    expect(farm.cash).toBe(0);
     expect(world.totalMoney()).toBeCloseTo(start, 6);
   });
 

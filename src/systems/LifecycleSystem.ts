@@ -6,6 +6,7 @@ import {
   BANKRUPT_CASH_FLOOR,
   BANKRUPT_GRACE_DAYS,
   EVICTION_GRACE_DAYS,
+  RECYCLE_BANKRUPT_ASSETS,
 } from "./constants";
 
 /**
@@ -49,6 +50,16 @@ export class LifecycleSystem implements System {
       worker.wagePerTick = 0;
     }
     biz.employeeIds = [];
+
+    // Liquidation (Phase 15 D): the husk's residual cash goes to its owner as
+    // recouped equity — returning that money to circulation instead of freezing it
+    // in a dead firm — and its non-cash stock is written off. Money moves only via
+    // transfer (which drains biz.cash to exactly 0), so the closed economy holds.
+    if (RECYCLE_BANKRUPT_ASSETS) {
+      this.world.transfer(biz.id, biz.ownerId, biz.cash);
+      biz.inventory = 0;
+      biz.resources = {};
+    }
   }
 
   private reviewHousing(resident: Resident): void {
