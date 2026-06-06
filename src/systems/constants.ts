@@ -191,6 +191,20 @@ export const BUSINESS_RESERVE = 3000;
 /** Max profit a single business disburses to residents per day ($). */
 export const PROFIT_DISTRIBUTION_CAP = 900;
 /**
+ * Phase 15 C — the fraction of a business's daily distributable profit that goes
+ * to its OWNER as personal income, before the rest recirculates evenly to all
+ * residents. 0 here (C1): owning a business pays nothing special and distribution
+ * is the old even split — byte-identical. Engaged at ~0.35 in C2, so an owner
+ * earns more as their firm prospers (the payoff that makes entrepreneurship — and
+ * the whole CEO premise — mean something economically), while the remaining ~0.65
+ * still recirculates broadly. It is deliberately a *split*, not a re-route: the
+ * even payout is the closed economy's primary demand pump, so routing 100% to the
+ * ~7 owners would pool money in them and collapse everyone else's spending.
+ * Real-world: an owner draws profits, but wages and supplier payments still spread
+ * income across the whole town.
+ */
+export const OWNER_DIVIDEND_SHARE = 0.1;
+/**
  * Phase 13c — the invest lever fires only when a capacity-bound business has at
  * least this much profit sitting above its reserve at review time. After the 13c
  * reorder the agent reviews *before* the daily dividend, so cash-above-reserve is
@@ -366,3 +380,15 @@ export const BENCH_TURNS = 42;
  * bound — so good stewardship shows up as a cleaner net-worth gap.
  */
 export const BENCH_WEALTH_ELASTICITY = 1;
+/**
+ * The owner-dividend share the CEO benchmark runs at — frozen *off* (0), separate
+ * from the live-game {@link OWNER_DIVIDEND_SHARE}. The benchmark measures one
+ * thing: how well a mind runs a single firm, read off that firm's net worth.
+ * The owner dividend is a wealth-*distribution* feature (it moves profit from firm
+ * equity to the owner's pocket), orthogonal to running skill — and because it
+ * concentrates wealth it perturbs city-wide demand chaotically, muddying the
+ * clean rules-vs-off comparison. Freezing it off (all profit stays in the firm, so
+ * net worth fully reflects stewardship) keeps the score a clean skill signal, just
+ * as {@link BENCH_WEALTH_ELASTICITY} freezes the demand knob.
+ */
+export const BENCH_OWNER_DIVIDEND_SHARE = 0;

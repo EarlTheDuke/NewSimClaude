@@ -1,7 +1,12 @@
 import type { System, SystemContext } from "../core/types";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import type { World } from "../world/World";
-import { LANDLORD_RESERVE, BUSINESS_RESERVE, PROFIT_DISTRIBUTION_CAP } from "./constants";
+import {
+  LANDLORD_RESERVE,
+  BUSINESS_RESERVE,
+  PROFIT_DISTRIBUTION_CAP,
+  OWNER_DIVIDEND_SHARE,
+} from "./constants";
 
 /**
  * Profit distribution — the feedback that keeps the closed loop alive (was a step
@@ -30,7 +35,15 @@ import { LANDLORD_RESERVE, BUSINESS_RESERVE, PROFIT_DISTRIBUTION_CAP } from "./c
  */
 export class DistributionSystem implements System {
   readonly id = "distribution";
-  constructor(private readonly world: World) {}
+  constructor(
+    private readonly world: World,
+    /**
+     * Fraction of each firm's profit paid to its owner before the even split
+     * (Phase 15 C). Defaults to the live-game {@link OWNER_DIVIDEND_SHARE}; the CEO
+     * benchmark passes 0 so its firm-net-worth score stays a clean skill signal.
+     */
+    private readonly ownerDividendShare: number = OWNER_DIVIDEND_SHARE,
+  ) {}
 
   update(ctx: SystemContext): void {
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
@@ -41,9 +54,24 @@ export class DistributionSystem implements System {
       const reserve = biz.kind === "landlord" ? LANDLORD_RESERVE : BUSINESS_RESERVE;
       const budget = Math.min(biz.cash - reserve, PROFIT_DISTRIBUTION_CAP);
       if (budget <= 0) continue;
-      const share = budget / residents.length;
-      for (const r of residents) {
-        biz.pnl.wagesPaid += this.world.transfer(biz.id, r.id, share);
+
+      // Owner's dividend first (Phase 15 C): a share λ of the day's profit goes to
+      // the firm's owner as personal income, so owning a thriving business pays.
+      // The owner is also a resident, so they additionally take their even slice of
+      // the remainder below — exactly like everyone else. With λ = 0 this whole
+      // branch is skipped and the split is the old even payout, byte-identical.
+      const ownerCut = budget * this.ownerDividendShare;
+      if (ownerCut > 0) {
+        biz.pnl.wagesPaid += this.world.transfer(biz.id, biz.ownerId, ownerCut);
+      }
+
+      // The rest recirculates evenly to all residents — the closed economy's
+      // primary demand pump, kept broad so dividends don't starve everyone else.
+      const share = (budget - ownerCut) / residents.length;
+      if (share > 0) {
+        for (const r of residents) {
+          biz.pnl.wagesPaid += this.world.transfer(biz.id, r.id, share);
+        }
       }
     }
   }

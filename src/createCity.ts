@@ -58,6 +58,12 @@ export interface CitySimOptions extends CityOptions {
    * is re-tuned.
    */
   wealthElasticity?: number;
+  /**
+   * Override the owner-dividend share (Phase 15 C). Defaults to the live-game
+   * `OWNER_DIVIDEND_SHARE`; the CEO benchmark passes 0 to keep its firm-net-worth
+   * score a clean skill signal, free of the dividend's wealth-concentration noise.
+   */
+  ownerDividendShare?: number;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -127,7 +133,7 @@ export function createCity(options: CitySimOptions = {}): {
   // the change that finally fires the dormant invest lever. With no agent this
   // sits right where distribution always ran (just after the market), so the
   // brain-off baseline is byte-identical.
-  sim.addSystem(new DistributionSystem(world));
+  sim.addSystem(new DistributionSystem(world, options.ownerDividendShare));
 
   let residentAgent: ResidentAgentSystem | undefined;
   const residentBrain = options.residentBrain ?? "off";

@@ -26,6 +26,7 @@ import {
   BENCH_START_CAPITAL,
   BENCH_TURNS,
   BENCH_WEALTH_ELASTICITY,
+  BENCH_OWNER_DIVIDEND_SHARE,
   CAPITAL_BASELINE,
 } from "../systems/constants";
 
@@ -102,9 +103,11 @@ function setupScenario(config: CeoBenchConfig): {
     brain: config.brain,
     agenticBusinessIds: [targetId],
     disasters: config.disasters ?? false,
-    // Freeze the benchmark's demand elasticity so live-knob tuning (13c) never
-    // drifts historical CEO scores.
+    // Freeze the benchmark's demand elasticity and owner dividend so live-knob
+    // tuning never drifts historical CEO scores, and the firm-net-worth score
+    // stays a clean skill signal (all profit stays in the firm).
     wealthElasticity: BENCH_WEALTH_ELASTICITY,
+    ownerDividendShare: BENCH_OWNER_DIVIDEND_SHARE,
   });
 
   const ceo = world.getBusiness(targetId);
