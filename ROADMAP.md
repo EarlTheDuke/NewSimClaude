@@ -1,91 +1,124 @@
-# CityWithLifeClaude — Economic Roadmap (Phase 16+)
+# CityWithLifeClaude — Post-v1 Roadmap (Phase 16+)
 
-**Status:** Active forward plan for the economic model.
-**Adopted:** 2026-06-06
-**Purpose:** Sequences the realism levers that come *after* [NORTH-STAR.md](NORTH-STAR.md)'s
-three core moves. NORTH-STAR is the *compass* (why); [MASTER-PLAN.md](MASTER-PLAN.md) is the
-*architecture*; this is the *forward sequence* (what's next, in what order). Read it at each
-phase boundary alongside NORTH-STAR, and check proposed work against it before planning.
+Concrete, dependency-ordered phases that grow the sim from a solid **micro** economy
+into a **macro** one. Derived from the economic-model audit (2026-06-06) and checked
+against [NORTH-STAR.md](NORTH-STAR.md). Phases 0–8 are [MASTER-PLAN.md](MASTER-PLAN.md)
+(shipped as v1.0); 9–15 shipped post-v1; **16+ is this document.**
 
-## Where the model is today
+## Standing principles (hold for every phase)
 
-The shipped economy is a **closed, fixed-money, fixed-population, single-town** market:
+- **Money conserved to the cent** (only via `World.transfer`) and **deterministic from
+  seed + snapshot.** Breaking either is a bug, not a tradeoff. New subsystems that move
+  money (a bank, a treasury, a port) must be *conserving holders*, never mint/burn.
+- **Ship flag-gated, default-OFF/no-op slices** (the 12a/13a/14a/15/16 pattern) — the
+  brain-off baseline stays byte-identical until each slice is deliberately engaged.
+- **Realism in the world model; benchmark through curated scenarios that freeze most of
+  it.** Add the mechanism to the live world, but keep it OFF (or frozen) in the CEO bench
+  so the skill signal stays clean. This is the NORTH-STAR tension — honor it every time.
 
-- ✅ **#1 Wants grow with wealth** (Phase 13) — demand rises with wealth; GDP climbs.
-- ✅ **#2 Business entry/exit** (Phase 15 D) — firms are born *and* die; self-healing.
-- 🔶 **#3 Close the investment loop** (Phase 12c / 14c / **16, live**) — the open frontier.
-  Producers are viable (15 B+A) and profit routes to owners (15 C), but the productivity
-  engine **still doesn't compound**: the 2026-06-06 audit + Phase-16 probes proved
-  investment self-extinguishes — firms run out of *cash* (distribution drains them to the
-  reserve floor) before utilization ever binds, and target-scaling alone makes it worse.
-  The **retain-to-reinvest** fix is Phase 16's live work and the gateway to everything below.
+## Where we are
 
-## The audit's top gaps (why these phases, in this order)
+**Phase 16 — Retain vs Distribute** is in progress. Slice 1 (the `payoutRate` seam) shipped
+and is byte-identical. Slice 2 (engage the rules brain) was attempted and **reverted**: a
+standalone retain rule broke the invest loop and the owner-dividend gap, because *retaining
+cash only pays if reinvestment compounds* — and today it can't, since demand is capped. That
+revert is the bridge to Phase 17: **the demand ceiling is the thing blocking the whole
+investment loop.**
 
-The closed economy caps growth + realism on five fronts. Each phase lifts one ceiling;
-they're ordered so each unlocks the next. Every phase ships behind a **default-OFF flag**
-(the proven 12a/13a/14a no-op discipline) so the baseline stays byte-identical until engaged.
+---
 
-### Phase 17 — Demand growth *(the keystone; unblocks the invest loop)*
-- **Gap:** wants grow with wealth, but the *market* can't truly expand — 12 residents,
-  tiered reservations, a near-fixed demand ceiling. Investment has nothing to grow *into*
-  (Phase 16 proved the engine dies for lack of demand + cash).
-- **Build:** a demand-side lever — marketing/advertising (spend cash → grow demand share /
-  lift reservations), product quality/differentiation, deepened wealth-elasticity.
-- **Why first:** the precondition for *every* growth lever below — and for Phase 16's
-  retain-to-reinvest to pay (retained capital compounds only if the extra output sells).
-  Benchmark: an uncapped market is the only kind where a skilled CEO pulls away.
+## Phase 17 — Demand can grow (the market expands) · *unblocks Phase 16*
 
-### Phase 18 — Credit & banking
-- **Gap:** firms can invest only from retained earnings; no leverage, no money-supply flex.
-- **Build:** a bank that takes deposits + lends; firms (and residents) borrow to invest or
-  buy ahead of cash.
-- **Care:** credit *creates* money — the sacred conservation invariant becomes
-  **money + net credit** (every loan a matched asset/liability). NORTH-STAR flags this as
-  the riskiest to the invariant; prove conservation-with-debt before engaging.
-- **Depends on 17:** borrowing-to-invest only pays when there's demand to grow into.
+- **Gap closed:** the fixed demand ceiling (audit Tier-1 #2, first relief) **and** Phase 16's
+  slice 3 ("make reinvestment pay").
+- **Why first:** retain, invest, and (later) credit all need somewhere to grow *into*. Today
+  demand tops out at 12 residents' wants, so capacity never stays bound and the investment
+  engine decays within a year. Everything downstream depends on lifting this.
+- **Mechanics:** a firm-level **marketing / quality lever** — spend cash to lift the firm's
+  own demand (raise residents' reservation prices toward it, or win share from a rival), so
+  `invest → capacity → serve grown demand` finally compounds. Demand-shaping is the real
+  "grow the market" decision.
+- **Benchmark:** marketing becomes a genuine CEO lever (spend-to-grow vs harvest) — enriches
+  the bench rather than muddying it.
+- **Conservation/determinism:** marketing spend is a transfer (to an ad channel / as price
+  rebate), never burned; the demand lift is a bounded, deterministic function of cumulative
+  spend. ✓
+- **Then:** finish Phase 16 — slice 3 (retain → reinvest → grow now compounds) and slice 4
+  (reframe the CEO bench to reward *growth* from working capital, with an anti-hoard guard).
 
-### Phase 19 — Population lifecycle
-- **Gap:** a fixed 12 residents — no births, aging, or death; no organic growth.
-- **Build:** seeded life events (birth, aging, retirement, death); households that grow.
-  The cleanest *organic* growth driver (more people → more demand + labour) and the most
-  genuinely "alive."
-- **Care:** determinism — life events from the seeded RNG only; labour/demand pools resize.
-- **Depends on 17–18:** a growing population needs an economy that can expand to employ
-  and supply it.
+## Phase 18 — Credit & Finance (banking)
 
-### Phase 20 — Government & fiscal policy
-- **Gap:** no taxes, public goods, or redistribution — no fiscal layer at all.
-- **Build:** a government that taxes (income/business), spends (public goods, transfers),
-  and redistributes — a real policy surface (a tax-rate decision; public investment).
-- **Care:** all fiscal flows via `World.transfer` (stays closed/conserved); the state is a
-  new agent behind the `DecisionProvider` seam.
-- **Depends on 17–19:** there must be income + activity worth taxing.
+- **Gap closed:** no finance (audit Tier-1 #1) — the single biggest missing subsystem.
+- **Why:** the *other* way to fund growth besides retained earnings; the direct complement
+  to Phase 16. "Should I lever up to expand?" is a rich, real CEO decision.
+- **Mechanics:** a **Bank** as a money-conserving holder; firms borrow to invest beyond
+  cash-on-hand; interest accrues as borrower→bank transfers; debt service + default feed
+  `LifecycleSystem`. Optional: **savings interest** so idle cash isn't free net worth — which
+  also fixes the hoarding exploit the retain lever exposes.
+- **Benchmark:** frozen off in the simple bench; a leverage scenario can spotlight it.
+- **Risk (high):** credit is where conservation is easiest to break — interest must move from
+  a holder, never be minted; insolvency must settle, not vanish. NORTH-STAR gates this as a
+  later, careful item.
+- **Depends on:** Phase 17 (credit only pays if there's growth to fund).
 
-### Phase 21 — External trade
-- **Gap:** closed borders — the demand ceiling is hard; no outside supply or demand.
-- **Build:** a port that buys exports (injects outside demand) + sells imports (outside
-  supply), at world prices.
-- **Care:** the economy is **no longer closed** — money crosses the border, so the
-  invariant becomes a *tracked external balance* (the biggest change to the money model).
-  NORTH-STAR's ultimate ceiling-breaker.
-- **Depends on 17–20:** a firm needs the capacity + capital to serve export demand.
+## Phase 19 — Population & Demographics
 
-### Texture track *(parallel; optional toggles, benchmarked off)*
-More goods/services, households + relationships, skills + inequality, neighborhoods + land
-value — the depth that makes the town *feel* alive. Independent of the growth spine above;
-ship as toggles when they add color without destabilizing a benchmark scenario.
+- **Gap closed:** fixed population (audit Tier-1 #2, structural) — the hardest ceiling.
+- **Why:** births / deaths / aging / migration / household formation let the market and
+  labour force *broaden*, not just deepen. NORTH-STAR calls this "the most genuinely alive,
+  and a clean growth driver."
+- **Mechanics:** residents age; households form and have children (new labour + demand
+  entrants); residents retire and die (estate transfers to heirs/owner — conserved); in/out
+  migration responds to wages and vacancies. All demographic events deterministic (seeded,
+  no wall-clock).
+- **Benchmark:** population frozen in the bench (determinism); growth shows in the live sim
+  and long soak.
+- **Risk:** determinism (deterministic demographic schedule only) and conservation (a death's
+  cash is transferred, never lost).
 
-## The realism-vs-benchmark tension (carried from NORTH-STAR)
+## Phase 20 — Government & Fiscal
 
-Every lever here adds realism *and* noise. Build realism into the **world model**, but
-benchmark through **curated scenarios** that freeze most of it and spotlight one decision
-domain (pricing, investment, market entry, credit, trade). Determinism from seed + snapshot
-is the gold that keeps a score about skill, not luck.
+- **Gap closed:** no government (audit Tier-1 #3) — adds the missing **G** to GDP.
+- **Mechanics:** a **Treasury** holder; taxes (sales / income / corporate) as transfers in;
+  public spending + transfers/welfare as transfers out (welfare smooths the demand floor);
+  optionally public goods. A real fiscal-policy lever.
+- **Benchmark:** enables a *new* scenario type ("balance the city budget"), but stays OFF in
+  the firm-CEO bench so it doesn't perturb that skill signal.
+- **Risk:** conservation (every tax/transfer routes through the treasury holder).
 
-## Sequence at a glance
+## Phase 21 — External Trade
 
-**16 retain-to-reinvest *(in progress)* → 17 demand growth → 18 credit → 19 population →
-20 government → 21 trade**, with the **texture track** in parallel. Each step lifts one
-ceiling and unlocks the next: 16–17 are the live frontier (the invest loop); 18–21 are the
-bigger realism levers NORTH-STAR gated for later, now sequenced.
+- **Gap closed:** closed economy (audit Tier-1 #4).
+- **Mechanics:** a **port** that buys exports and sells imports at world prices — injects
+  outside demand and breaks the internal ceiling, giving the city an external growth/shock
+  channel.
+- **Risk:** the closed-money invariant — model the port as a conserving current-account
+  holder (trade nets through it), or make any outside money in/outflow explicit, bounded, and
+  measured, so `totalMoney()` stays auditable.
+- **Benchmark:** off in the bench; a growth + volatility driver in the live world.
+
+---
+
+## Texture track (interleavable — depth, not ceilings)
+
+Lighter additions that make the world feel like an economy rather than a mechanism; slot any
+of them between the structural phases whenever the world feels thin:
+
+- **Goods & services variety** — a services sector (health / education / entertainment-as-
+  service), product differentiation + quality tiers, substitution between goods. More demand
+  surface and more for a CEO to navigate.
+- **Human capital** — worker skills / education / specialization; productivity heterogeneity;
+  training as a form of investment. Turns interchangeable labour into a real factor.
+- **Asset markets** — a housing market (buy/sell homes, land value), tradeable firm **equity**
+  (value and sell a business — makes `ownerId` mean something liquid), savings vehicles.
+  (Overlaps Phase 18's finance work.)
+
+## Sequencing rationale
+
+**17 first** because demand growth unblocks Phase 16's invest loop and is the prerequisite for
+everything — capital, credit, and population all need somewhere to grow into. **18 (credit)**
+is the next funding lever once growth pays. **19 (population)** is the structural ceiling lift
+(broaden, not just deepen). **20 (government)** and **21 (trade)** add the remaining macro
+sectors (the G and the NX in GDP = C + I + G + NX). Texture interleaves. Every structural
+phase is OFF in the benchmark — the live sim is where the macro economy comes alive, the
+curated scenarios are where skill is measured.
