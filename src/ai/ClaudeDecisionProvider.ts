@@ -7,6 +7,9 @@ import type {
   ProviderUsage,
 } from "./types";
 
+/** The slice of the Anthropic client this provider actually uses — enough for a test stub. */
+export type MessagesClient = Pick<Anthropic, "messages">;
+
 export interface ClaudeProviderOptions {
   /** API key. Falls back to VITE_ANTHROPIC_API_KEY / ANTHROPIC_API_KEY. */
   apiKey?: string;
@@ -19,6 +22,12 @@ export interface ClaudeProviderOptions {
   inputCostPerToken?: number;
   /** USD per output token. Estimate — override to match current pricing. */
   outputCostPerToken?: number;
+  /**
+   * Inject a client (or a stub) instead of constructing one from an API key —
+   * for tests, so the request-building and reply-parsing run without a network
+   * call or a key. When set, the key requirement is skipped.
+   */
+  client?: MessagesClient;
 }
 
 const DEFAULTS = {
@@ -50,13 +59,18 @@ export class ClaudeDecisionProvider implements DecisionProvider {
   private readonly outputCostPerToken: number;
 
   constructor(opts: ClaudeProviderOptions = {}) {
-    const apiKey = opts.apiKey ?? readEnvKey();
-    if (!apiKey) {
-      throw new Error(
-        "ClaudeDecisionProvider: no API key (set VITE_ANTHROPIC_API_KEY or pass apiKey).",
-      );
+    if (opts.client) {
+      // Test/seam injection — no key or network needed.
+      this.client = opts.client as Anthropic;
+    } else {
+      const apiKey = opts.apiKey ?? readEnvKey();
+      if (!apiKey) {
+        throw new Error(
+          "ClaudeDecisionProvider: no API key (set VITE_ANTHROPIC_API_KEY or pass apiKey).",
+        );
+      }
+      this.client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
     }
-    this.client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
     this.model = opts.model ?? DEFAULTS.model;
     this.timeoutMs = opts.timeoutMs ?? DEFAULTS.timeoutMs;
     this.maxTokens = opts.maxTokens ?? DEFAULTS.maxTokens;
@@ -77,10 +91,16 @@ export class ClaudeDecisionProvider implements DecisionProvider {
       model: this.model,
       max_tokens: this.maxTokens,
       system:
-        "You run a single small business in a watchable city economy. Decide " +
-        "this day's move using only the levers in the `set_business_plan` " +
-        "tool. Be conservative and profit-seeking; values outside the limits are " +
-        "clamped, so stay within them. Always give a one-sentence reason.",
+        "You are the CEO of one firm in a small, closed city economy, maximizing " +
+        "your firm's net worth (cash + inventory + equipment) over many days. Each " +
+        "day you set a plan with the `set_business_plan` tool — adjust price, " +
+        "hire/lay off staff, invest cash in equipment, and set the wage. Play it " +
+        "well: price near the going market rate and never below your unit cost; " +
+        "invest in equipment only when you are capacity-bound (utilization near " +
+        "100%) and still hold a cash cushion; raise the wage to attract or keep " +
+        "staff when short-handed, and ease it back when fully crewed and cash is " +
+        "tight; hire when you are profitable and short-handed. Values outside the " +
+        "limits are clamped, so stay within them. Always give a one-sentence reason.",
       tool_choice: { type: "tool", name: "set_business_plan" },
       tools: [
         {
@@ -96,6 +116,14 @@ export class ClaudeDecisionProvider implements DecisionProvider {
               hire: {
                 type: "integer",
                 description: `Net headcount change, +hire / -layoff, within ±${limits.maxHirePerReview}. Omit for none.`,
+              },
+              invest: {
+                type: "number",
+                description: `Cash to spend on equipment this day (0-${limits.maxInvestPerReview}); raises future output but only pays off when capacity-bound. Omit for none.`,
+              },
+              setWage: {
+                type: "number",
+                description: `New wage per tick (current ${o.wagePerTick}, role base ${o.baseWagePerTick}); raise toward roughly twice the base to attract/keep staff, never below base. Omit to keep.`,
               },
               reason: { type: "string", description: "One sentence: why." },
             },
@@ -115,6 +143,8 @@ export class ClaudeDecisionProvider implements DecisionProvider {
     const action: BusinessAction = {};
     if (typeof input.setPrice === "number") action.setPrice = input.setPrice;
     if (typeof input.hire === "number") action.hire = input.hire;
+    if (typeof input.invest === "number") action.invest = input.invest;
+    if (typeof input.setWage === "number") action.setWage = input.setWage;
 
     const usage: ProviderUsage = {
       inputTokens: response.usage.input_tokens,
@@ -132,13 +162,22 @@ export class ClaudeDecisionProvider implements DecisionProvider {
   }
 
   private observationText(o: DecisionRequest["observation"]): string {
-    return [
-      `Business: ${o.name} (${o.kind}), day ${o.day}.`,
-      `Cash ${round(o.cash)}, inventory ${o.inventory}, price ${round(o.price)}.`,
-      `Staff ${o.employeeCount} at wage ${o.wagePerTick}/tick; ${o.unemployedCount} people available to hire.`,
-      `Yesterday: revenue ${round(o.dayRevenue)}, wages ${round(o.dayWages)}, rent ${round(o.dayRent)}, net ${round(o.dayProfit)}.`,
-      `Choose this day's plan.`,
-    ].join(" ");
+    const lines = [
+      `You run ${o.name} (a ${o.kind}). Day ${o.day}.`,
+      `Cash ${round(o.cash)}, inventory ${o.inventory} units, your price ${round(o.price)}.`,
+      `Staff ${o.employeeCount}${o.understaffed ? " (SHORT-HANDED — a seat is open)" : " (fully crewed)"} at wage ${o.wagePerTick}/tick (role base ${o.baseWagePerTick}); ${o.unemployedCount} people are looking for work.`,
+    ];
+    if (o.referencePrice !== undefined) lines.push(`The going rate for your goods is about ${round(o.referencePrice)}.`);
+    if (o.rivalPrice !== undefined) lines.push(`A competitor across town charges ${round(o.rivalPrice)}.`);
+    if (o.unitCost !== undefined) lines.push(`Each unit costs you ${round(o.unitCost)} to stock — selling below that loses money.`);
+    if (o.capital !== undefined) {
+      const util = o.capacityUtilization;
+      const utilStr = util !== undefined ? `, running at ${Math.round(util * 100)}% of capacity${util > 0.9 ? " (capacity-bound — more equipment would pay off)" : ""}` : "";
+      lines.push(`Equipment (capital) ${round(o.capital)}${utilStr}.`);
+    }
+    lines.push(`Yesterday: revenue ${round(o.dayRevenue)}, wages ${round(o.dayWages)}, rent ${round(o.dayRent)}, net ${round(o.dayProfit)}.`);
+    lines.push(`Choose this day's plan.`);
+    return lines.join(" ");
   }
 }
 
