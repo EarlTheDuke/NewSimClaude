@@ -52,9 +52,24 @@ mind sets it.
    **Lesson:** the paradox-of-thrift coupling is real + measured. Retain can't ship
    standalone — it needs slice 3 first (so reinvestment *compounds* instead of
    self-limiting), or to be offered to the LM CEO only (no rules-economy disruption).
-3. **Make reinvestment pay.** Couple with demand growth / capacity binding so
-   retained → invested → grows revenue (folds in the "marketing / demand-growth"
-   improvement). This is the *point* of retaining.
+3. **Make reinvestment pay.** Couple so retained → invested → grows revenue.
+   **— Probed 2026-06-06; TARGET_CAPITAL_SCALING (re-fire 14c) REFUTED.** Measured the
+   full agentic economy (3 yr, seeds 1 & 7), flag off vs on:
+   | | OFF (today) | ON (14c) |
+   |---|---|---|
+   | capital yr1→yr3 | 2090 → 1410 | **879 → 189** |
+   | GDP yr3 | 1951 | 1798 |
+   | invest/day yr2-3 | 0 | 0 |
+   Turning the flag on makes the engine **worse** (capital + GDP lower, invest never
+   fires). The engine doesn't die from poisoned utilization — util stays **65–77%**,
+   *above* the 0.45 gate. It dies from **cash**: distribution drains every firm to its
+   reserve floor, so the invest gate (`cash > reserve + surplus`) only clears in year 1's
+   exceptional surplus; target-scaling makes bigger targets that cost *more* to fill,
+   starving cash further. **The real fix is retain-to-reinvest** — a capacity-bound firm
+   retains its surplus specifically to fund *sustained* investment (slice 2 done right:
+   tie retain to the invest opportunity, not a flat buffer), designed + tuned with a soak.
+   The flat-buffer retain (slice 2) and target-scaling (this) each fail alone; they must
+   be designed *together*. A genuine mini-phase, not a one-liner.
 4. **Reframe the CEO bench to reward growth** (pending the decision above) + an anti-hoard
    guard; re-baseline; ablation proves `setPayout` is a real, correct-sign lever.
 
