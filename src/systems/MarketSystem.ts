@@ -243,13 +243,28 @@ export class MarketSystem implements System {
   }
 
   /**
+   * The lower bound a resource's market price may not fall below (Phase 15, B).
+   * With {@link PRODUCER_COST_FLOOR} off this is the flat band floor
+   * base*{@link PRICE_MIN_MULT} — exactly today's behaviour, so the B1 seam is a
+   * pure no-op. On (B2) it becomes the producer's cost of production (input +
+   * wages) plus a margin, so price discovery can never drive a producer's revenue
+   * below its own costs and bankrupt the upstream chain (P10-7). Real-world: the
+   * reservation price a supplier won't sell beneath, the discipline that keeps the
+   * B2B supply chain solvent.
+   */
+  private priceFloor(res: ResourceKind): number {
+    return BASE_RESOURCE_PRICE[res] * PRICE_MIN_MULT;
+  }
+
+  /**
    * Price tracks how hard each producer is being worked: brisk sales (high
    * utilization of its daily capacity) nudge the price up, a slow day nudges it
    * down. In the neutral band between those — neither over- nor under-worked —
    * the price drifts gently back toward base (snapping once within a hair),
    * giving base a restoring pull instead of leaving it frozen wherever an early
    * transient landed (P9-9). Bounded so it can never run away in either
-   * direction.
+   * direction — and, once the Phase 15 floor engages, never below a producer's
+   * own cost of production ({@link priceFloor}).
    */
   private adjustPrices(sold: Record<ResourceKind, number>): void {
     for (const res of RESOURCES) {
@@ -271,7 +286,7 @@ export class MarketSystem implements System {
         p += (base - p) * PRICE_REVERT_FRACTION;
         if (Math.abs(base - p) <= base * PRICE_REVERT_SNAP) p = base;
       }
-      this.prices[res] = clamp(p, base * PRICE_MIN_MULT, base * PRICE_MAX_MULT);
+      this.prices[res] = clamp(p, this.priceFloor(res), base * PRICE_MAX_MULT);
     }
   }
 

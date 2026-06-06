@@ -108,6 +108,30 @@ export const PRICE_MIN_MULT = 0.4;
 // resource can rise to at most base*1.6 (food 12.8, wares 17.6), so a storefront
 // always keeps a margin over what it pays its supplier.
 export const PRICE_MAX_MULT = 1.6;
+/**
+ * Phase 15 (B) — whether a producer's resource price is floored at its *cost of
+ * production* (input + wages) plus a margin, instead of the flat band floor
+ * base*{@link PRICE_MIN_MULT}. OFF here: B1 ships the floor seam as a pure no-op
+ * (the floor stays the old band floor, byte-identical). Turned ON in B2.
+ *
+ * Real-world: a supplier won't keep selling below its own cost — it goes broke.
+ * Today's price-discovery loop has no such reservation, so on a long agentic run
+ * a B2B producer's resource price can sag below what the firm pays for inputs and
+ * wages, draining its cash until it goes bankrupt and starves the storefronts of
+ * supply (P10-7). A cost-plus floor is the upstream fix that keeps the whole
+ * supply chain solvent — the first, highest-leverage slice of Phase 15.
+ */
+export const PRODUCER_COST_FLOOR = false;
+/**
+ * Phase 15 (B) — the gross markup a producer adds over its unit cost (input +
+ * labour) when {@link PRODUCER_COST_FLOOR} is on. A *fractional* markup, so the
+ * floor is `unitCost * (1 + this)`. 0.15 = a 15% margin: enough to cover wages
+ * and leave a thin operating surplus (so the firm can fund a competitive wage and
+ * the odd capital purchase) without squeezing the storefront that buys from it —
+ * the floor is additionally capped below base*{@link PRICE_MAX_MULT} so a
+ * storefront always keeps a margin over what it pays. Unused until B2.
+ */
+export const PRODUCER_COST_PLUS_MARGIN = 0.15;
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;
 /**
