@@ -40,9 +40,18 @@ mind sets it.
    [0,1] + apply (`setPayout → payoutRate`) + `DistributionSystem` honors `payoutRate`
    (default 1 ⇒ byte-identical). No brain emits it yet. Test: a firm with `payoutRate < 1`
    retains more cash; the default path is unchanged.
-2. **Engage (living economy).** Rules brain emits `setPayout` (retain when a profitable
-   invest is warranted / utilization high; pay out when slack); observation surfaces
-   retained earnings. Soak: aggregate demand stays alive (the paradox-of-thrift guard).
+2. **Engage (living economy).** Rules brain emits `setPayout`; observation surfaces
+   retained earnings. Soak guards aggregate demand (paradox of thrift).
+   **— Attempted 2026-06-06, REVERTED.** A standalone buffer-retain rule (retain 50% of
+   surplus below a $6k cushion) broke two engaged systems and was backed out:
+   - *invest loop* (`capital.test`): capital stopped deepening — retained cash → more
+     invest → lower capital-poisoned utilization → the invest gate (`utilization > 0.45`)
+     stops firing → the loop self-extinguishes.
+   - *owner dividend* (`distribution.test`): the owner/non-owner wealth gap inverted —
+     retaining shrinks the owner cut faster than the even payout.
+   **Lesson:** the paradox-of-thrift coupling is real + measured. Retain can't ship
+   standalone — it needs slice 3 first (so reinvestment *compounds* instead of
+   self-limiting), or to be offered to the LM CEO only (no rules-economy disruption).
 3. **Make reinvestment pay.** Couple with demand growth / capacity binding so
    retained → invested → grows revenue (folds in the "marketing / demand-growth"
    improvement). This is the *point* of retaining.
