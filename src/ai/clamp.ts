@@ -14,6 +14,8 @@ export const DEFAULT_LIMITS: DecisionLimits = {
   // cap [base, base*MAX_WAGE_MULT] is enforced in BusinessAgentSystem.apply().
   minWagePerTick: 0,
   maxWagePerTick: 1,
+  // Phase 17 — max cash spent on brand/marketing per review (mirrors maxInvestPerReview).
+  maxBrandPerReview: 500,
 };
 
 /**
@@ -58,6 +60,12 @@ export function clampAction(
   if (action.setPayout !== undefined && Number.isFinite(action.setPayout)) {
     // Phase 16 — fraction of the distributable surplus to pay out (rest retained).
     out.setPayout = clamp(action.setPayout, 0, 1);
+  }
+
+  if (action.brand !== undefined && Number.isFinite(action.brand)) {
+    // Phase 17 — pure per-review cap; the cash-vs-reserve floor is applied later in
+    // BusinessAgentSystem.applyBrand(), where current cash is known (mirrors invest).
+    out.brand = clamp(action.brand, 0, limits.maxBrandPerReview);
   }
 
   return out;

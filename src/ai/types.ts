@@ -96,6 +96,14 @@ export interface BusinessObservation {
    * only for producer kinds; undefined otherwise.
    */
   capacityUtilization?: number;
+  /**
+   * Current brand-equity stock (Phase 17) — the demand-side twin of {@link capital}.
+   * A mind reads it to judge whether more marketing would lift demand. Present once
+   * the firm has spent on brand; absent ⇒ baseline.
+   */
+  brand?: number;
+  /** Cumulative cash this firm has spent on brand (Phase 17); absent ⇒ 0. */
+  brandSpent?: number;
 }
 
 /**
@@ -135,6 +143,15 @@ export interface BusinessAction {
    * byte-identical. Moves no cash itself.
    */
   setPayout?: number;
+  /**
+   * Cash to spend on brand/marketing this review (Phase 17) — builds the firm's
+   * brand-equity stock, the demand-side twin of `invest`: it lifts residents'
+   * willingness-to-pay at this firm. Clamped to [0, maxBrandPerReview] and the
+   * cash-above-reserve headroom in BusinessAgentSystem.applyBrand. The demand payoff
+   * is live only when BRAND_DEMAND_ELASTICITY > 0 (17d); until then it is a pure
+   * (conserved) cash outflow to the ad channel.
+   */
+  brand?: number;
 }
 
 /**
@@ -155,6 +172,8 @@ export interface DecisionLimits {
   minWagePerTick: number;
   /** Absolute ceiling on a posted wage (Phase 15 A safety rail; the real cap is base*MAX_WAGE_MULT). */
   maxWagePerTick: number;
+  /** Max cash a business may spend on brand/marketing in one review (Phase 17). */
+  maxBrandPerReview: number;
 }
 
 /** A provider's verdict: what to do, and why. */

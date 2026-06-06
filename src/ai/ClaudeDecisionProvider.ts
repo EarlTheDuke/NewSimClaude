@@ -94,10 +94,13 @@ export class ClaudeDecisionProvider implements DecisionProvider {
         "You are the CEO of one firm in a small, closed city economy, maximizing " +
         "your firm's net worth (cash + inventory + equipment) over many days. Each " +
         "day you set a plan with the `set_business_plan` tool — adjust price, " +
-        "hire/lay off staff, invest cash in equipment, and set the wage. Play it " +
+        "hire/lay off staff, invest cash in equipment, set the wage, and spend on " +
+        "marketing to grow demand. Play it " +
         "well: price near the going market rate and never below your unit cost; " +
         "invest in equipment only when you are capacity-bound (utilization near " +
-        "100%) and still hold a cash cushion; raise the wage to attract or keep " +
+        "100%) and still hold a cash cushion; spend on marketing to lift customers' " +
+        "willingness-to-pay and grow your demand when you have room to sell more; " +
+        "raise the wage to attract or keep " +
         "staff when short-handed, and ease it back when fully crewed and cash is " +
         "tight; hire when you are profitable and short-handed. Values outside the " +
         "limits are clamped, so stay within them. Always give a one-sentence reason.",
@@ -125,6 +128,10 @@ export class ClaudeDecisionProvider implements DecisionProvider {
                 type: "number",
                 description: `New wage per tick (current ${o.wagePerTick}, role base ${o.baseWagePerTick}); raise toward roughly twice the base to attract/keep staff, never below base. Omit to keep.`,
               },
+              brand: {
+                type: "number",
+                description: `Cash to spend on marketing/quality this day (0-${limits.maxBrandPerReview}); builds brand equity that lifts customers' willingness-to-pay and grows demand, with diminishing returns + decay. Omit for none.`,
+              },
               reason: { type: "string", description: "One sentence: why." },
             },
             required: ["reason"],
@@ -145,6 +152,7 @@ export class ClaudeDecisionProvider implements DecisionProvider {
     if (typeof input.hire === "number") action.hire = input.hire;
     if (typeof input.invest === "number") action.invest = input.invest;
     if (typeof input.setWage === "number") action.setWage = input.setWage;
+    if (typeof input.brand === "number") action.brand = input.brand;
 
     const usage: ProviderUsage = {
       inputTokens: response.usage.input_tokens,
@@ -175,6 +183,7 @@ export class ClaudeDecisionProvider implements DecisionProvider {
       const utilStr = util !== undefined ? `, running at ${Math.round(util * 100)}% of capacity${util > 0.9 ? " (capacity-bound — more equipment would pay off)" : ""}` : "";
       lines.push(`Equipment (capital) ${round(o.capital)}${utilStr}.`);
     }
+    if (o.brand !== undefined) lines.push(`Brand equity ${round(o.brand)} — marketing spend lifts it, growing how much customers will pay and buy.`);
     const distNote = o.dayDistributed !== undefined ? `, distributed ${round(o.dayDistributed)}` : "";
     lines.push(`Yesterday: revenue ${round(o.dayRevenue)}, wages ${round(o.dayWages)}, rent/COGS ${round(o.dayRent)}${distNote}, net cash ${round(o.dayProfit)}.`);
     lines.push(`Choose this day's plan.`);

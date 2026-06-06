@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import { brandFactor } from "./EconomySystem";
 import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
+import { MockProvider } from "../ai/MockProvider";
+import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
+import { BRAND_BASELINE } from "./constants";
 
 /**
  * Phase 17 — the brand-equity lever (demand-side twin of capital). 17a ships the
@@ -68,5 +71,37 @@ describe("Phase 17b — Hook A reservation lift", () => {
     const withBrand = goodsRevenue({ price: 44, brand: 1e6, brandElasticity: 0 });
     const noBrand = goodsRevenue({ price: 44, brandElasticity: 0 });
     expect(withBrand).toBe(noBrand);
+  });
+});
+
+describe("Phase 17c — the brand lever (action + clamp + apply, conserving)", () => {
+  it("clampAction bounds brand to [0, maxBrandPerReview]", () => {
+    expect(clampAction({ brand: -50 }, 34, DEFAULT_LIMITS).brand).toBe(0);
+    expect(clampAction({ brand: 300 }, 34, DEFAULT_LIMITS).brand).toBe(300);
+    expect(clampAction({ brand: 999_999 }, 34, DEFAULT_LIMITS).brand).toBe(DEFAULT_LIMITS.maxBrandPerReview);
+    expect(clampAction({ brand: NaN }, 34, DEFAULT_LIMITS).brand).toBeUndefined();
+  });
+
+  it("a brand spend is a conserved cash->landlord transfer that builds the stock", () => {
+    const provider = new MockProvider({ fixed: { action: { brand: 500 }, reason: "ad" } });
+    const { sim, world } = createCity({ seed: 1, brain: provider, agenticBusinessIds: ["biz_goods"] });
+    const goods = world.getBusiness("biz_goods")!;
+    goods.cash = 50_000; // genesis headroom to spend
+    const startMoney = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 3);
+    expect(goods.brandSpent ?? 0).toBeGreaterThan(0); // spend recorded
+    expect(goods.brand ?? 0).toBeGreaterThan(BRAND_BASELINE); // stock built above baseline
+    expect(world.totalMoney()).toBeCloseTo(startMoney, 2); // closed economy holds to the cent
+  });
+
+  it("applyBrand never self-transfers — an agentic landlord mints no brand", () => {
+    const provider = new MockProvider({ fixed: { action: { brand: 500 }, reason: "ad" } });
+    const { sim, world } = createCity({ seed: 1, brain: provider, agenticBusinessIds: ["biz_landlord"] });
+    const landlord = world.getBusiness("biz_landlord")!;
+    landlord.cash = 50_000;
+    const startMoney = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 3);
+    expect("brand" in landlord).toBe(false); // sink === self ⇒ guarded ⇒ no stock built
+    expect(world.totalMoney()).toBeCloseTo(startMoney, 2);
   });
 });
