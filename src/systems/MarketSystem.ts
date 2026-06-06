@@ -2,7 +2,7 @@ import type { System, SystemContext } from "../core/types";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import type { World } from "../world/World";
 import type { Business, ResourceKind } from "../world/types";
-import { ARCHETYPES, PRODUCER_OF } from "../world/archetypes";
+import { ARCHETYPES } from "../world/archetypes";
 import {
   BASE_RESOURCE_PRICE,
   PRICE_MIN_MULT,
@@ -94,7 +94,7 @@ export class MarketSystem implements System {
    * unstaffed (no wage cost to cover).
    */
   costFloorFor(res: ResourceKind): number {
-    return this.priceFloor(res, this.world.getBusiness(PRODUCER_OF[res]));
+    return this.priceFloor(res, this.producerOf(res));
   }
 
   /**
@@ -108,6 +108,21 @@ export class MarketSystem implements System {
     const p = clamp(base * multiplier, base * PRICE_MIN_MULT, base * PRICE_MAX_MULT);
     this.prices[resource] = p;
     return p;
+  }
+
+  /**
+   * The active producer of a resource — found by *kind*, not a fixed id (Phase 15
+   * D), so a respawned producer (which has a new business id) seamlessly takes
+   * over the supply chain when the original dies. Niche detection only spawns a
+   * replacement once a kind is fully extinct, so there is at most one active
+   * producer per resource and the first match in deterministic array order is
+   * unambiguous. For the default city this is exactly the canonical seeded
+   * producer — a pure no-op.
+   */
+  private producerOf(resource: ResourceKind): Business | undefined {
+    return this.world.businesses.find(
+      (b) => b.active && ARCHETYPES[b.kind].produces === resource,
+    );
   }
 
   private procure(sold: Record<ResourceKind, number>): void {
@@ -126,7 +141,7 @@ export class MarketSystem implements System {
       const want = Math.max(0, deficit - (biz.resources[input] ?? 0));
       if (want <= 0) continue;
 
-      const producer = this.world.getBusiness(PRODUCER_OF[input]);
+      const producer = this.producerOf(input);
       if (!producer || !producer.active) continue;
       const price = this.prices[input];
       const avail = producer.resources[input] ?? 0;
@@ -312,7 +327,7 @@ export class MarketSystem implements System {
    */
   private adjustPrices(sold: Record<ResourceKind, number>): void {
     for (const res of RESOURCES) {
-      const producer = this.world.getBusiness(PRODUCER_OF[res]);
+      const producer = this.producerOf(res);
       // Measure how hard the producer worked against its *effective* capacity,
       // not the flat maxPerDay (Phase 12b) — otherwise an understaffed producer's
       // brisk-but-small output would read as a slow day and the price would sag

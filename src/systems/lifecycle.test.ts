@@ -95,7 +95,8 @@ describe("LifecycleSystem — invariants", () => {
   });
 
   it("liquidates a bankrupt firm's residual cash to its owner — the husk isn't frozen (Phase 15 D)", () => {
-    const { sim, world } = createCity({ seed: 1 });
+    // businessEntry off so the bakery we strand the farm with isn't simply reborn.
+    const { sim, world } = createCity({ seed: 1, businessEntry: false });
     world.getBusiness("biz_bakery")!.active = false; // strand the farm: cut its only buyer
     const farm = world.getBusiness("biz_farm")!;
     // Strip its crew (so no wage drain races the residual to zero) and park a small

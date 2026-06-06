@@ -171,7 +171,12 @@ export class BusinessAgentSystem implements System {
     const headroom = Math.max(0, biz.cash - BUSINESS_RESERVE);
     const want = Math.min(requested, headroom);
     if (want <= 0) return 0;
-    const moved = this.world.transfer(biz.id, "biz_factory", want);
+    // The capital-goods seller is whatever factory is currently active — found by
+    // kind, not a fixed id, so a respawned factory (Phase 15 D) still takes the
+    // payment. No active factory means no one to buy equipment from this review.
+    const factory = this.world.businesses.find((b) => b.active && b.kind === "factory");
+    if (!factory) return 0;
+    const moved = this.world.transfer(biz.id, factory.id, want);
     if (moved <= 0) return 0;
     biz.capital = (biz.capital ?? CAPITAL_BASELINE) + moved;
     // Book the expenditure so MacroSystem can count it as the investment term in

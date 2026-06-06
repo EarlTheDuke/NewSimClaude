@@ -189,6 +189,32 @@ export const BANKRUPT_GRACE_DAYS = 5;
  */
 export const RECYCLE_BANKRUPT_ASSETS = true;
 /**
+ * Phase 15 D — whether new firms are *born* to fill an empty niche. ON. A
+ * BusinessKind that has gone fully extinct (every firm of it bankrupt) is a
+ * standing unmet demand; this lets a resident-entrepreneur found a fresh firm to
+ * serve it, so the city self-heals from the deaths the productivity engine's
+ * long-run churn produces — and it is the disruption that finally makes the labour
+ * levers (hire/setWage) bite. Inert until a kind actually goes extinct, so the
+ * seeded city (every kind staffed and solvent) is unaffected.
+ */
+export const BUSINESS_ENTRY = true;
+/**
+ * The savings a resident needs before they'll sink {@link NEW_FIRM_CAPITAL} into
+ * founding a firm — they keep a cushion for themselves. Kept low because residents
+ * run cash-light (they spend down into luxuries), so an entrepreneur is someone who
+ * has banked a little above the seeded $500 starting balance.
+ */
+export const ENTREPRENEUR_MIN_SAVINGS = 600;
+/**
+ * Starting cash a founder capitalises a new firm with (a resident → firm transfer,
+ * so birth mints no money). Modest by necessity — it's what a cash-light resident
+ * can spare — but a firm born into an *empty* niche is the sole supplier of a
+ * needed good, so it earns its way up from a thin start.
+ */
+export const NEW_FIRM_CAPITAL = 500;
+/** Min days between business births — hysteresis so a wave of deaths heals gradually, not in a thrash. */
+export const ENTRY_COOLDOWN_DAYS = 10;
+/**
  * Profit distribution keeps the closed economy alive. In a closed loop, resident
  * shop-spending must equal total business wages, so any per-business surplus
  * would otherwise pool forever in one holder (a rent-collecting landlord, a

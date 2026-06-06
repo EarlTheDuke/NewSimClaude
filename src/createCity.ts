@@ -11,6 +11,7 @@ import { EventSystem, type EventSystemOptions } from "./systems/EventSystem";
 import { GodMode } from "./systems/GodMode";
 import { NeedsSystem } from "./systems/NeedsSystem";
 import { LifecycleSystem } from "./systems/LifecycleSystem";
+import { BusinessEntrySystem } from "./systems/BusinessEntrySystem";
 import { MacroSystem } from "./systems/MacroSystem";
 import { BusinessAgentSystem } from "./systems/BusinessAgentSystem";
 import { ResidentAgentSystem } from "./systems/ResidentAgentSystem";
@@ -64,6 +65,12 @@ export interface CitySimOptions extends CityOptions {
    * score a clean skill signal, free of the dividend's wealth-concentration noise.
    */
   ownerDividendShare?: number;
+  /**
+   * Toggle business birth (Phase 15 D). Defaults to the live `BUSINESS_ENTRY`;
+   * lifecycle/bankruptcy tests pass `false` to isolate a death from the entry
+   * system that would otherwise refill the niche it opens.
+   */
+  businessEntry?: boolean;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -84,6 +91,7 @@ export function createCity(options: CitySimOptions = {}): {
   agent?: BusinessAgentSystem;
   residentAgent?: ResidentAgentSystem;
   events?: EventSystem;
+  entry: BusinessEntrySystem;
   god: GodMode;
 } {
   const seed = options.seed ?? 1;
@@ -153,6 +161,12 @@ export function createCity(options: CitySimOptions = {}): {
   // holder on the fully-settled day: bankruptcy off true end-of-day cash, and
   // eviction off the rent actually paid this day.
   sim.addSystem(new LifecycleSystem(world));
+  // Business entry runs right after lifecycle (Phase 15 D): it sees the day's
+  // bankruptcies settled, then refills any niche they emptied — before Macro reads
+  // the day's vitals. Inert until a kind goes extinct, so the seeded city is
+  // unchanged.
+  const entry = new BusinessEntrySystem(world, options.businessEntry);
+  sim.addSystem(entry);
   sim.addSystem(new NeedsSystem(world));
 
   // Macro vitals last of all: it reads the fully-settled day (post-economy,
@@ -165,5 +179,5 @@ export function createCity(options: CitySimOptions = {}): {
   // sim clock to stamp interventions and mirrors forced disasters into `events`.
   const god = new GodMode(world, market, sim.time, seed, events);
 
-  return { sim, world, market, macro, agent, residentAgent, events, god };
+  return { sim, world, market, macro, agent, residentAgent, events, entry, god };
 }
