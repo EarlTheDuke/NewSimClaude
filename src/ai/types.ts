@@ -78,9 +78,9 @@ export interface BusinessObservation {
 }
 
 /**
- * The three levers a business mind may pull. Every field is optional; an
- * omitted field means "leave it alone". Values are *proposals* — they are
- * clamped to {@link DecisionLimits} before they ever touch the world.
+ * The levers a business mind may pull. Every field is optional; an omitted field
+ * means "leave it alone". Values are *proposals* — they are clamped to
+ * {@link DecisionLimits} before they ever touch the world.
  */
 export interface BusinessAction {
   /** Proposed new unit price. */
@@ -96,6 +96,18 @@ export interface BusinessAction {
    * over-investing into insolvency is on the provider to avoid.
    */
   invest?: number;
+  /**
+   * Proposed new posted wage per tick (Phase 15 A) — what the firm pays each
+   * worker per tick on shift, and the rate a new hire starts at. The firm's lever
+   * in the labour market: post a higher wage to attract and keep staff (so
+   * producers can stop bleeding workers to the storefronts, P10-3), a lower one
+   * (down to the role's base) to trim payroll. Clamped to an absolute safety band
+   * here, then to [base, base*MAX_WAGE_MULT] per-business in
+   * {@link BusinessAgentSystem}.apply, which also re-rates sitting staff *up* to
+   * the new rate (never down). Moves no cash itself — wages still flow through the
+   * economy — so the conservation invariant is untouched.
+   */
+  setWage?: number;
 }
 
 /**
@@ -114,6 +126,10 @@ export interface DecisionLimits {
   maxProducePerReview: number;
   /** Max cash a business may spend on capital goods in one review. */
   maxInvestPerReview: number;
+  /** Absolute floor on a posted wage (Phase 15 A safety rail; the real floor is the role's base). */
+  minWagePerTick: number;
+  /** Absolute ceiling on a posted wage (Phase 15 A safety rail; the real cap is base*MAX_WAGE_MULT). */
+  maxWagePerTick: number;
 }
 
 /** A provider's verdict: what to do, and why. */

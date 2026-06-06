@@ -64,6 +64,17 @@ describe("clampAction", () => {
     );
     expect(clampAction({ invest: NaN }, 14, DEFAULT_LIMITS).invest).toBeUndefined();
   });
+
+  it("clamps setWage to the absolute safety band [minWagePerTick, maxWagePerTick] (Phase 15 A)", () => {
+    expect(clampAction({ setWage: 5 }, 14, DEFAULT_LIMITS).setWage).toBe(
+      DEFAULT_LIMITS.maxWagePerTick,
+    );
+    expect(clampAction({ setWage: -1 }, 14, DEFAULT_LIMITS).setWage).toBe(
+      DEFAULT_LIMITS.minWagePerTick,
+    );
+    expect(clampAction({ setWage: 0.3 }, 14, DEFAULT_LIMITS).setWage).toBeCloseTo(0.3, 6);
+    expect(clampAction({ setWage: NaN }, 14, DEFAULT_LIMITS).setWage).toBeUndefined();
+  });
 });
 
 describe("RuleBasedProvider", () => {

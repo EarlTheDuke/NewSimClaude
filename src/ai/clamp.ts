@@ -11,6 +11,10 @@ export const DEFAULT_LIMITS: DecisionLimits = {
   maxHirePerReview: 2,
   maxProducePerReview: 200,
   maxInvestPerReview: 500,
+  // Phase 15 A — coarse detonation guard on the posted wage; the real per-firm
+  // cap [base, base*MAX_WAGE_MULT] is enforced in BusinessAgentSystem.apply().
+  minWagePerTick: 0,
+  maxWagePerTick: 1,
 };
 
 /**
@@ -47,6 +51,13 @@ export function clampAction(
     // Phase 12c — pure per-review cap. The cash-vs-reserve floor is applied
     // later in BusinessAgentSystem.apply(), where current cash is known.
     out.invest = clamp(action.invest, 0, limits.maxInvestPerReview);
+  }
+
+  if (action.setWage !== undefined && Number.isFinite(action.setWage)) {
+    // Phase 15 A — coarse absolute safety band. The real, per-business cap
+    // [base, base*MAX_WAGE_MULT] is applied later in BusinessAgentSystem.apply(),
+    // where the firm's base wage is known.
+    out.setWage = clamp(action.setWage, limits.minWagePerTick, limits.maxWagePerTick);
   }
 
   return out;
