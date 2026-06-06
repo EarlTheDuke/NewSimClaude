@@ -119,6 +119,23 @@ export interface Business {
    * {@link World.transfer}, so the conservation invariant is untouched.
    */
   capitalInvested?: number;
+  /**
+   * Brand equity — the demand-side twin of {@link capital} (Phase 17). Built by
+   * spending cash on marketing/quality (the `brand` lever); it lifts residents'
+   * willingness-to-pay at this firm and depreciates daily like capital. Quoted
+   * relative to `BRAND_BASELINE`; absent ⇒ read as baseline ⇒ no demand lift,
+   * byte-identical to pre-17. Never money — a non-cash quantity like capital, so
+   * the conservation invariant is untouched. NEVER seeded/defaulted: a brain-off
+   * snapshot must omit it entirely.
+   */
+  brand?: number;
+  /**
+   * Cumulative cash spent on brand via the `brand` lever (Phase 17) — the
+   * demand-side mirror of {@link capitalInvested}, for observation/ROI. Absent ⇒ 0.
+   * Never money (it only records spend that already moved via World.transfer).
+   * NEVER seeded.
+   */
+  brandSpent?: number;
 }
 
 export interface ProfitAndLoss {

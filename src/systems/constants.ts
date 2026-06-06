@@ -309,6 +309,22 @@ export const CAPITAL_OUTPUT_ELASTICITY = 0.3;
  */
 export const CAPITAL_DEPRECIATION_RATE = 0.01;
 /**
+ * Phase 17 — BRAND equity: the demand-side twin of productive capital. A firm spends
+ * cash (the `brand` lever) to build a brand stock that lifts residents'
+ * willingness-to-pay at that firm, with diminishing returns + daily decay — exactly
+ * the {@link CAPITAL_BASELINE} / {@link CAPITAL_OUTPUT_ELASTICITY} /
+ * {@link CAPITAL_DEPRECIATION_RATE} shape, mirrored on the demand side. All default
+ * OFF/no-op: `BRAND_DEMAND_ELASTICITY = 0` ⇒ brandFactor ≡ 1 ⇒ no lift, and brand is
+ * never seeded ⇒ a no-spend city sits at baseline forever (byte-identical to pre-17).
+ */
+export const BRAND_BASELINE = 100; // demand-capital scale, twin of CAPITAL_BASELINE
+export const BRAND_DEMAND_ELASTICITY = 0; // Hook A master knob. OFF (17a-17c); ~0.3 live in 17d.
+export const BRAND_UNITS_ELASTICITY = 0; // Hook B (units/visit) — OFF for all of Phase 17.
+export const BRAND_DEPRECIATION_RATE = 0.01; // daily decay of above-baseline brand (≈ capital)
+export const BRAND_PER_DOLLAR = 1; // cash -> stock; keeps brand on the capital scale
+export const BRAND_DEMAND_CAP = 4; // headroom for the (inert) Hook B, separate from WEALTH_DEMAND_CAP
+export const BRAND_SURPLUS_FRACTION = 0.25; // share of surplus to brand, taken BEFORE invest (17d split)
+/**
  * The head-count at which a business counts as "fully staffed" for production.
  * Output scales with min(1, employees / this): with no workers a business makes
  * nothing (the fix for empty producers shipping full output, P10-3), and it
@@ -428,3 +444,11 @@ export const BENCH_WEALTH_ELASTICITY = 1;
  * as {@link BENCH_WEALTH_ELASTICITY} freezes the demand knob.
  */
 export const BENCH_OWNER_DIVIDEND_SHARE = 0;
+/**
+ * Phase 17 — the CEO bench freezes the brand-demand COEFFICIENT (not the lever): a
+ * CEO may spend on `brand`, but its demand payoff is frozen to 0 so re-tuning the
+ * live {@link BRAND_DEMAND_ELASTICITY} never silently moves historical scores — the
+ * same discipline as {@link BENCH_WEALTH_ELASTICITY} / {@link BENCH_OWNER_DIVIDEND_SHARE}.
+ * Un-frozen deliberately as the versioned Phase-16 slice-4 bench re-baseline.
+ */
+export const BENCH_BRAND_DEMAND_ELASTICITY = 0;

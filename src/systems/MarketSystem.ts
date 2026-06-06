@@ -20,6 +20,8 @@ import {
   CAPITAL_DEPRECIATION_RATE,
   LABOR_FULL_STAFF,
   TARGET_CAPITAL_SCALING,
+  BRAND_BASELINE,
+  BRAND_DEPRECIATION_RATE,
 } from "./constants";
 
 const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
@@ -266,9 +268,17 @@ export class MarketSystem implements System {
     for (const biz of this.world.businesses) {
       if (!biz.active) continue;
       const capital = biz.capital ?? CAPITAL_BASELINE;
-      if (capital <= CAPITAL_BASELINE) continue;
-      const excess = capital - CAPITAL_BASELINE;
-      biz.capital = CAPITAL_BASELINE + excess * (1 - CAPITAL_DEPRECIATION_RATE);
+      if (capital > CAPITAL_BASELINE) {
+        const excess = capital - CAPITAL_BASELINE;
+        biz.capital = CAPITAL_BASELINE + excess * (1 - CAPITAL_DEPRECIATION_RATE);
+      }
+      // Phase 17 — brand equity decays like capital (above-baseline only). A
+      // no-spend city has brand unset ⇒ this skips ⇒ byte-identical no-op.
+      const brand = biz.brand ?? BRAND_BASELINE;
+      if (brand > BRAND_BASELINE) {
+        const excess = brand - BRAND_BASELINE;
+        biz.brand = BRAND_BASELINE + excess * (1 - BRAND_DEPRECIATION_RATE);
+      }
     }
   }
 

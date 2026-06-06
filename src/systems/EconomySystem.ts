@@ -14,6 +14,8 @@ import {
   WEALTH_ELASTICITY,
   WEALTH_DEMAND_CAP,
   WEALTH_ROUND_TIERS,
+  BRAND_BASELINE,
+  BRAND_DEMAND_ELASTICITY,
 } from "./constants";
 
 /**
@@ -209,4 +211,20 @@ export function consumptionUnits(
   const idx = Number(resident.id.split("_")[1] ?? 0);
   const phase = (idx % WEALTH_ROUND_TIERS) / WEALTH_ROUND_TIERS;
   return Math.floor(mult + phase);
+}
+
+/**
+ * Demand-side twin of MarketSystem's capitalFactor: (brand / baseline) ^ elasticity,
+ * exactly 1 at {@link BRAND_BASELINE} (Phase 17). UNBOUNDED by design — every call
+ * site MUST clamp the resulting lift (Hook A clamps the final reservation). With
+ * `elasticity` 0 it short-circuits to 1: the hard global OFF switch (mirrors
+ * {@link consumptionUnits}). Pure + RNG-free — Math.pow of a stored scalar.
+ */
+export function brandFactor(
+  biz: Pick<Business, "brand">,
+  elasticity: number = BRAND_DEMAND_ELASTICITY,
+): number {
+  if (elasticity === 0) return 1; // hard OFF switch
+  const brand = biz.brand ?? BRAND_BASELINE; // pre-17 saves read as baseline
+  return Math.pow(Math.max(0, brand) / BRAND_BASELINE, elasticity);
 }
