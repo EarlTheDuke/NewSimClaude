@@ -12,7 +12,7 @@ import type {
 } from "../ai/types";
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
-import { BUSINESS_RESERVE, CAPITAL_BASELINE, RETAIL_REFERENCE_PRICE } from "./constants";
+import { BUSINESS_RESERVE, CAPITAL_BASELINE, MAX_WAGE_MULT, RETAIL_REFERENCE_PRICE } from "./constants";
 import { ARCHETYPES } from "../world/archetypes";
 import type { MarketSystem } from "./MarketSystem";
 
@@ -142,6 +142,7 @@ export class BusinessAgentSystem implements System {
     if (clamped.invest !== undefined && clamped.invest > 0) {
       clamped.invest = this.applyInvest(biz, clamped.invest);
     }
+    if (clamped.setWage !== undefined) this.applySetWage(biz, clamped.setWage);
 
     this.log.push({
       day,
@@ -179,6 +180,27 @@ export class BusinessAgentSystem implements System {
     // money is created, so conservation is untouched.
     biz.capitalInvested = (biz.capitalInvested ?? 0) + moved;
     return moved;
+  }
+
+  /**
+   * Phase 15 A — post a new wage and bring the team along. The proposal is clamped
+   * to `[base, base*MAX_WAGE_MULT]`: a firm competes by paying *above* the role's
+   * base, never below it, never past the cap. Sitting staff are re-rated *up* to
+   * the new posted rate (you can compete for the workers you already have, not just
+   * new hires — the wage actually paid lives on the resident, so without this a
+   * raise wouldn't reach them) but never cut below what they already earn — no
+   * clawing back a wage. Moves no cash: wages keep flowing through EconomySystem,
+   * now at the new rate, so the closed economy is untouched. Deterministic — fixed
+   * employee order, no RNG.
+   */
+  private applySetWage(biz: Business, wage: number): void {
+    const base = biz.baseWagePerTick ?? biz.wagePerTick;
+    const posted = Math.max(base, Math.min(base * MAX_WAGE_MULT, wage));
+    biz.wagePerTick = posted;
+    for (const id of biz.employeeIds) {
+      const r = this.world.getResident(id);
+      if (r && r.wagePerTick < posted) r.wagePerTick = posted;
+    }
   }
 
   /** Move residents in/out of the jobless pool. Deterministic ordering. */

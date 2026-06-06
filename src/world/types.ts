@@ -74,8 +74,18 @@ export interface Business {
   price: number;
   /** Resident ids on payroll. */
   employeeIds: string[];
-  /** Per-tick wage paid to each employee while they are working here. */
+  /** Per-tick wage paid to each employee while they are working here — the firm's *posted* wage. */
   wagePerTick: number;
+  /**
+   * The role's immutable *base* wage (Phase 15 A) — what this firm was seeded
+   * paying. `wagePerTick` is the mutable *posted* wage that the setWage lever
+   * moves within `[base, base*MAX_WAGE_MULT]`; this base is the stable reference
+   * the wage cap and resident raise-caps read, so a bidding war can't compound
+   * wages upward without bound. Seeded equal to `wagePerTick`; absent on
+   * pre-Phase-15 saves, read as `wagePerTick` (an old town resumes with base =
+   * its posted wage). Never money.
+   */
+  baseWagePerTick?: number;
   /** Running P&L since the start of the run. */
   pnl: ProfitAndLoss;
   /** B2B resource stock on hand, keyed by resource (Phase 4). */

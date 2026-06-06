@@ -210,7 +210,11 @@ export class ResidentAgentSystem implements System {
       jobId: r.jobId,
       jobName: job?.name ?? "—",
       wagePerTick: r.wagePerTick,
-      jobBaseWage: job?.wagePerTick ?? 0,
+      // The role's stable base wage (Phase 15 A), so a resident's raise cap is
+      // reckoned against base — not the firm's mutable posted wage — and can't
+      // compound when a firm bids its posted wage up. Equal to the posted wage at
+      // seed and on pre-15 saves, so this is byte-identical until setWage moves.
+      jobBaseWage: job?.baseWagePerTick ?? job?.wagePerTick ?? 0,
       homeId: r.homeId,
       homeName: home.name,
       rent: home.rent ?? 0,

@@ -3,6 +3,7 @@ import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { MockProvider } from "../ai/MockProvider";
 import { runAB } from "../ai/abHarness";
+import { MAX_WAGE_MULT } from "./constants";
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -83,6 +84,46 @@ describe("BusinessAgentSystem", () => {
     expect(log).toHaveLength(1);
     expect(log[0]!.fallback).toBe(true);
     expect(log[0]!.providerId).toBe("rules");
+  });
+});
+
+describe("Phase 15 A — setWage lever", () => {
+  it("posts a higher wage (capped at base*MAX_WAGE_MULT) and re-rates sitting staff up", () => {
+    const provider = new MockProvider({ fixed: { action: { setWage: 9 }, reason: "outbid the storefronts" } });
+    const { sim, world } = createCity({ seed: 1, brain: provider, agenticBusinessIds: ["biz_mine"] });
+    const mine = world.getBusiness("biz_mine")!;
+    const base = mine.baseWagePerTick!; // 0.05 at seed
+    expect(mine.employeeIds.length).toBeGreaterThan(0);
+    const start = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY); // one day-boundary review
+
+    // 9 asked -> absolute clamp to 1 -> per-firm clamp to base*MAX_WAGE_MULT.
+    expect(mine.wagePerTick).toBeCloseTo(base * MAX_WAGE_MULT, 6);
+    // Sitting staff are re-rated up to the new posted rate (the wage actually paid
+    // lives on the resident, so the raise has to reach them).
+    for (const id of mine.employeeIds) {
+      expect(world.getResident(id)!.wagePerTick).toBeCloseTo(base * MAX_WAGE_MULT, 6);
+    }
+    // setWage moves no cash; the closed economy still balances over the day.
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("floors at the base wage and never cuts an already-better-paid worker", () => {
+    const provider = new MockProvider({ fixed: { action: { setWage: 0 }, reason: "cut to nothing" } });
+    const { sim, world } = createCity({ seed: 1, brain: provider, agenticBusinessIds: ["biz_mine"] });
+    const mine = world.getBusiness("biz_mine")!;
+    const base = mine.baseWagePerTick!;
+    // A sitting worker who already earns above base (as if from past raises).
+    const worker = world.getResident(mine.employeeIds[0]!)!;
+    worker.wagePerTick = base * 1.8;
+
+    sim.run(TICKS_PER_DAY);
+
+    // The posted wage floors at base (a firm can't post below the role's base),
+    // and the better-paid worker keeps their rate — no clawback.
+    expect(mine.wagePerTick).toBeCloseTo(base, 6);
+    expect(worker.wagePerTick).toBeCloseTo(base * 1.8, 6);
   });
 });
 

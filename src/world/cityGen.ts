@@ -149,6 +149,13 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
   }
   const homes = locations.filter((l) => l.type === "home");
 
+  // Phase 15 A — seed each firm's immutable base wage = its posted wage. The
+  // setWage lever then moves the *posted* wagePerTick within [base,
+  // base*MAX_WAGE_MULT]; base stays fixed as the reference the wage cap and
+  // resident raises read, so the labour market can bid wages up without them
+  // compounding away.
+  for (const b of businesses) b.baseWagePerTick = b.wagePerTick;
+
   world.locations = locations;
   world.businesses = businesses;
   world.reindex();
