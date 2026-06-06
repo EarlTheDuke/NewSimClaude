@@ -67,6 +67,25 @@ willingness-to-pay is `anchor × (1 + 0.6 × tier)` over 6 tiers (`EconomySystem
 Holding $42 matched the probe exactly. I re-evaluated mid-game and held — the fixed-$42
 line beat every other fixed price over the full horizon, so there was nothing to adjust.
 
+**The honest shape of the game: one real decision, then 41 holds.** Full per-day trace
+via `npx vite-node src/bench/play.ts -- log` (reproducible). Phases:
+
+- **Day 1 — the only decision:** $34 → $42 (one review; clamp allows up to $42.5). Net
+  worth dips to $50,196; util 76%; day-revenue craters to $408 as demand re-sorts.
+- **Days 2–8 — hold nerve:** util sags to 48% then recovers (48→52→57→67→71→76%); revenue
+  climbs $420 → $672. The dip is a transient, not a mistake. Hold.
+- **Days 9–35 — the wealth engine shows:** util grinds 76% → 95%, revenue $672 → $840.
+  As the store distributes profit to residents, they get richer and (wealth-elastic) buy
+  *more* from it — demand it partly funds itself. Net worth still bleeds ~$570/day to the
+  capped distribution, but I'm above both baselines the whole way. Hold.
+- **Days 36–42 — steady state:** util pins at 95–100%, revenue tops out at $882/day. End
+  net worth **$26,805**.
+
+Net worth fell monotonically (50,196 → 26,805) — the game is a *managed decline*: the
+$50k drains via distribution no matter what; pricing at $42 just makes it drain slower
+than the baselines. Inventory sat at 24 every day (the store restocks to target), so the
+only thing my single lever changed was margin-per-sale.
+
 ### Final scoreboard
 
 | player | net worth | vs me |

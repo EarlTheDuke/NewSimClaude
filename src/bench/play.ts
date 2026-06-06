@@ -49,7 +49,9 @@ function netWorth(ceo: { cash: number; inventory: number; price: number; capital
   return ceo.cash + ceo.inventory * ceo.price + Math.max(0, (ceo.capital ?? CAPITAL_BASELINE) - CAPITAL_BASELINE);
 }
 
-function replay(actions: BusinessAction[]) {
+type DayHook = (day: number, ceo: any, market: any, prevCash: number, prevPnl: any) => void;
+
+function replay(actions: BusinessAction[], onDay?: DayHook) {
   const decisions = actions.length
     ? actions.map((a) => ({ action: a, reason: "claude" }))
     : [{ action: {} as BusinessAction, reason: "noop" }];
@@ -70,6 +72,7 @@ function replay(actions: BusinessAction[]) {
     prevCash = ceo.cash;
     prevPnl = { ...ceo.pnl };
     sim.run(TICKS_PER_DAY);
+    onDay?.(t + 1, ceo, market, prevCash, prevPnl);
   }
   return { world, market, ceo, prevCash, prevPnl };
 }
@@ -125,6 +128,20 @@ function main(): void {
     for (let i = 0; i < n; i++) a.push({});
     saveActions(a);
     report(a);
+    return;
+  }
+
+  if (cmd === "log") {
+    const a = loadActions();
+    console.log("day | price | inv | util | dayRev | dayWage* | cash | netWorth   (*wage tally incl. distribution — see PLAYTHROUGH.md bug #1)");
+    replay(a, (day, ceo, market, prevCash, prevPnl) => {
+      const util = market.capacityUtilizationFor(ceo.id);
+      const dayRev = ceo.pnl.revenue - prevPnl.revenue;
+      const dayWage = ceo.pnl.wagesPaid - prevPnl.wagesPaid;
+      console.log(
+        `${String(day).padStart(3)} | $${ceo.price.toFixed(0).padStart(3)} | ${String(ceo.inventory).padStart(3)} | ${(util !== undefined ? (util * 100).toFixed(0) + "%" : "-").padStart(4)} | $${dayRev.toFixed(0).padStart(4)} | $${dayWage.toFixed(0).padStart(5)} | $${ceo.cash.toFixed(0).padStart(6)} | $${netWorth(ceo).toFixed(0).padStart(6)}`,
+      );
+    });
     return;
   }
 
