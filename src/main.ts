@@ -29,18 +29,34 @@ const brain: BrainOption = "rules";
 //   import { ClaudeResidentProvider } from "./ai/ClaudeResidentProvider";
 //   const residentBrain: ResidentBrainOption = new ClaudeResidentProvider();
 const residentBrain: ResidentBrainOption = "rules";
-const agenticResidentIds = ["res_0", "res_1", "res_2", "res_3"];
+// The full living firm economy (Phase 15): EVERY resident is an agent, so the whole
+// labour market is live — workers chase better-paying jobs, firms that fall short
+// of staff bid wages up, and the supply chain reshuffles itself in front of you.
+const agenticResidentIds = Array.from({ length: 12 }, (_, i) => `res_${i}`);
 
-// A rival diner across town (Phase 11b): residents now choose between two food
-// sellers on price + distance, and both re-price under the brain — so the live
-// city shows storefront competition, not just a lone monopolist. The newcomer
-// shares the goods store's node (a strip mall) at the bottom-right.
+// Every firm runs the brain too (a rival diner included, Phase 11b — two food
+// sellers competing on price + distance, sharing the goods store's node in a strip
+// mall). So the live city shows the whole thing at once: producers and storefronts
+// pricing, hiring, bidding wages and investing in equipment; owners enriching on
+// dividends; and — over a long watch — marginal firms going bankrupt and fresh ones
+// being *founded* by resident-entrepreneurs to refill the niches (Phase 15 D). This
+// is the watchable AI city economy the project is for; the decision traces narrate
+// every move. (Set agenticBusinessIds back to just the storefronts for the calmer,
+// pre-Phase-15 view.)
 const { sim, world, market, macro, agent, residentAgent, events, god } = createCity({
   seed: 1,
   brain,
   residentBrain,
   agenticResidentIds,
-  agenticBusinessIds: ["biz_diner", "biz_diner_2", "biz_goods"],
+  agenticBusinessIds: [
+    "biz_diner",
+    "biz_diner_2",
+    "biz_goods",
+    "biz_farm",
+    "biz_mine",
+    "biz_bakery",
+    "biz_factory",
+  ],
   secondDiner: true,
   disasters: true,
 });
@@ -404,9 +420,14 @@ function renderMacro(): void {
   const history = macro.history();
   const latest = macro.latest();
   const active = world.businesses.filter((b) => b.active).length;
+  // Creative destruction at a glance (Phase 15 D): how many firms have been founded
+  // by entrepreneurs and how many have closed over the run. Shown only once it starts.
+  const founded = world.businesses.filter((b) => b.id.includes("_gen")).length;
+  const closed = world.businesses.filter((b) => !b.active).length;
+  const churn = founded > 0 || closed > 0 ? ` · ${founded} founded · ${closed} closed` : "";
   econTagEl.textContent = latest
-    ? `· day ${latest.day} · ${active}/${world.businesses.length} active`
-    : `· ${active}/${world.businesses.length} active`;
+    ? `· day ${latest.day} · ${active} active${churn}`
+    : `· ${active} active${churn}`;
 
   if (latest) {
     vitalsEl.innerHTML = [
