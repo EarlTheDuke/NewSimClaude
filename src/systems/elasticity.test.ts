@@ -14,12 +14,14 @@ const THIRTY_DAYS = TICKS_PER_DAY * 30;
 
 /**
  * Leisure revenue booked at the goods store over `days`, with the store priced
- * at `price`. Brain + residentBrain are both OFF, so the store never re-prices
- * and residents buy no luxuries/vehicles — goods.pnl.revenue is then *pure*
- * leisure spend, the clean signal for measuring discretionary demand.
+ * at `price`. Brain + residentBrain are both OFF, and the owner dividend is frozen
+ * off (Phase 15 C), so the store never re-prices, residents buy no
+ * luxuries/vehicles, and no profit is redistributed to concentrate wealth — making
+ * goods.pnl.revenue *pure* leisure spend at baseline wealth, the clean signal for
+ * measuring price elasticity without the dividend's wealth dynamics confounding it.
  */
 function leisureRevenue(price: number, days = 30): number {
-  const { sim, world } = createCity({ seed: 1 });
+  const { sim, world } = createCity({ seed: 1, ownerDividendShare: 0 });
   world.getBusiness("biz_goods")!.price = price;
   sim.run(TICKS_PER_DAY * days);
   return world.getBusiness("biz_goods")!.pnl.revenue;
