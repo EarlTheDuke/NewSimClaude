@@ -8,9 +8,12 @@ This file auto-loads every session in this repo. It is the operating manual; the
    boundary and check proposed work against the three moves (wants-grow-with-wealth →
    business entry → close the investment loop), the sequencing, and the
    realism-vs-benchmark tension. If a feature doesn't ladder up to it, say so *before* building.
-2. **[MASTER-PLAN.md](MASTER-PLAN.md)** — architecture & guiding principles. Its Phase 0–8
+2. **[ROADMAP.md](ROADMAP.md)** — the forward *sequence* of economic phases (16+): what's
+   next and in what order, folding the 2026-06-06 economic-model audit's gaps. Consult it
+   with NORTH-STAR when picking the next phase.
+3. **[MASTER-PLAN.md](MASTER-PLAN.md)** — architecture & guiding principles. Its Phase 0–8
    roadmap shipped as v1.0; treat it as the standing design reference, not a to-do list.
-3. **[PHASE9-PLAYTEST.md](PHASE9-PLAYTEST.md)** — where routine progress and the live
+4. **[PHASE9-PLAYTEST.md](PHASE9-PLAYTEST.md)** — where routine progress and the live
    Phase 12 plan actually live. Update this for day-to-day work (NORTH-STAR.md only when the
    *direction* genuinely changes).
 

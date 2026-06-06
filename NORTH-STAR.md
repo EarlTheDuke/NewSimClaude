@@ -2,7 +2,7 @@
 
 **Status:** Active true-north (post-v1 direction)
 **Adopted:** 2026-06-04
-**Purpose:** The high-level compass for what we build next. Read this at the start of every new phase or feature and check the proposed work against it *before* planning. This is the current *direction*; [MASTER-PLAN.md](MASTER-PLAN.md) remains the architecture & guiding-principles reference (its Phase 0–8 roadmap shipped as v1.0).
+**Purpose:** The high-level compass for what we build next. Read this at the start of every new phase or feature and check the proposed work against it *before* planning. This is the current *direction*; [MASTER-PLAN.md](MASTER-PLAN.md) remains the architecture & guiding-principles reference (its Phase 0–8 roadmap shipped as v1.0). The *forward sequence* of post-#3 economic phases (16+) lives in [ROADMAP.md](ROADMAP.md).
 
 ## How to use this document
 - **At every phase boundary**, re-read this and ask of any proposed work: *which of the three moves does it serve, does it respect the sequencing, and does it honor the realism-vs-benchmark tension?*
