@@ -92,4 +92,32 @@ describe("BusinessEntrySystem — business birth", () => {
     loaded.sim.run(TICKS_PER_DAY * 5);
     expect(loaded.world.serialize()).toEqual(original.world.serialize());
   });
+
+  it("self-heals: forced exits across the chain are refilled over a churning run (D4)", () => {
+    const { sim, world } = createCity({
+      seed: 1,
+      brain: "rules",
+      residentBrain: "rules",
+      agenticBusinessIds: ["biz_diner", "biz_goods", "biz_farm", "biz_factory", "biz_mine", "biz_bakery"],
+      agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
+    });
+    const startMoney = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 60); // warm up so residents bank the savings to found firms
+
+    // Force two exits on different chains — a retail food seller and a raw producer.
+    kill(world, "biz_diner");
+    kill(world, "biz_mine");
+    expect(world.businesses.filter((b) => b.kind === "diner" && b.active)).toHaveLength(0);
+    expect(world.businesses.filter((b) => b.kind === "mine" && b.active)).toHaveLength(0);
+
+    sim.run(TICKS_PER_DAY * 120); // give entry time (births are cooldown-spaced)
+
+    // Both niches are served again — entrepreneurs refilled them, so the city healed.
+    expect(world.businesses.filter((b) => b.kind === "diner" && b.active).length).toBeGreaterThan(0);
+    expect(world.businesses.filter((b) => b.kind === "mine" && b.active).length).toBeGreaterThan(0);
+    // The closed economy held through all the death, liquidation and birth; nobody underwater.
+    expect(world.totalMoney()).toBeCloseTo(startMoney, 2);
+    for (const b of world.businesses) expect(b.cash).toBeGreaterThanOrEqual(0);
+    for (const r of world.residents) expect(r.money).toBeGreaterThanOrEqual(0);
+  });
 });
