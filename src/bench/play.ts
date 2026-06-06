@@ -134,7 +134,7 @@ function main(): void {
   if (cmd === "log") {
     const a = loadActions();
     console.log("day | price | inv | util | dayRev | dayWage* | cash | netWorth   (*wage tally incl. distribution — see PLAYTHROUGH.md bug #1)");
-    replay(a, (day, ceo, market, prevCash, prevPnl) => {
+    replay(a, (day, ceo, market, _prevCash, prevPnl) => {
       const util = market.capacityUtilizationFor(ceo.id);
       const dayRev = ceo.pnl.revenue - prevPnl.revenue;
       const dayWage = ceo.pnl.wagesPaid - prevPnl.wagesPaid;
