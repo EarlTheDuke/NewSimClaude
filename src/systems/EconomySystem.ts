@@ -16,6 +16,8 @@ import {
   WEALTH_ROUND_TIERS,
   BRAND_BASELINE,
   BRAND_DEMAND_ELASTICITY,
+  BRAND_UNITS_ELASTICITY,
+  BRAND_DEMAND_CAP,
 } from "./constants";
 
 /**
@@ -38,6 +40,12 @@ export class EconomySystem implements System {
   constructor(
     private readonly world: World,
     private readonly wealthElasticity: number = WEALTH_ELASTICITY,
+    /**
+     * How strongly a firm's brand equity lifts residents' willingness-to-pay
+     * (Phase 17 Hook A). Defaults to the live {@link BRAND_DEMAND_ELASTICITY} (0
+     * until 17d); the CEO bench injects its frozen value so scores don't drift.
+     */
+    private readonly brandElasticity: number = BRAND_DEMAND_ELASTICITY,
   ) {}
 
   update(ctx: SystemContext): void {
@@ -111,10 +119,13 @@ export class EconomySystem implements System {
     // gated identically; at baseline wealth (or keystone off) it is one unit, so
     // the body below runs exactly once, byte-identical to before.
     const units = consumptionUnits(resident, this.wealthElasticity);
+    // Brand lift is loop-invariant (venue.brand is fixed for the visit) — hoist it.
+    const anchor = RETAIL_REFERENCE_PRICE[venue.kind];
+    const reservation =
+      anchor !== undefined ? this.leisureReservation(resident, anchor, venue) : undefined;
     for (let k = 0; k < units; k++) {
       const cost = venue.price > 0 ? venue.price : SOCIAL_SPEND;
-      const anchor = RETAIL_REFERENCE_PRICE[venue.kind];
-      if (anchor !== undefined && cost > this.leisureReservation(resident, anchor) + 1e-9) {
+      if (reservation !== undefined && cost > reservation + 1e-9) {
         break; // priced past this resident's reservation — they window-shop, buy nothing
       }
       const paid = this.world.transfer(resident.id, venue.id, cost);
@@ -132,10 +143,18 @@ export class EconomySystem implements System {
    * tiers by resident index. No RNG, so it is stable across saves and identical
    * for the same resident every visit.
    */
-  private leisureReservation(resident: Resident, anchor: number): number {
+  private leisureReservation(resident: Resident, anchor: number, venue: Business): number {
     const idx = Number(resident.id.split("_")[1] ?? 0);
     const tier = (idx % LEISURE_TOLERANCE_TIERS) / (LEISURE_TOLERANCE_TIERS - 1);
-    return anchor * (1 + LEISURE_PRICE_SPREAD * tier);
+    // Phase 17 Hook A — brand lifts willingness-to-pay toward this venue. lift = 0 at
+    // baseline (brandElasticity 0 or brand unset) ⇒ today's value exactly.
+    const lift = brandFactor(venue, this.brandElasticity) - 1;
+    const lifted = anchor * (1 + LEISURE_PRICE_SPREAD * tier) * (1 + lift);
+    // Clamp the FINAL reservation to today's top of band (anchor × 1.6): brand converts
+    // price-sensitive window-shoppers into buyers — it lifts the low/mid tiers up toward
+    // the existing ceiling, never into a new super-premium region above it.
+    const ceiling = anchor * (1 + LEISURE_PRICE_SPREAD);
+    return Math.min(ceiling, lifted);
   }
 
   private collectRent(): void {
@@ -204,10 +223,19 @@ export class EconomySystem implements System {
 export function consumptionUnits(
   resident: Pick<Resident, "id" | "money">,
   elasticity: number = WEALTH_ELASTICITY,
+  venue?: Pick<Business, "brand">,
+  brandUnitsElasticity: number = BRAND_UNITS_ELASTICITY,
 ): number {
-  if (elasticity === 0) return 1;
+  // OFF fast-path: no wealth curve AND no engaged brand-units hook ⇒ exactly 1
+  // (byte-identical to pre-13/pre-17). An active venue with brand unset is a real object.
+  if (elasticity === 0 && (venue === undefined || brandUnitsElasticity === 0)) return 1;
   const ratio = Math.max(0, resident.money) / WEALTH_BASELINE;
-  const mult = Math.min(WEALTH_DEMAND_CAP, Math.max(1, Math.pow(ratio, elasticity)));
+  const wealthMult = elasticity === 0 ? 1 : Math.max(1, Math.pow(ratio, elasticity));
+  // Phase 17 Hook B (units/visit) — PLUMBED INERT: brandUnitsElasticity defaults to 0,
+  // so brandMult ≡ 1 and the cap stays WEALTH_DEMAND_CAP. Never engaged in Phase 17.
+  const brandMult = venue && brandUnitsElasticity !== 0 ? brandFactor(venue, brandUnitsElasticity) : 1;
+  const cap = brandMult > 1 ? BRAND_DEMAND_CAP : WEALTH_DEMAND_CAP;
+  const mult = Math.min(cap, Math.max(1, wealthMult * brandMult));
   const idx = Number(resident.id.split("_")[1] ?? 0);
   const phase = (idx % WEALTH_ROUND_TIERS) / WEALTH_ROUND_TIERS;
   return Math.floor(mult + phase);

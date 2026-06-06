@@ -60,6 +60,12 @@ export interface CitySimOptions extends CityOptions {
    */
   wealthElasticity?: number;
   /**
+   * Override how strongly brand equity lifts willingness-to-pay (Phase 17 Hook A).
+   * Defaults to the live `BRAND_DEMAND_ELASTICITY` (0 until 17d); the CEO benchmark
+   * passes its frozen `BENCH_BRAND_DEMAND_ELASTICITY` so scores stay reproducible.
+   */
+  brandElasticity?: number;
+  /**
    * Override the owner-dividend share (Phase 15 C). Defaults to the live-game
    * `OWNER_DIVIDEND_SHARE`; the CEO benchmark passes 0 to keep its firm-net-worth
    * score a clean skill signal, free of the dividend's wealth-concentration noise.
@@ -118,7 +124,7 @@ export function createCity(options: CitySimOptions = {}): {
   if (events) sim.addSystem(events);
   sim.addSystem(new BrainSystem(world));
   sim.addSystem(new MovementSystem(world));
-  sim.addSystem(new EconomySystem(world, options.wealthElasticity));
+  sim.addSystem(new EconomySystem(world, options.wealthElasticity, options.brandElasticity));
   sim.addSystem(market);
 
   let agent: BusinessAgentSystem | undefined;
