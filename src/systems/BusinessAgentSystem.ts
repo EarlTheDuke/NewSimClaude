@@ -137,7 +137,6 @@ export class BusinessAgentSystem implements System {
   ): void {
     const clamped = clampAction(decision.action, biz.price, this.limits);
     if (clamped.setPrice !== undefined) biz.price = clamped.setPrice;
-    if (clamped.produce !== undefined) biz.inventory += clamped.produce;
     if (clamped.hire !== undefined && clamped.hire !== 0) this.applyHire(biz, clamped.hire);
     if (clamped.invest !== undefined && clamped.invest > 0) {
       clamped.invest = this.applyInvest(biz, clamped.invest);

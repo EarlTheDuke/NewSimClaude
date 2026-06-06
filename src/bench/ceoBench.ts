@@ -22,7 +22,12 @@
  */
 import { createCity, type BrainOption } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
-import { BENCH_START_CAPITAL, BENCH_TURNS, BENCH_WEALTH_ELASTICITY } from "../systems/constants";
+import {
+  BENCH_START_CAPITAL,
+  BENCH_TURNS,
+  BENCH_WEALTH_ELASTICITY,
+  CAPITAL_BASELINE,
+} from "../systems/constants";
 
 export interface CeoBenchConfig {
   seed: number;
@@ -51,7 +56,9 @@ export interface CeoBenchResult {
   finalInventory: number;
   /** Inventory marked to the storefront's ask price. */
   finalInventoryValue: number;
-  /** The score: cash + inventory value at the final turn. */
+  /** Productive capital above baseline at depreciated book (Phase 15 F1) — counts toward the score. */
+  finalCapitalValue: number;
+  /** The score: cash + inventory value + capital value at the final turn. */
   finalNetWorth: number;
   /** finalNetWorth − startNetWorth: what the CEO's stewardship added (or lost). */
   profit: number;
@@ -107,7 +114,16 @@ function setupScenario(config: CeoBenchConfig): {
   // conservation is measured from here, over the run.
   ceo.cash = startCapital;
 
-  const netWorth = (): number => ceo.cash + ceo.inventory * ceo.price;
+  // Phase 15 F1 — net worth counts the CEO's *productive capital* too, at its
+  // depreciated above-baseline book value (invest is cash->capital 1:1, then the
+  // excess decays ~1%/day). Without this, buying equipment reads as pure
+  // net-worth loss — cash leaves, nothing on the books replaces it — so the
+  // benchmark would punish the very productivity strategy the engine rewards.
+  // With it, a capitalized firm is scored as the value it is, and invest-*timing*
+  // (capital wears out) becomes a real decision. Baseline capital is the common
+  // endowment every firm starts with, so only what the CEO built above it counts.
+  const capitalValue = (): number => (ceo.capital ?? CAPITAL_BASELINE) - CAPITAL_BASELINE;
+  const netWorth = (): number => ceo.cash + ceo.inventory * ceo.price + capitalValue();
   const startNetWorth = netWorth();
   const startMoney = world.totalMoney();
   const brainId = typeof config.brain === "string" ? config.brain : config.brain.id;
@@ -126,6 +142,7 @@ function setupScenario(config: CeoBenchConfig): {
       finalCash: ceo.cash,
       finalInventory: ceo.inventory,
       finalInventoryValue: ceo.inventory * ceo.price,
+      finalCapitalValue: capitalValue(),
       finalNetWorth,
       profit: finalNetWorth - startNetWorth,
       moneyConserved: Math.abs(moneyDelta) < 1e-6,
@@ -200,6 +217,7 @@ export function formatCeoScorecard(results: CeoBenchResult[]): string {
     ["  profit", (r) => `${r.profit >= 0 ? "+" : "−"}${money(Math.abs(r.profit))}`],
     ["  cash", (r) => money(r.finalCash)],
     ["  inventory", (r) => `${r.finalInventory} @ ${money(r.finalInventoryValue)}`],
+    ["  capital", (r) => money(r.finalCapitalValue)],
     ["survived", (r) => (r.survived ? "yes" : "BANKRUPT")],
     ["decisions", (r) => `${r.decisions}${r.fellBack > 0 ? ` (${r.fellBack} fell back)` : ""}`],
     ["city GDP", (r) => money(r.cityGdp)],

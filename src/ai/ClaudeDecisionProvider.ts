@@ -78,7 +78,7 @@ export class ClaudeDecisionProvider implements DecisionProvider {
       max_tokens: this.maxTokens,
       system:
         "You run a single small business in a watchable city economy. Decide " +
-        "this day's move using only the three levers in the `set_business_plan` " +
+        "this day's move using only the levers in the `set_business_plan` " +
         "tool. Be conservative and profit-seeking; values outside the limits are " +
         "clamped, so stay within them. Always give a one-sentence reason.",
       tool_choice: { type: "tool", name: "set_business_plan" },
@@ -96,10 +96,6 @@ export class ClaudeDecisionProvider implements DecisionProvider {
               hire: {
                 type: "integer",
                 description: `Net headcount change, +hire / -layoff, within ±${limits.maxHirePerReview}. Omit for none.`,
-              },
-              produce: {
-                type: "integer",
-                description: `Units to produce, 0-${limits.maxProducePerReview}. Omit for none.`,
               },
               reason: { type: "string", description: "One sentence: why." },
             },
@@ -119,7 +115,6 @@ export class ClaudeDecisionProvider implements DecisionProvider {
     const action: BusinessAction = {};
     if (typeof input.setPrice === "number") action.setPrice = input.setPrice;
     if (typeof input.hire === "number") action.hire = input.hire;
-    if (typeof input.produce === "number") action.produce = input.produce;
 
     const usage: ProviderUsage = {
       inputTokens: response.usage.input_tokens,

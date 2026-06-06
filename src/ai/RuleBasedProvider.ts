@@ -71,12 +71,6 @@ export class RuleBasedProvider implements DecisionProvider {
       action.setPrice = Math.max(action.setPrice, o.unitCost);
     }
 
-    // Produce: restock when the shelves run low.
-    if (o.inventory < 60) {
-      action.produce = 80;
-      notes.push("low inventory, producing 80");
-    }
-
     // Staff: hire when profitable with people to hire; trim when cash is thin.
     if (o.dayProfit > 50 && o.unemployedCount > 0 && o.employeeCount < 6) {
       action.hire = 1;

@@ -87,8 +87,6 @@ export interface BusinessAction {
   setPrice?: number;
   /** Net headcount change: +N hires from the jobless pool, -N lays off. */
   hire?: number;
-  /** Units of inventory to produce (added to stock on hand). */
-  produce?: number;
   /**
    * Cash to spend buying capital goods (equipment) wholesale from the factory
    * this review. Raises future output via 12b's `capitalFactor`. Routed through
@@ -122,8 +120,6 @@ export interface DecisionLimits {
   maxPriceChangeFraction: number;
   /** Max net hires or layoffs per review (absolute). */
   maxHirePerReview: number;
-  /** Max units produced per review. */
-  maxProducePerReview: number;
   /** Max cash a business may spend on capital goods in one review. */
   maxInvestPerReview: number;
   /** Absolute floor on a posted wage (Phase 15 A safety rail; the real floor is the role's base). */

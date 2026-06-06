@@ -9,18 +9,15 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe("BusinessAgentSystem", () => {
   it("applies a clamped decision once per day per business", () => {
-    const provider = new MockProvider({ fixed: { action: { setPrice: 99, produce: 50 }, reason: "test" } });
+    const provider = new MockProvider({ fixed: { action: { setPrice: 99 }, reason: "test" } });
     const { sim, world, agent } = createCity({ seed: 1, brain: provider, agenticBusinessIds: ["biz_diner"] });
     const diner = world.getBusiness("biz_diner")!;
-    const startInv = diner.inventory;
 
     sim.run(TICKS_PER_DAY); // exactly one day-boundary review
 
     // price clamped: diner starts at 18 -> at most 18 * 1.25 = 22.5
     expect(diner.price).toBeLessThanOrEqual(22.5);
     expect(diner.price).toBeGreaterThan(18);
-    // produce added to inventory (minus any meals sold during the day)
-    expect(diner.inventory).toBeGreaterThan(startInv - 200 + 50 - 1);
     expect(agent!.decisions()).toHaveLength(1);
     expect(agent!.decisions()[0]!.fallback).toBe(false);
   });

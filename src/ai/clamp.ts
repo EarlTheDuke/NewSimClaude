@@ -9,7 +9,6 @@ export const DEFAULT_LIMITS: DecisionLimits = {
   maxPrice: 100,
   maxPriceChangeFraction: 0.25,
   maxHirePerReview: 2,
-  maxProducePerReview: 200,
   maxInvestPerReview: 500,
   // Phase 15 A — coarse detonation guard on the posted wage; the real per-firm
   // cap [base, base*MAX_WAGE_MULT] is enforced in BusinessAgentSystem.apply().
@@ -41,10 +40,6 @@ export function clampAction(
 
   if (action.hire !== undefined && Number.isFinite(action.hire)) {
     out.hire = Math.trunc(clamp(action.hire, -limits.maxHirePerReview, limits.maxHirePerReview));
-  }
-
-  if (action.produce !== undefined && Number.isFinite(action.produce)) {
-    out.produce = Math.trunc(clamp(action.produce, 0, limits.maxProducePerReview));
   }
 
   if (action.invest !== undefined && Number.isFinite(action.invest)) {

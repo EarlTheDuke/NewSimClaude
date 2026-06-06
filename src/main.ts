@@ -322,7 +322,6 @@ function renderTrace(): void {
       const levers: string[] = [];
       if (e.action.setPrice !== undefined) levers.push(`price→${money(e.action.setPrice)}`);
       if (e.action.hire) levers.push(e.action.hire > 0 ? `+${e.action.hire} hire` : `${e.action.hire} layoff`);
-      if (e.action.produce) levers.push(`+${e.action.produce} stock`);
       if (e.action.invest) levers.push(`+${money(e.action.invest)} invest`);
       const act = levers.length > 0 ? levers.join(", ") : "hold";
       const cost = e.usage?.costUsd !== undefined ? ` · $${e.usage.costUsd.toFixed(4)}` : "";

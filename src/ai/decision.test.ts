@@ -46,11 +46,6 @@ describe("clampAction", () => {
     expect(clampAction({ hire: 1.9 }, 14, DEFAULT_LIMITS).hire).toBe(1);
   });
 
-  it("keeps produce non-negative and capped", () => {
-    expect(clampAction({ produce: -50 }, 14, DEFAULT_LIMITS).produce).toBe(0);
-    expect(clampAction({ produce: 9999 }, 14, DEFAULT_LIMITS).produce).toBe(DEFAULT_LIMITS.maxProducePerReview);
-  });
-
   it("drops absent and non-finite levers", () => {
     expect(clampAction({}, 14, DEFAULT_LIMITS)).toEqual({});
     expect(clampAction({ setPrice: NaN, hire: Infinity }, 14, DEFAULT_LIMITS)).toEqual({});
@@ -116,11 +111,6 @@ describe("RuleBasedProvider", () => {
     expect(d.action.setPrice!).toBeGreaterThan(14);
   });
 
-  it("produces when inventory runs low", () => {
-    const d = rules.decide(req({ inventory: 20 }));
-    expect(d.action.produce).toBeGreaterThan(0);
-  });
-
   it("always gives a reason", () => {
     expect(rules.decide(req()).reason.length).toBeGreaterThan(0);
   });
@@ -167,8 +157,8 @@ describe("RuleBasedProvider", () => {
 
 describe("MockProvider", () => {
   it("returns its fixed decision and counts calls", () => {
-    const m = new MockProvider({ fixed: { action: { produce: 10 }, reason: "x" } });
-    expect((m.decide(req()) as { action: { produce?: number } }).action.produce).toBe(10);
+    const m = new MockProvider({ fixed: { action: { hire: 1 }, reason: "x" } });
+    expect((m.decide(req()) as { action: { hire?: number } }).action.hire).toBe(1);
     expect(m.calls).toBe(1);
   });
 

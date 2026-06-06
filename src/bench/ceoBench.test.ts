@@ -24,13 +24,17 @@ describe("CEO benchmark (Phase 10d)", () => {
       expect(r.startNetWorth).toBeGreaterThanOrEqual(BENCH_START_CAPITAL);
     });
 
-    it("net worth is exactly cash plus marked-to-ask inventory; profit is the delta from open", () => {
+    it("net worth is cash + marked-to-ask inventory + capital value; profit is the delta from open", () => {
       for (const brain of ["off", "rules"] as const) {
         const r = runCeoBenchmark({ seed: SEED, brain });
         expect(r.finalCash).toBeGreaterThanOrEqual(0);
         expect(r.finalInventory).toBeGreaterThanOrEqual(0);
         expect(r.finalInventoryValue).toBeGreaterThanOrEqual(0);
-        expect(r.finalNetWorth).toBeCloseTo(r.finalCash + r.finalInventoryValue, 6);
+        expect(r.finalCapitalValue).toBeGreaterThanOrEqual(0); // Phase 15 F1
+        expect(r.finalNetWorth).toBeCloseTo(
+          r.finalCash + r.finalInventoryValue + r.finalCapitalValue,
+          6,
+        );
         expect(r.profit).toBeCloseTo(r.finalNetWorth - r.startNetWorth, 6);
       }
     });

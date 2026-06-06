@@ -122,7 +122,13 @@ describe("Phase 11b storefront competition", () => {
     };
 
     it("converges to a shared price after a deep undercut — both survive", () => {
-      const { sim, world } = city(1, () => 12); // diner_2 opens a price war at 12
+      // diner_2 opens with a deep but *viable* undercut (14 vs the 18 anchor).
+      // A below-cost war price (e.g. 12) is no longer survivable now that the
+      // free-restock produce exploit is gone (Phase 15 E1): an underwater diner
+      // correctly bleeds out as the distribution system skims its good days but
+      // not its bad ones. So the truce is tested at a price a rival can actually
+      // hold — they still converge to a single shared price and both survive.
+      const { sim, world } = city(1, () => 14);
       sim.run(TICKS_PER_DAY * 90);
       const d1 = world.getBusiness("biz_diner")!;
       const d2 = world.getBusiness("biz_diner_2")!;
