@@ -48,7 +48,21 @@ export interface BusinessObservation {
    */
   unitCost?: number;
   employeeCount: number;
+  /** The firm's current *posted* wage per tick. */
   wagePerTick: number;
+  /**
+   * The role's immutable *base* wage (Phase 15 A) — the floor and the
+   * `base*MAX_WAGE_MULT` cap reference for the setWage lever. A mind compares it
+   * to {@link wagePerTick} to see how much wage headroom it has left.
+   */
+  baseWagePerTick: number;
+  /**
+   * True when the firm has an unfilled seat (`employeeCount < DESIRED_HEADCOUNT`)
+   * — the cue to bid wages up to attract/keep staff (Phase 15 A). When a producer
+   * is poached down to an empty seat this is how its mind knows to compete for
+   * labour rather than silently starve.
+   */
+  understaffed: boolean;
   /** Revenue booked during the day that just ended. */
   dayRevenue: number;
   /** Wages paid during the day that just ended. */

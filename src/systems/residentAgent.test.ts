@@ -135,23 +135,27 @@ describe("clampResidentAction", () => {
 
 describe("ResidentAgentSystem", () => {
   it("applies a job switch, moving the resident between payrolls", () => {
-    const provider = new MockResidentProvider({ fixed: { action: { switchJobTo: "biz_goods" }, reason: "better pay" } });
+    // Under the Phase 15 A hiring cap a full crew advertises no vacancy, and the
+    // seeded city now staffs every producer to DESIRED_HEADCOUNT — so open a seat
+    // at the bakery first, then a switch there is honoured.
+    const provider = new MockResidentProvider({ fixed: { action: { switchJobTo: "biz_bakery" }, reason: "open seat" } });
     const { sim, world, residentAgent } = createCity({
       seed: 1,
       residentBrain: provider,
       agenticResidentIds: ["res_0"],
     });
     const diner = world.getBusiness("biz_diner")!;
-    const goods = world.getBusiness("biz_goods")!;
+    const bakery = world.getBusiness("biz_bakery")!;
+    world.getResident(bakery.employeeIds.pop()!)!.jobId = ""; // open a vacancy
     expect(diner.employeeIds).toContain("res_0");
 
     sim.run(TICKS_PER_DAY);
 
     const r = world.getResident("res_0")!;
-    expect(r.jobId).toBe("biz_goods");
-    expect(r.wagePerTick).toBe(goods.wagePerTick);
+    expect(r.jobId).toBe("biz_bakery");
+    expect(r.wagePerTick).toBe(bakery.wagePerTick);
     expect(diner.employeeIds).not.toContain("res_0");
-    expect(goods.employeeIds).toContain("res_0");
+    expect(bakery.employeeIds).toContain("res_0");
     expect(residentAgent!.decisions()).toHaveLength(1);
     expect(residentAgent!.decisions()[0]!.fallback).toBe(false);
   });
@@ -249,8 +253,10 @@ describe("ResidentAgentSystem", () => {
   });
 
   it("applies async decisions after they resolve, off the tick path", async () => {
-    const provider = new MockResidentProvider({ async: true, fixed: { action: { switchJobTo: "biz_goods" }, reason: "async" } });
+    const provider = new MockResidentProvider({ async: true, fixed: { action: { switchJobTo: "biz_bakery" }, reason: "async" } });
     const { sim, world, residentAgent } = createCity({ seed: 1, residentBrain: provider, agenticResidentIds: ["res_0"] });
+    // Open a seat so the bakery is hiring under the Phase 15 A cap.
+    world.getResident(world.getBusiness("biz_bakery")!.employeeIds.pop()!)!.jobId = "";
 
     sim.run(TICKS_PER_DAY);
     expect(residentAgent!.decisions()).toHaveLength(0);
@@ -258,7 +264,23 @@ describe("ResidentAgentSystem", () => {
     await flush();
 
     expect(residentAgent!.decisions()).toHaveLength(1);
-    expect(world.getResident("res_0")!.jobId).toBe("biz_goods");
+    expect(world.getResident("res_0")!.jobId).toBe("biz_bakery");
+  });
+
+  it("won't move a resident into a fully-staffed firm (Phase 15 A3 hiring cap)", () => {
+    const provider = new MockResidentProvider({ fixed: { action: { switchJobTo: "biz_goods" }, reason: "chasing the top wage" } });
+    const { sim, world } = createCity({ seed: 1, residentBrain: provider, agenticResidentIds: ["res_0"] });
+    const goods = world.getBusiness("biz_goods")!;
+    expect(goods.employeeIds.length).toBe(2); // seeded full at DESIRED_HEADCOUNT
+    const before = world.getResident("res_0")!.jobId;
+
+    sim.run(TICKS_PER_DAY);
+
+    // The top-paying storefront advertises no vacancy, so the switch is dropped —
+    // the cap that stops every agentic resident stampeding it and stripping the
+    // producers of labour (P10-3).
+    expect(world.getResident("res_0")!.jobId).toBe(before);
+    expect(goods.employeeIds.length).toBe(2);
   });
 
   it("falls back invisibly when an async provider rejects", async () => {

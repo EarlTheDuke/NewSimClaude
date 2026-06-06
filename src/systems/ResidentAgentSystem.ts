@@ -14,6 +14,7 @@ import type {
 } from "../ai/residentTypes";
 import { clampResidentAction, DEFAULT_RESIDENT_LIMITS } from "../ai/residentClamp";
 import { RuleBasedResidentProvider } from "../ai/RuleBasedResidentProvider";
+import { desiredHeadcount } from "../world/archetypes";
 
 /**
  * The agentic layer for people: once per sim-day, each opted-in resident
@@ -185,9 +186,19 @@ export class ResidentAgentSystem implements System {
     const job = employed ? this.world.getBusiness(r.jobId) : undefined;
     const home = this.world.getLocation(r.homeId);
 
+    // A job is "hiring" only while it has an open seat (Phase 15 A) — a firm with
+    // its full crew stops advertising. This is what keeps every agentic resident
+    // from stampeding the single top-paying storefront and starving the producers
+    // of labour (P10-3): once the storefronts fill, the rest of the workforce
+    // looks to the under-staffed producers instead.
     const jobOptions: JobOption[] = this.world.businesses
       .filter((b) => b.id !== r.jobId)
-      .map((b) => ({ businessId: b.id, name: b.name, wagePerTick: b.wagePerTick, hiring: true }));
+      .map((b) => ({
+        businessId: b.id,
+        name: b.name,
+        wagePerTick: b.wagePerTick,
+        hiring: b.employeeIds.length < desiredHeadcount(b.kind),
+      }));
 
     const homeOptions: HomeOption[] = this.world.locations
       .filter((l) => l.type === "home" && l.id !== r.homeId)

@@ -8,6 +8,7 @@ import {
   BUSINESS_RESERVE,
   INVEST_MIN_SURPLUS,
   INVEST_UTILIZATION_THRESHOLD,
+  MAX_WAGE_MULT,
 } from "../systems/constants";
 
 /**
@@ -71,10 +72,14 @@ export class RuleBasedProvider implements DecisionProvider {
       action.setPrice = Math.max(action.setPrice, o.unitCost);
     }
 
-    // Staff: hire when profitable with people to hire; trim when cash is thin.
-    if (o.dayProfit > 50 && o.unemployedCount > 0 && o.employeeCount < 6) {
+    // Staff: hire when profitable, short-handed, and there are people to hire;
+    // trim when cash is thin. Capping hiring at the firm's desired headcount
+    // (o.understaffed) stops a profitable storefront from vacuuming up the whole
+    // jobless pool — workers freed by churn flow back to the under-staffed
+    // producers instead of ballooning one store (Phase 15 A).
+    if (o.dayProfit > 50 && o.unemployedCount > 0 && o.understaffed) {
       action.hire = 1;
-      notes.push("profitable, hiring 1");
+      notes.push("profitable and short-handed, hiring 1");
     } else if (o.cash < 200 && o.employeeCount > 1) {
       action.hire = -1;
       notes.push("cash low, laying off 1");
@@ -100,6 +105,23 @@ export class RuleBasedProvider implements DecisionProvider {
       // Reinvest half of today's surplus; the rest flows out as the dividend.
       action.invest = (o.cash - BUSINESS_RESERVE) / 2;
       notes.push("capacity-bound + profitable, reinvesting half the day's surplus");
+    }
+
+    // Wage: compete for labour (Phase 15 A). A short-handed firm bids its wage up
+    // toward the cap to attract and keep staff — the lever that stops a low-paying
+    // producer from bleeding its crew to the storefronts and starving the chain
+    // (P10-3). Raising the *offer* is cheap (you only pay it once someone takes the
+    // seat), so it isn't gated on today's profit; but a fully-staffed firm that has
+    // run its cash below reserve eases back toward base, so wages settle where
+    // vacancies clear instead of ratcheting to the ceiling and sticking there.
+    const base = o.baseWagePerTick;
+    const wageCap = base * MAX_WAGE_MULT;
+    if (o.understaffed && o.wagePerTick < wageCap) {
+      action.setWage = Math.min(wageCap, o.wagePerTick * 1.1);
+      notes.push("short-handed, raising the wage to attract staff");
+    } else if (!o.understaffed && o.cash < BUSINESS_RESERVE && o.wagePerTick > base) {
+      action.setWage = Math.max(base, o.wagePerTick * 0.95);
+      notes.push("fully staffed but cash-thin, easing wages back toward base");
     }
 
     return {

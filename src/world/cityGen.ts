@@ -9,6 +9,7 @@ import type {
   WorkSchedule,
 } from "./types";
 import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE } from "../systems/constants";
+import { ARCHETYPES } from "./archetypes";
 
 /**
  * Builds the default small city, deterministically from the given RNG.
@@ -160,12 +161,18 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
   world.businesses = businesses;
   world.reindex();
 
+  // Workers staff only the *producing* businesses, round-robin (the landlord runs
+  // on rent, with no crew) — so the seeded workforce fully staffs the supply chain
+  // (in the default town, exactly DESIRED_HEADCOUNT per producer) and no producer
+  // is left to starve when the agentic labour market churns (Phase 15 A).
+  const staffable = businesses.filter((b) => ARCHETYPES[b.kind].maxPerDay > 0);
+
   // --- Residents: assign a home and a job, start asleep at home ---
   const residents: Resident[] = [];
   for (let i = 0; i < residentCount; i++) {
     const home = homes[i % homes.length]!;
     const employed = i < employedCount;
-    const biz = businesses[i % businesses.length]!;
+    const biz = staffable[i % staffable.length]!;
     if (employed) biz.employeeIds.push(`res_${i}`);
     const homeNode = world.getNode(home.nodeId);
     residents.push({

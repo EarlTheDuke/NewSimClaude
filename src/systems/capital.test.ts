@@ -104,6 +104,31 @@ describe("Phase 12b — production responds to labour & capital", () => {
     expect(staffedFarm.resources.grain!).toBeGreaterThan(0);
   });
 
+  it("output scales with head-count: one worker is half, two is full (Phase 15 E2)", () => {
+    // With LABOR_FULL_STAFF = 2, a fully-crewed producer makes its full maxPerDay,
+    // but a producer poached down to a single worker makes only half. That output
+    // loss is what makes losing staff a real cost (the retention incentive behind
+    // the labour market) and hire a real recovery lever.
+    const two = createCity({ seed: 1 });
+    const farm2 = two.world.getBusiness("biz_farm")!;
+    expect(farm2.employeeIds.length).toBe(2);
+    farm2.resources.grain = 0;
+    two.sim.run(TICKS_PER_DAY);
+    const fullOutput = farm2.resources.grain!;
+
+    const one = createCity({ seed: 1 });
+    const farm1 = one.world.getBusiness("biz_farm")!;
+    one.world.getResident(farm1.employeeIds.pop()!)!.jobId = ""; // poach a worker
+    farm1.resources.grain = 0;
+    one.sim.run(TICKS_PER_DAY);
+    const halfOutput = farm1.resources.grain!;
+
+    expect(halfOutput).toBeGreaterThan(0);
+    expect(halfOutput).toBeLessThan(fullOutput);
+    // One worker makes ~half of two (within integer flooring of the capacity).
+    expect(Math.abs(halfOutput * 2 - fullOutput)).toBeLessThanOrEqual(2);
+  });
+
   it("above-baseline capital depreciates toward baseline; baseline capital is untouched", () => {
     const { sim, world } = createCity({ seed: 1 });
     const factory = world.getBusiness("biz_factory")!;
@@ -410,5 +435,11 @@ describe("Phase 13c — the invest loop closes", () => {
     expect(capital()).toBeGreaterThan(startCapital); // capital deepened above baseline
     expect(world.totalMoney()).toBeCloseTo(startMoney, 2); // the closed economy still balances
     for (const b of world.businesses) expect(b.active).toBe(true); // nobody collapsed
+    // Phase 15 A+E: the labour market holds — every producer keeps a crew instead
+    // of bleeding it to the storefronts (P10-3), so the whole chain stays in
+    // production rather than freezing at zero output.
+    for (const id of ["biz_farm", "biz_mine", "biz_bakery", "biz_factory"]) {
+      expect(world.getBusiness(id)!.employeeIds.length).toBeGreaterThan(0);
+    }
   });
 });

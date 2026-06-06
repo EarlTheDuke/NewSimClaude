@@ -27,6 +27,8 @@ function dinerObs(over: Partial<BusinessObservation> = {}): BusinessObservation 
     referencePrice: 18,
     employeeCount: 1,
     wagePerTick: 0.17,
+    baseWagePerTick: 0.17,
+    understaffed: false,
     dayRevenue: 0,
     dayWages: 0,
     dayRent: 0,

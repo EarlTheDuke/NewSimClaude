@@ -1,4 +1,5 @@
 import type { BusinessKind, ResourceKind } from "./types";
+import { DESIRED_HEADCOUNT } from "../systems/constants";
 
 /**
  * The economic identity of each business archetype (Phase 4). The MarketSystem
@@ -43,6 +44,18 @@ export const ARCHETYPES: Record<BusinessKind, Archetype> = {
   goods: { consumes: "wares", sellsToResidents: true, target: 24, maxPerDay: 21 },
   landlord: { sellsToResidents: false, target: 0, maxPerDay: 0 },
 };
+
+/**
+ * How many workers a business wants on staff (Phase 15 A). A *producing* business
+ * (anything with a daily output ceiling) wants {@link DESIRED_HEADCOUNT}; the
+ * landlord produces nothing — it runs on rent — so it wants no crew, which frees
+ * the seeded workforce to fully staff the supply chain instead. Drives both the
+ * `hiring` signal a job-hunting resident sees and the `understaffed` cue a firm's
+ * mind reads to decide whether to bid wages up.
+ */
+export function desiredHeadcount(kind: BusinessKind): number {
+  return ARCHETYPES[kind].maxPerDay > 0 ? DESIRED_HEADCOUNT : 0;
+}
 
 /** The single producer business id for each tradeable resource. */
 export const PRODUCER_OF: Record<ResourceKind, string> = {

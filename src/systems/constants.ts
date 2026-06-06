@@ -250,15 +250,38 @@ export const CAPITAL_OUTPUT_ELASTICITY = 0.3;
  */
 export const CAPITAL_DEPRECIATION_RATE = 0.01;
 /**
- * Phase 12b — the head-count at which a business counts as "fully staffed" for
- * production. Output scales with min(1, employees / this): with no workers a
- * business makes nothing (the fix for empty producers shipping full output,
- * P10-3), and it reaches its full ceiling once staffed to this level. Set to 1
- * because the seeded city gives every producer at least one worker, so the labour
- * factor sits at 1 there and 12b stays a pure no-op for the default town. Raising
- * it — so head-count, not mere presence, drives output — is a Phase 12e lever.
+ * The head-count at which a business counts as "fully staffed" for production.
+ * Output scales with min(1, employees / this): with no workers a business makes
+ * nothing (the fix for empty producers shipping full output, P10-3), and it
+ * reaches its full ceiling once staffed to this level.
+ *
+ * Phase 15 E2 — raised from 1 to 2 so head-count, not mere presence, drives
+ * output: a fully-crewed producer (2 workers) makes its full `maxPerDay`, but a
+ * producer poached down to 1 worker makes only half — which is what makes losing
+ * staff a real cost (the retention incentive behind the labour market) and makes
+ * `hire` a genuine recovery lever. Kept equal to {@link DESIRED_HEADCOUNT} so the
+ * two crew a firm *wants* are exactly the two its output needs — no unproductive
+ * overhead. The seeded city now staffs every producing business to this level
+ * (cityGen), so brain-off output is unchanged: 2 workers → laborFactor 1 → today's
+ * `maxPerDay`, exactly as the old 1-worker/LABOR_FULL_STAFF=1 city produced.
  */
-export const LABOR_FULL_STAFF = 1;
+export const LABOR_FULL_STAFF = 2;
+/**
+ * Phase 15 A — how many workers a business *wants* on staff, and so the hiring-
+ * capacity cap a job-hunting resident sees: a firm advertises a vacancy only
+ * while `employeeIds.length < this`. This is the fix for the labour drain
+ * (P10-3): without a cap every agentic resident piles into the single top-paying
+ * storefront, stripping the producers of staff until the supply chain collapses
+ * (producers → 0 workers → 0 output). With the cap, the storefronts fill and the
+ * rest of the labour stays in production, so the chain survives agentic play.
+ *
+ * Real-world: a diner has only so many shifts to offer; once they're filled it
+ * stops taking applications, and the next worker looks elsewhere. Decoupled from
+ * {@link LABOR_FULL_STAFF} (output) for now — output still saturates at one
+ * worker — so this changes only *agentic job mobility*, never brain-off
+ * production. (E2 will couple them so a poached worker is a real output loss.)
+ */
+export const DESIRED_HEADCOUNT = 2;
 /** Consecutive days of unpaid rent before a resident is downgraded to a cheaper home. */
 export const EVICTION_GRACE_DAYS = 3;
 /** Days of macro vitals retained in the ring buffer (chartable history). */

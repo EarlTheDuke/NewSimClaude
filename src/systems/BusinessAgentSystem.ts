@@ -13,7 +13,7 @@ import type {
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
 import { BUSINESS_RESERVE, CAPITAL_BASELINE, MAX_WAGE_MULT, RETAIL_REFERENCE_PRICE } from "./constants";
-import { ARCHETYPES } from "../world/archetypes";
+import { ARCHETYPES, desiredHeadcount } from "../world/archetypes";
 import type { MarketSystem } from "./MarketSystem";
 
 /** Cumulative readings captured at the previous review, to diff into day deltas. */
@@ -265,6 +265,8 @@ export class BusinessAgentSystem implements System {
       unitCost,
       employeeCount: biz.employeeIds.length,
       wagePerTick: biz.wagePerTick,
+      baseWagePerTick: biz.baseWagePerTick ?? biz.wagePerTick,
+      understaffed: biz.employeeIds.length < desiredHeadcount(biz.kind),
       dayRevenue,
       dayWages,
       dayRent,

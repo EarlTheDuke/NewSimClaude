@@ -323,6 +323,7 @@ function renderTrace(): void {
       if (e.action.setPrice !== undefined) levers.push(`price→${money(e.action.setPrice)}`);
       if (e.action.hire) levers.push(e.action.hire > 0 ? `+${e.action.hire} hire` : `${e.action.hire} layoff`);
       if (e.action.invest) levers.push(`+${money(e.action.invest)} invest`);
+      if (e.action.setWage !== undefined) levers.push(`wage→${e.action.setWage.toFixed(3)}`);
       const act = levers.length > 0 ? levers.join(", ") : "hold";
       const cost = e.usage?.costUsd !== undefined ? ` · $${e.usage.costUsd.toFixed(4)}` : "";
       const lat = e.usage?.latencyMs !== undefined ? ` · ${Math.round(e.usage.latencyMs)}ms` : "";

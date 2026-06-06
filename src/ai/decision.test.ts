@@ -15,6 +15,8 @@ function obs(over: Partial<BusinessObservation> = {}): BusinessObservation {
     price: 14,
     employeeCount: 3,
     wagePerTick: 0.5,
+    baseWagePerTick: 0.5,
+    understaffed: false,
     dayRevenue: 100,
     dayWages: 40,
     dayRent: 120,
@@ -152,6 +154,25 @@ describe("RuleBasedProvider", () => {
     // capacity-bound.
     const d = rules.decide(req({ ...investContext, cash: 3100 }));
     expect(d.action.invest).toBeUndefined();
+  });
+
+  // Phase 15 A4 — the wage lever, the firm's move in the labour market.
+  it("raises the wage when short-handed, capped at base*MAX_WAGE_MULT (Phase 15 A4)", () => {
+    const d = rules.decide(req({ understaffed: true, wagePerTick: 0.1, baseWagePerTick: 0.1 }));
+    expect(d.action.setWage!).toBeGreaterThan(0.1);
+    expect(d.action.setWage!).toBeLessThanOrEqual(0.2 + 1e-9); // base * MAX_WAGE_MULT (2)
+    expect(d.reason).toMatch(/wage|staff/i);
+  });
+
+  it("holds wages when fully staffed and solvent", () => {
+    const d = rules.decide(req({ understaffed: false, cash: 5000, wagePerTick: 0.12, baseWagePerTick: 0.1 }));
+    expect(d.action.setWage).toBeUndefined();
+  });
+
+  it("eases wages back toward base when fully staffed but cash-thin (no ratchet to the cap)", () => {
+    const d = rules.decide(req({ understaffed: false, cash: 100, wagePerTick: 0.18, baseWagePerTick: 0.1 }));
+    expect(d.action.setWage!).toBeLessThan(0.18);
+    expect(d.action.setWage!).toBeGreaterThanOrEqual(0.1); // never below base
   });
 });
 
