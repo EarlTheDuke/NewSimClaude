@@ -8,7 +8,7 @@ import type {
   Resident,
   WorkSchedule,
 } from "./types";
-import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE } from "../systems/constants";
+import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE, PRODUCER_WAGE_FLOOR } from "../systems/constants";
 import { ARCHETYPES } from "./archetypes";
 
 /**
@@ -155,6 +155,15 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
   // base*MAX_WAGE_MULT]; base stays fixed as the reference the wage cap and
   // resident raises read, so the labour market can bid wages up without them
   // compounding away.
+  // Phase 18-pre — floor producer wages so the supply chain keeps its crew under demand
+  // growth (default 0 ⇒ the if-block skips ⇒ byte-identical). Applied before baseWagePerTick
+  // is set below, so the floor becomes the producer's stable base.
+  const producerKinds = new Set(["farm", "mine", "bakery", "factory"]);
+  if (PRODUCER_WAGE_FLOOR > 0) {
+    for (const b of businesses) {
+      if (producerKinds.has(b.kind)) b.wagePerTick = Math.max(b.wagePerTick, PRODUCER_WAGE_FLOOR);
+    }
+  }
   for (const b of businesses) b.baseWagePerTick = b.wagePerTick;
 
   world.locations = locations;

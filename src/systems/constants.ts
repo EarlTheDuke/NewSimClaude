@@ -98,6 +98,16 @@ export const VEHICLE_COST = 800; // resident -> goods store to buy a vehicle
 export const VEHICLE_RESALE = 500; // goods store -> resident when selling back
 export const RAISE_FRACTION = 0.08; // a granted raise lifts wage by this fraction
 export const MAX_WAGE_MULT = 2; // wage may not exceed this multiple of the job's base wage
+/**
+ * Phase 18-pre (sustain the engine) — minimum base wage a B2B *producer* (farm, mine,
+ * bakery, factory) is seeded paying. Producers seed cheap (mine 0.05) and, against the
+ * storefronts' 0.17-0.20, can't hold a crew once demand growth (Phase 17 brand) makes the
+ * storefronts richer employers — the lowest-wage producer goes crewless, starves the chain,
+ * the factory dies, and the invest/brand engine can't compound (it loses its supply).
+ * Flooring producer wages keeps the chain staffed so the engine sustains. Default 0 ⇒
+ * today's seeds ⇒ byte-identical; engaged (~0.16) ⇒ producers compete for labour.
+ */
+export const PRODUCER_WAGE_FLOOR = 0;
 export const JOB_CHANGE_COOLDOWN_DAYS = 5; // min days between a resident's job switches
 export const RAISE_COOLDOWN_DAYS = 7; // min days between a resident's raise requests
 
