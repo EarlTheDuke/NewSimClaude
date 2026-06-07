@@ -83,6 +83,34 @@ mind sets it.
    be designed *together*. A genuine mini-phase, not a one-liner.
 4. **Reframe the CEO bench to reward growth** (pending the decision above) + an anti-hoard
    guard; re-baseline; ablation proves `setPayout` is a real, correct-sign lever.
+   **— SHIPPED 2026-06-06 (commit `1cac9b2`), with a corrected design.** A probe (seeds +
+   horizons swept) **refuted the original plan**: "start smaller + score net-worth growth"
+   does NOT stop hoarding — a CEO that just parks cash (`payoutRate=0`) still maxes raw net
+   worth. It also surfaced the **paradox of thrift**: in the closed bench, *distributing*
+   enriches the firm's own customers → more demand → more productive growth than retaining
+   (Ford's "pay them enough to buy the cars," which §2 cites). So the fix scores **productive
+   value**, not cash:
+   - **Growth mode** (`config.growth`, opt-in → classic bench byte-identical): modest start
+     (`BENCH_GROWTH_START_CAPITAL=5000`) + a live, frozen brand growth path
+     (`BENCH_GROWTH_BRAND_ELASTICITY=0.3`).
+   - **`growthScore` = `min(cash, BUSINESS_RESERVE) + capital + brand + inventory − start`** —
+     parked cash above working capital doesn't count, so **hoarding can't win** (a pure
+     hoarder has far higher *raw* net worth but a *lower* growth score than the rules CEO).
+   - **`setPayout` proven a real, correct-sign lever** via a payout sweep: a *balanced* payout
+     (0.5) out-grows *retain-everything* (0) — over-retaining starves the demand pump. (The
+     formal `AblatedProvider` can't measure it — the rules brain stays silent on `setPayout`
+     by slice-2's design — so the proof is the direct sweep.)
+   - Skill amplified (rules ≫ off on growth score), conservation + determinism hold, 309 green.
+   - **Honest limit:** the *cleanest* anti-hoard mechanism is a live cost-of-carry on idle
+     cash (savings interest), which lives in the **shelved Phase 18 credit** work; until then
+     the growth *score* discounts hoarded cash, which achieves the same benchmark goal.
+
+## Phase 16 — COMPLETE ✅ (2026-06-06)
+
+All four slices shipped. The retain-vs-distribute lever exists for the LM CEO (slice 2), the
+investment loop compounds (slice 3, via the Phase-18-pre wage floor), and the CEO benchmark
+now rewards *growing a productive firm* rather than hoarding cash (slice 4). NORTH-STAR move
+\#3 (close the investment loop) is delivered.
 
 ## Conservation & determinism
 

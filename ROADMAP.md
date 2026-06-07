@@ -26,11 +26,12 @@ against [NORTH-STAR.md](NORTH-STAR.md). Phases 0–8 are [MASTER-PLAN.md](MASTER
   self-extinguished since 13c/14c) was root-caused to shared-labour-pool fragility and fixed
   with `PRODUCER_WAGE_FLOOR=0.12` (a floor sweep found 0.12 dominates). **NORTH-STAR move #3
   (close the investment loop) is structurally achieved** — capital compounds ~25× over 2yr.
-- **Phase 16 — Retain vs Distribute** ✅ functionally complete: slice 1 (payout seam), slice 2
-  (the `setPayout` retain lever wired for the **LM CEO**; rules brain silent → byte-identical),
-  slice 3 (reinvestment compounds — met by the wage-floor fix, not the refuted target-scaling).
-  **Slice 4 (reframe the CEO bench to reward growth) remains PARKED — needs sign-off** (it moves
-  historical bench baselines). See [PHASE16-RETAIN-DISTRIBUTE.md](PHASE16-RETAIN-DISTRIBUTE.md).
+- **Phase 16 — Retain vs Distribute** ✅ **COMPLETE** (all four slices): slice 1 (payout seam),
+  slice 2 (the `setPayout` retain lever wired for the **LM CEO**; rules brain silent →
+  byte-identical), slice 3 (reinvestment compounds — met by the wage-floor fix), slice 4
+  (the CEO bench reframed to a hoard-proof **growth score** — `min(cash, reserve) + capital +
+  brand + inventory`; opt-in growth mode, classic bench unchanged). See
+  [PHASE16-RETAIN-DISTRIBUTE.md](PHASE16-RETAIN-DISTRIBUTE.md).
 
 ### ⏸ SHELVED 2026-06-06 — the macro track (Phases 18–21)
 
