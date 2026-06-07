@@ -3,6 +3,12 @@ import { createCity, type BrainOption, type ResidentBrainOption } from "./create
 import { SPEED_OPTIONS, type SpeedMultiplier } from "./core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "./utils/serialization";
 import { CanvasRenderer, type Pick, type DisasterMarker } from "./render/CanvasRenderer";
+import {
+  tickerItems,
+  latestDecisionFor,
+  summarizeBusinessAction,
+  summarizeResidentAction,
+} from "./render/DecisionNarration";
 import { ARCHETYPES } from "./world/archetypes";
 import type { ResourceKind } from "./world/types";
 import type { DisasterKind } from "./systems/disasters";
@@ -73,6 +79,7 @@ app.innerHTML = `
     <canvas id="city" width="${WIDTH}" height="${HEIGHT}"></canvas>
     <div class="inspector" id="inspector"><p class="hint">Click a resident or building to inspect.</p></div>
   </div>
+  <div class="ticker" id="ticker"><span class="hint">The city's decisions will scroll here as days roll…</span></div>
   <div class="hud econ">
     <h2>Economy <span class="hint" id="econTag"></span></h2>
     <div class="vitals" id="vitals"><p class="hint">No data yet — vitals post at each day boundary.</p></div>
@@ -124,6 +131,16 @@ const expControlsEl = el<HTMLDivElement>("#expControls");
 const expOutputEl = el<HTMLPreElement>("#expOutput");
 const costPanelEl = el<HTMLDivElement>("#costPanel");
 const canvas = el<HTMLCanvasElement>("#city");
+const tickerEl = el<HTMLDivElement>("#ticker");
+
+// Name resolvers for the decision narration (read-only). A business id → its
+// name; any id a resident move references → a business or a location name.
+const businessNameOf = (id: string): string => world.getBusiness(id)?.name ?? id;
+const resolveName = (id: string): string => {
+  const b = world.getBusiness(id);
+  if (b) return b.name;
+  return world.locations.find((l) => l.id === id)?.name ?? id;
+};
 
 eventsTagEl.textContent = events ? "· disasters on" : "· disasters off";
 
@@ -281,6 +298,14 @@ function renderInspector(): void {
       r.schedule && r.schedule.daysOff.length > 0
         ? r.schedule.daysOff.map((d) => WEEKDAYS[d] ?? `d${d}`).join(", ")
         : "none";
+    const decR = latestDecisionFor(r.id, agent?.decisions() ?? [], residentAgent?.decisions() ?? []);
+    const whyNowRes =
+      decR && "residentId" in decR
+        ? `<div class="whynow"><div class="wn-head">Why now? · Day ${decR.day}</div>` +
+          `<p class="wn-move"><b>${summarizeResidentAction(decR.action, resolveName)}</b>${decR.fallback ? ' <span class="fallback">fallback</span>' : ""}</p>` +
+          `<p class="wn-reason">“${decR.reason}”</p>` +
+          `<p class="wn-signals">money ${money(r.money)} · wage ${r.wagePerTick.toFixed(2)} · hunger ${Math.round(r.needs.hunger)} · energy ${Math.round(r.needs.energy)} · social ${Math.round(r.needs.social)}</p></div>`
+        : "";
     inspectorEl.innerHTML = `
       <h2>${r.name}</h2>
       <p class="tag">${r.activity}</p>
@@ -294,6 +319,7 @@ function renderInspector(): void {
       ${bar("Hunger", r.needs.hunger)}
       ${bar("Energy", r.needs.energy)}
       ${bar("Social", r.needs.social)}
+      ${whyNowRes}
     `;
   } else {
     const b = world.getBusiness(selected.id);
@@ -312,6 +338,14 @@ function renderInspector(): void {
     const util = market.capacityUtilizationFor(b.id);
     const utilStr = util !== undefined ? `${(util * 100).toFixed(0)}%` : "—";
     const net = b.pnl.revenue + b.pnl.rentCollected - b.pnl.wagesPaid - b.pnl.distributed;
+    const decB = latestDecisionFor(b.id, agent?.decisions() ?? [], residentAgent?.decisions() ?? []);
+    const whyNowBiz =
+      decB && "businessId" in decB
+        ? `<div class="whynow"><div class="wn-head">Why now? · Day ${decB.day}</div>` +
+          `<p class="wn-move"><b>${summarizeBusinessAction(decB.action)}</b>${decB.fallback ? ' <span class="fallback">fallback</span>' : ""}</p>` +
+          `<p class="wn-reason">“${decB.reason}”</p>` +
+          `<p class="wn-signals">cash ${money(b.cash)} · util ${utilStr} · price ${money(b.price)} · capital ${(b.capital ?? CAPITAL_BASELINE).toFixed(0)} · inv ${b.inventory}</p></div>`
+        : "";
     inspectorEl.innerHTML = `
       <h2>${b.name}</h2>
       <p class="tag">${b.kind}${b.active ? "" : " · CLOSED"}</p>
@@ -322,6 +356,7 @@ function renderInspector(): void {
       <p>capital: ${(b.capital ?? CAPITAL_BASELINE).toFixed(0)} · utilization: ${utilStr}</p>
       ${insolvent > 0 ? `<p class="warn">insolvent ${insolvent}d</p>` : ""}
       <p class="pnl">revenue ${money(b.pnl.revenue)} · wages ${money(b.pnl.wagesPaid)} · rent ${money(b.pnl.rentCollected)} · dist ${money(b.pnl.distributed)} · net ${money(net)}</p>
+      ${whyNowBiz}
     `;
   }
 }
@@ -373,6 +408,28 @@ function renderResidentTrace(): void {
     })
     .join("");
   resTraceLogEl.innerHTML = rows;
+}
+
+/**
+ * The city decision ticker — a single newest-first strip merging every mind's
+ * latest moves (businesses + residents) with the one-line reason behind each.
+ * The "news feed" of the AI economy; reads the same logs the panels do.
+ */
+function renderTicker(): void {
+  const items = tickerItems(
+    agent?.decisions() ?? [],
+    residentAgent?.decisions() ?? [],
+    { businessName: businessNameOf, resolveName },
+    14,
+  );
+  if (items.length === 0) return;
+  tickerEl.innerHTML = items
+    .map((it) => {
+      const fb = it.fallback ? ' <span class="fallback">fallback</span>' : "";
+      const cls = it.kind === "business" ? "tk-biz" : "tk-res";
+      return `<span class="tk ${cls}"><b>D${it.day}</b> ${it.actorName}: <i>${it.summary}</i>${fb}<span class="tk-why"> — ${it.reason}</span></span>`;
+    })
+    .join("");
 }
 
 function renderEvents(): void {
@@ -468,6 +525,7 @@ function renderFrame(): void {
   renderGod();
   renderTrace();
   renderResidentTrace();
+  renderTicker();
   renderCost();
 }
 
@@ -491,6 +549,24 @@ function frame(now: number): void {
   last = now;
   renderFrame();
   requestAnimationFrame(frame);
+}
+
+// Dev-only debug handle for the visualization track's verification gates — lets a
+// browser console (or the preview harness) drive + inspect the live sim when the
+// tab's requestAnimationFrame is throttled. Read-only against determinism: stepping
+// via sim.run is the same deterministic advance the rAF loop performs. Stripped from
+// production builds (import.meta.env.DEV is false there), so it never ships.
+const isDev = (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV;
+if (isDev) {
+  (window as unknown as { cwlc?: unknown }).cwlc = {
+    sim,
+    world,
+    market,
+    macro,
+    agent,
+    residentAgent,
+    renderFrame,
+  };
 }
 
 renderFrame();
