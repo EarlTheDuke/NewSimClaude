@@ -18,6 +18,12 @@ import {
   POPULATION_BIRTHS,
   BIRTH_GIFT,
   COMING_OF_AGE_YEARS,
+  HOUSING_CONSTRUCTION,
+  HOME_BUILD_COST,
+  HOME_BUILD_RESERVE,
+  HOME_BUILD_CAPACITY,
+  HOME_BUILD_RENT,
+  HOME_BUILD_COOLDOWN_DAYS,
 } from "./constants";
 
 /** Tunable growth/mortality knobs; each defaults to the live constant. Tests/tuning override. */
@@ -38,6 +44,10 @@ export interface PopulationOptions {
   births?: boolean;
   /** Age (years) at which a child becomes a working adult and can be employed. */
   comingOfAgeYears?: number;
+  /** Whether the landlord builds new homes when the town is housing-constrained (HP4). */
+  construction?: boolean;
+  /** Min days between builds (HP4) — paces the construction staircase. */
+  buildCooldownDays?: number;
 }
 
 /** Numeric index from a `res_N` id — finite for every id we mint (the NaN-id guard). */
@@ -92,6 +102,10 @@ export class PopulationSystem implements System {
   private readonly daysPerYear: number;
   private readonly births: boolean;
   private readonly comingOfAgeYears: number;
+  private readonly construction: boolean;
+  private readonly buildCooldownDays: number;
+  /** Day the last home was built, for the construction cooldown. */
+  private lastBuildDay: number;
 
   constructor(
     private readonly world: World,
@@ -108,18 +122,62 @@ export class PopulationSystem implements System {
     this.daysPerYear = opts.daysPerYear ?? DAYS_PER_YEAR;
     this.births = opts.births ?? POPULATION_BIRTHS;
     this.comingOfAgeYears = opts.comingOfAgeYears ?? COMING_OF_AGE_YEARS;
+    this.construction = opts.construction ?? HOUSING_CONSTRUCTION;
+    this.buildCooldownDays = opts.buildCooldownDays ?? HOME_BUILD_COOLDOWN_DAYS;
     this.lastSpawnDay = -this.cooldownDays;
+    this.lastBuildDay = -this.buildCooldownDays;
   }
 
   update(ctx: SystemContext): void {
-    if (!this.enabled && !this.mortality) return; // fully inert ⇒ byte-identical
+    if (!this.enabled && !this.mortality && !this.construction) return; // fully inert ⇒ byte-identical
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
     const { day } = ctx.time.time();
 
     // Deaths first (they free homes + jobs the same-day growth can refill), once a
-    // year. Then growth admits newcomers.
+    // year. Then build housing if the town is full, then admit newcomers into it.
     if (this.mortality && day > 0 && day % this.daysPerYear === 0) this.ageAndReap();
+    if (this.construction) this.construct(day);
     if (this.enabled) this.grow(day);
+  }
+
+  /**
+   * Housing construction (HP4): when the town is out of homes, the landlord spends
+   * rent income to build one more, lifting the population ceiling so growth doesn't
+   * freeze at the seeded cap. Paced by a cooldown, so the town grows in a staircase
+   * (build → fill → build). Self-limiting: it only builds while *constrained* (every
+   * home full), and growth itself stops once prosperity dilutes — so the town settles
+   * at a wealth-supported size rather than ballooning without bound.
+   *
+   * Conservation: the build cost is a single transfer landlord → factory (paying for
+   * materials), capped at the landlord's balance — the new home Location is non-cash,
+   * exactly like adding a resident, so `totalMoney()` is unchanged. Determinism: fixed
+   * builder, the first active factory, node round-robin by home count, no RNG.
+   */
+  private construct(day: number): void {
+    if (!this.isHousingConstrained()) return; // only build when every home is full
+    if (day - this.lastBuildDay < this.buildCooldownDays) return;
+    const landlord = this.world.getBusiness("biz_landlord");
+    if (!landlord || landlord.cash - HOME_BUILD_COST < HOME_BUILD_RESERVE) return;
+    const factory = this.world.businesses.find((b) => b.kind === "factory" && b.active);
+    if (!factory) return; // no materials supplier — can't build this cycle
+
+    this.world.transfer(landlord.id, factory.id, HOME_BUILD_COST); // pay for materials (conserved)
+
+    // Co-locate the new home on an existing home node (round-robin), the way the
+    // factory shares the mine's node; continues the loc_home_N namespace.
+    const homes = this.world.locations.filter((l) => l.type === "home");
+    const nodeIds = [...new Set(homes.map((l) => l.nodeId))];
+    const node = nodeIds[homes.length % Math.max(1, nodeIds.length)] ?? homes[0]!.nodeId;
+    this.world.locations.push({
+      id: `loc_home_${homes.length}`,
+      name: `Home ${homes.length + 1}`,
+      type: "home",
+      nodeId: node,
+      rent: HOME_BUILD_RENT,
+      capacity: HOME_BUILD_CAPACITY,
+    });
+    this.world.reindex();
+    this.lastBuildDay = day;
   }
 
   /** The in-migration trigger (HP3-5): admit newcomers when the town is healthy. */
@@ -392,6 +450,7 @@ export class PopulationSystem implements System {
       spawnCount: this.spawnCount,
       pressureAccumulator: this.pressureAccumulator,
       lastSpawnDay: this.lastSpawnDay,
+      lastBuildDay: this.lastBuildDay,
       migratedCount: this.migratedCount,
       bornCount: this.bornCount,
       diedCount: this.diedCount,
@@ -404,6 +463,7 @@ export class PopulationSystem implements System {
           spawnCount?: number;
           pressureAccumulator?: number;
           lastSpawnDay?: number;
+          lastBuildDay?: number;
           migratedCount?: number;
           bornCount?: number;
           diedCount?: number;
@@ -412,6 +472,7 @@ export class PopulationSystem implements System {
     this.spawnCount = s?.spawnCount ?? 0;
     this.pressureAccumulator = s?.pressureAccumulator ?? 0;
     this.lastSpawnDay = s?.lastSpawnDay ?? -this.cooldownDays;
+    this.lastBuildDay = s?.lastBuildDay ?? -this.buildCooldownDays;
     this.migratedCount = s?.migratedCount ?? 0;
     this.bornCount = s?.bornCount ?? 0;
     this.diedCount = s?.diedCount ?? 0;

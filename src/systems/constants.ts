@@ -105,6 +105,18 @@ export const BIRTH_GIFT = 100;
  */
 export const COMING_OF_AGE_YEARS = 18;
 
+// Housing construction (HP4) — when the town runs out of homes, the landlord invests
+// rent income in building more, lifting the population ceiling so growth continues
+// past the seeded cap instead of freezing. The town then grows in a staircase: build
+// a home → people fill it → build again. Default-OFF ⇒ inert. Real-world: a landlord
+// seeing full occupancy and standing demand builds more housing to rent out.
+export const HOUSING_CONSTRUCTION = false; // master flag
+export const HOME_BUILD_COST = 1500; // cash the landlord spends per home (a transfer -> the factory for materials)
+export const HOME_BUILD_RESERVE = 2000; // cash the landlord keeps after a build (so it stays solvent)
+export const HOME_BUILD_CAPACITY = 3; // occupancy of a newly built home
+export const HOME_BUILD_RENT = 60; // daily rent of a newly built home (mid-tier, so it doesn't trigger churn)
+export const HOME_BUILD_COOLDOWN_DAYS = 20; // min days between builds (paces the staircase)
+
 // Economy
 export const RENT_PER_DAY = 70; // resident -> landlord (fallback when a home has no rent set)
 export const BUSINESS_RENT_PER_DAY = 60; // diner/goods -> landlord

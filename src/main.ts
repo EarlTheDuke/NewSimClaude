@@ -76,7 +76,10 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
   // producer kind stays staffed, revenue grows, money conserved. Default-OFF in
   // createCity (tests/bench unchanged); engaged here so the town lives before you.
   populationGrowth: true,
-  populationOptions: { births: true, mortality: true },
+  // ...and when every home is full, the landlord builds more (HP4), so the town keeps
+  // growing in a staircase rather than freezing at the seeded cap — self-limiting as
+  // prosperity dilutes, so it settles at a wealth-supported size.
+  populationOptions: { births: true, mortality: true, construction: true },
 });
 
 const app = document.querySelector<HTMLDivElement>("#app")!;

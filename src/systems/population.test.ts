@@ -505,3 +505,60 @@ describe("PopulationSystem coming-of-age (HP3-9)", () => {
     for (const r of world.residents) expect(r.money).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("PopulationSystem construction (HP4)", () => {
+  it("builds a new home when the town is full, lifting the cap (money conserved)", () => {
+    // prosperityFloor 0 + a short cooldown so migration fills the town and the
+    // landlord builds quickly; in-migration (births off) keeps it simple.
+    const { sim, world } = createCity({
+      seed: 1,
+      populationGrowth: true,
+      populationOptions: { construction: true, prosperityFloor: 0, buildCooldownDays: 5 },
+    });
+    const start = world.totalMoney();
+    const homes0 = world.locations.filter((l) => l.type === "home").length; // 6
+
+    sim.run(TICKS_PER_DAY * 365);
+
+    const homes1 = world.locations.filter((l) => l.type === "home").length;
+    expect(homes1).toBeGreaterThan(homes0); // the landlord built housing
+    expect(world.residents.length).toBeGreaterThan(18); // grew past the seeded 18 cap
+    expect(world.totalMoney()).toBeCloseTo(start, 2); // build cost was a transfer, not minted
+    // No home is ever over capacity, including the newly built ones.
+    const occ = occupantsByHome(world.residents);
+    for (const l of world.locations) {
+      if (l.type === "home") expect(occ.get(l.id) ?? 0).toBeLessThanOrEqual(l.capacity ?? 99);
+    }
+  });
+
+  it("the living economy grows past the cap, self-limits, stays healthy + deterministic", () => {
+    const mk = () =>
+      createCity({
+        seed: 1,
+        brain: "rules",
+        residentBrain: "rules",
+        agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
+        agenticBusinessIds: ["biz_diner", "biz_diner_2", "biz_goods", "biz_farm", "biz_mine", "biz_bakery", "biz_factory"],
+        secondDiner: true,
+        disasters: true,
+        populationGrowth: true,
+        populationOptions: { births: true, mortality: true, construction: true, maxAgeYears: 40, daysPerYear: 30, comingOfAgeYears: 9 },
+      });
+    const a = mk();
+    const b = mk();
+    const start = a.world.totalMoney();
+
+    a.sim.run(TICKS_PER_DAY * 365 * 3);
+    b.sim.run(TICKS_PER_DAY * 365 * 3);
+
+    expect(a.world.serialize()).toEqual(b.world.serialize()); // deterministic with construction
+    expect(a.world.locations.filter((l) => l.type === "home").length).toBeGreaterThan(6); // built homes
+    expect(a.world.residents.length).toBeGreaterThan(12); // grew past the seed
+    expect(a.world.residents.length).toBeLessThanOrEqual(40); // but self-limited (no runaway)
+    for (const k of ["farm", "mine", "bakery", "factory", "diner", "goods"] as const) {
+      expect(a.world.businesses.some((bz) => bz.kind === k && bz.active && bz.employeeIds.length > 0)).toBe(true);
+    }
+    expect(a.world.totalMoney()).toBeCloseTo(start, 1);
+    for (const r of a.world.residents) expect(r.money).toBeGreaterThanOrEqual(0);
+  });
+});
