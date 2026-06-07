@@ -73,6 +73,9 @@ export class PixiRenderer implements CityRenderer {
   private roadsGfx: Graphics | undefined;
   private buildingsLayer: Container | undefined;
   private residentsLayer: Container | undefined;
+  private hudLayer: Container | undefined; // screen-fixed (never under the camera)
+  private sunC: Container | undefined;
+  private moonC: Container | undefined;
 
   private roadsBuilt = false;
   private readonly buildingViews = new Map<string, BuildingView>();
@@ -103,6 +106,9 @@ export class PixiRenderer implements CityRenderer {
     this.residentsLayer = new Container();
     this.worldLayer.addChild(this.roadsGfx, this.buildingsLayer, this.residentsLayer);
     this.app.stage.addChild(this.skyGfx, this.worldLayer);
+    this.hudLayer = new Container();
+    this.app.stage.addChild(this.hudLayer);
+    this.buildHud();
     this.ready = true;
     // Deferred first paint when the tab's rAF is throttled (background preview);
     // production's live rAF loop paints next frame regardless.
@@ -144,6 +150,84 @@ export class PixiRenderer implements CityRenderer {
       this.updateResidentView(this.ensureResidentView(r.id), r);
     }
     this.reapResidents(seenR);
+
+    this.updateSkyBadge(hourFloat);
+  }
+
+  /** Legend (bottom-left) + sun/moon badge (top-right), built once in screen space. */
+  private buildHud(): void {
+    if (!this.hudLayer) return;
+    const items = Object.entries(ACTIVITY_COLOR);
+    const lineH = 13;
+    const padX = 8;
+    const padY = 6;
+    const sw = 8;
+    const boxW = 96;
+    const boxH = padY * 2 + items.length * lineH;
+    const x = 8;
+    const y = HEIGHT - 8 - boxH; // HEIGHT constant, never canvas.height (§6.5)
+    const legend = new Container();
+    const bg = new Graphics();
+    bg.rect(x, y, boxW, boxH)
+      .fill({ color: 0x0e1116, alpha: 0.66 })
+      .stroke({ width: 1, color: 0x788296, alpha: 0.35 });
+    legend.addChild(bg);
+    items.forEach(([act, color], i) => {
+      const cy = y + padY + i * lineH + lineH / 2;
+      const swatch = new Graphics();
+      swatch.rect(x + padX, cy - sw / 2, sw, sw).fill(parseInt(color.slice(1), 16));
+      const t = new Text({
+        text: act,
+        style: { fontFamily: "system-ui, sans-serif", fontSize: 10, fill: 0xc9d1d9 },
+      });
+      t.anchor.set(0, 0.5);
+      t.position.set(x + padX + sw + 6, cy);
+      legend.addChild(swatch, t);
+    });
+    this.hudLayer.addChild(legend);
+
+    const cx = WIDTH - 30;
+    const cyy = 30;
+    const rad = 10;
+    const moon = new Container();
+    moon.position.set(cx, cyy);
+    const mc = new Graphics();
+    mc.circle(0, 0, rad).fill(0xdfe6f2);
+    const cr1 = new Graphics();
+    cr1.circle(-3, -2, 2.4).fill({ color: 0x788296, alpha: 0.5 });
+    const cr2 = new Graphics();
+    cr2.circle(3, 3, 1.8).fill({ color: 0x788296, alpha: 0.5 });
+    moon.addChild(mc, cr1, cr2);
+
+    const sun = new Container();
+    sun.position.set(cx, cyy);
+    const halo = new Graphics(); // soft halo — the shadowBlur glow approximation (R2-PARITY waiver)
+    halo.circle(0, 0, rad + 6).fill({ color: 0xffd27a, alpha: 0.22 });
+    const rays = new Graphics();
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2;
+      rays
+        .moveTo(Math.cos(ang) * (rad + 3), Math.sin(ang) * (rad + 3))
+        .lineTo(Math.cos(ang) * (rad + 7), Math.sin(ang) * (rad + 7));
+    }
+    rays.stroke({ width: 2, color: 0xffcf6b });
+    const sc = new Graphics();
+    sc.circle(0, 0, rad).fill(0xffd27a);
+    sun.addChild(halo, rays, sc);
+
+    this.hudLayer.addChild(moon, sun);
+    this.moonC = moon;
+    this.sunC = sun;
+  }
+
+  /** Crossfade sun↔moon by time of day (same `day = 1 - windowGlow` math as canvas). */
+  private updateSkyBadge(hourFloat: number): void {
+    if (!this.sunC || !this.moonC) return;
+    const day = 1 - windowGlow(hourFloat);
+    this.moonC.visible = day < 0.98;
+    this.moonC.alpha = Math.min(1, 1 - day + 0.02);
+    this.sunC.visible = day > 0.02;
+    this.sunC.alpha = Math.min(1, day + 0.02);
   }
 
   private ensureRoads(): void {
