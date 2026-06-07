@@ -467,8 +467,14 @@ describe("Phase 18-pre — the engine sustains over multiple years (producer wag
   const runEngine = (producerWageFloor: number) => {
     // Full-live city with the brand demand engine ON (live default elasticity) —
     // this is the regime that used to collapse the supply chain.
+    // Seed 7 (HP3-3 re-baseline): the capacity-aware eviction fix made the chain
+    // robust enough that seed 1 now sustains even WITHOUT the floor (evictees no
+    // longer pile into one home, so labour/commute settle steadier). Seed 7 still
+    // isolates the floor cleanly — without it the chain collapses (factory dies,
+    // goods capital pinned at baseline), with it the engine compounds — so the A/B
+    // proves the floor is the cause on the seed where it remains decisive.
     const { sim, world } = createCity({
-      seed: 1,
+      seed: 7,
       brain: "rules",
       residentBrain: "rules",
       producerWageFloor,

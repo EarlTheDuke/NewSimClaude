@@ -3,6 +3,7 @@ import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "../utils/serialization";
 import { BANKRUPT_GRACE_DAYS, EVICTION_GRACE_DAYS } from "./constants";
+import { occupantsByHome } from "../world/housing";
 
 /**
  * Strands a business so it earns nothing: zero its cash and cut off its only
@@ -50,7 +51,7 @@ describe("LifecycleSystem — bankruptcy", () => {
 });
 
 describe("LifecycleSystem — safe eviction", () => {
-  it("re-homes a resident who can't make rent, to the cheapest home, never homeless", () => {
+  it("re-homes a resident who can't make rent, to the cheapest VACANT home, never homeless or overfilled (HP3-3)", () => {
     const { sim, world } = createCity({ seed: 1 });
     const res = world.getResident("res_0")!;
     const startHome = res.homeId;
@@ -59,14 +60,31 @@ describe("LifecycleSystem — safe eviction", () => {
 
     sim.run(TICKS_PER_DAY * (EVICTION_GRACE_DAYS + 1));
 
-    // Moved off the unpayable home onto the cheapest one — and still housed.
+    // Moved off the unpayable home and still housed.
     expect(res.homeId).not.toBe(startHome);
     const home = world.getLocation(res.homeId);
     expect(home.type).toBe("home");
-    const cheapest = Math.min(
-      ...world.locations.filter((l) => l.type === "home").map((l) => l.rent ?? Infinity),
+
+    // HP3-3 re-baseline: the three cheapest seed-1 homes are full (caps [5,4,3,2,2,2],
+    // 2 occupants each), so the old code would have STACKED the evictee into the
+    // globally-cheapest home past its capacity. The fix lands them in the cheapest
+    // home that still had a free slot instead — and, crucially, NO home is ever
+    // pushed over its capacity by an eviction.
+    const occ = occupantsByHome(world.residents);
+    for (const l of world.locations) {
+      if (l.type !== "home") continue;
+      expect(occ.get(l.id) ?? 0).toBeLessThanOrEqual(l.capacity ?? 99);
+    }
+    // It is the cheapest home that had room for them (every strictly-cheaper home
+    // was already full at the moment of the move).
+    const cheaperWithRoom = world.locations.filter(
+      (l) =>
+        l.type === "home" &&
+        l.id !== res.homeId &&
+        (l.rent ?? 0) < (home.rent ?? 0) &&
+        (occ.get(l.id) ?? 0) < (l.capacity ?? 99),
     );
-    expect(home.rent).toBe(cheapest);
+    expect(cheaperWithRoom).toHaveLength(0);
   });
 
   it("leaves the stable city's residents housed and solvent for 100 days", () => {

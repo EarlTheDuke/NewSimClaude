@@ -8,6 +8,7 @@ import {
   EVICTION_GRACE_DAYS,
   RECYCLE_BANKRUPT_ASSETS,
 } from "./constants";
+import { cheapestVacantHome } from "../world/housing";
 
 /**
  * Business and resident lifecycle (Phase 4c). Runs once per sim-day, after the
@@ -64,25 +65,15 @@ export class LifecycleSystem implements System {
 
   private reviewHousing(resident: Resident): void {
     if ((resident.rentMissedDays ?? 0) < EVICTION_GRACE_DAYS) return;
-    // Re-home to the cheapest home, then reset the streak for a fresh start.
-    // Already in the cheapest home? There's nowhere cheaper, so they keep it —
-    // eviction never produces a homeless resident.
-    const cheapest = this.cheapestHome();
-    if (cheapest && cheapest !== resident.homeId) resident.homeId = cheapest;
+    // Re-home to the cheapest home WITH A FREE SLOT (HP3-3), then reset the streak.
+    // Respecting the HP1 capacity cap is what stops eviction from stacking people
+    // past a dwelling's size — the old cheapestHome() picked the globally cheapest
+    // home regardless of occupancy, so under population growth it would overfill
+    // it. If no home has room the resident keeps their current home: eviction
+    // never produces a homeless resident, and never overfills one. Occupancy is
+    // non-cash, so this never touches the money invariant.
+    const target = cheapestVacantHome(this.world.residents, this.world.locations);
+    if (target && target !== resident.homeId) resident.homeId = target;
     resident.rentMissedDays = 0;
-  }
-
-  private cheapestHome(): string | undefined {
-    let bestId: string | undefined;
-    let bestRent = Infinity;
-    for (const loc of this.world.locations) {
-      if (loc.type !== "home") continue;
-      const rent = loc.rent ?? 0;
-      if (rent < bestRent) {
-        bestRent = rent;
-        bestId = loc.id;
-      }
-    }
-    return bestId;
   }
 }
