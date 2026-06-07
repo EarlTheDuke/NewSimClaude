@@ -151,13 +151,13 @@ el<HTMLSpanElement>("#resBrainTag").textContent = residentAgent
   ? `· ${residentBrain === "rules" ? "rules" : "claude"} brain · ${agenticResidentIds.length} agentic`
   : "· brain off";
 
-// Renderer seam (visualization R2): the canvas renderer is the default; opt into
-// the WebGL Pixi renderer with ?renderer=pixi. The default flips to Pixi at R2g
-// (after parity sign-off), at which point ?renderer=canvas is the rollback.
-const usePixi = new URLSearchParams(location.search).get("renderer") === "pixi";
-const renderer: CityRenderer = usePixi
-  ? new PixiRenderer(canvas, world)
-  : new CanvasRenderer(canvas, world);
+// Renderer seam (visualization R2g): the WebGL Pixi renderer is now the default —
+// parity with the canvas was verified per-slice and signed off. ?renderer=canvas
+// rolls back to the original CanvasRenderer (kept compiled as the live fallback).
+const useCanvas = new URLSearchParams(location.search).get("renderer") === "canvas";
+const renderer: CityRenderer = useCanvas
+  ? new CanvasRenderer(canvas, world)
+  : new PixiRenderer(canvas, world);
 let selected: Pick | undefined;
 
 // Thought-bubble lifecycle + narration toggle (presentation-only). The fade is
