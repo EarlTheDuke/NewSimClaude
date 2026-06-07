@@ -8,7 +8,7 @@ import type {
   Resident,
   WorkSchedule,
 } from "./types";
-import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE, PRODUCER_WAGE_FLOOR } from "../systems/constants";
+import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE, PRODUCER_WAGE_FLOOR, HOME_CAPACITY_MAX, HOME_CAPACITY_MIN } from "../systems/constants";
 import { ARCHETYPES } from "./archetypes";
 
 /**
@@ -153,7 +153,12 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
     // Rents fan downward from the baseline (70, 66, 62, …) so re-homing always
     // has a cheaper option to move toward, and totals stay safely positive.
     const rent = Math.max(1, RENT_PER_DAY - i * 4);
-    locations.push({ id: `loc_home_${i}`, name: `Home ${i + 1}`, type: "home", nodeId: homeNodes[i]!, rent });
+    // Capacity reflects size: the priciest home (i=0) is the biggest; cheaper homes
+    // are smaller flats (HP1). Total capacity exceeds the seeded population, so the
+    // town has housing slack for population to grow into (HP3), and no single cheap
+    // home can swallow everyone.
+    const capacity = Math.max(HOME_CAPACITY_MIN, HOME_CAPACITY_MAX - i);
+    locations.push({ id: `loc_home_${i}`, name: `Home ${i + 1}`, type: "home", nodeId: homeNodes[i]!, rent, capacity });
   }
   const homes = locations.filter((l) => l.type === "home");
 

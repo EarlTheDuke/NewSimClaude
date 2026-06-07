@@ -46,6 +46,16 @@ export const LONELY_THRESHOLD = 35;
 export const MOVE_SPEED = 20; // world units per tick
 export const VEHICLE_SPEED_MULT = 1.6; // a vehicle owner covers more ground per tick
 
+// Housing (HP1) — homes are dwellings with a finite occupancy. Capacity reflects
+// size: premium (pricier) homes are bigger, cheap homes are small flats. The town
+// is seeded with more capacity than people (slack) so population can grow into it
+// (HP3), and the cheapest home can't swallow the whole town. Re-homing only moves
+// to a home with a free slot, and only for a *meaningful* saving (so people stay
+// settled instead of churning toward the cheapest).
+export const HOME_CAPACITY_MAX = 5; // capacity of the priciest/biggest home
+export const HOME_CAPACITY_MIN = 2; // capacity of the cheapest/smallest home
+export const HOME_MOVE_MIN_SAVING = 6; // min daily rent saving to bother moving home
+
 // Economy
 export const RENT_PER_DAY = 70; // resident -> landlord (fallback when a home has no rent set)
 export const BUSINESS_RENT_PER_DAY = 60; // diner/goods -> landlord

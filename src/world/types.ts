@@ -30,6 +30,8 @@ export interface Location {
   nodeId: string;
   /** Daily rent for a home (resident -> landlord). Absent/0 for workplaces. */
   rent?: number;
+  /** Max occupants for a home (HP1) — its dwelling size. Absent for workplaces. */
+  capacity?: number;
 }
 
 /**
