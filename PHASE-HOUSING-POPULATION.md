@@ -13,7 +13,7 @@
 | Slice | What | Status |
 |---|---|---|
 | **HP1** | Home capacity (cheap=small, premium=big; ~18 slots for 12 people = slack) + vacancy-aware re-homing. Fixes the "everyone piles into Home 6" bug. | ✅ Shipped (`fedcefb`, `f20ae72`) |
-| **HP2** | Housing scarcity / dynamic rent / landlord meaning. | Deferred |
+| **HP2** | Dynamic rent / housing market / landlord meaning. | ✅ Shipped (`e3824a9`) — rents track scarcity; landlord builds with the income (loop with HP4) |
 | **HP3** | **Population growth — in-migration → births → mortality.** (this doc) | ✅ Shipped (`0e4ff6a`…`fea3eee`, 8 slices) |
 | **HP4** | Housing construction when the town fills (built on HP3's `isHousingConstrained()` trigger — now live). | Deferred (next) |
 
@@ -105,9 +105,14 @@ housing+prosperity gate self-limits as designed; in-migration is a strong stabil
    creation / the shelved Phase 18 **credit** track). That deliberately relaxes "money conserved
    to the cent," so it is left for an explicit decision rather than done autonomously.
 
-**Track status:** HP1 + HP3 (1–9) + HP4 shipped; the living, growing, self-sustaining
-population economy is complete. HP2 (dynamic rent / landlord depth) remains the only unbuilt
-housing slice; population scale-up is gated on the conservation fork above.
+**Track status — COMPLETE.** HP1 + HP2 + HP3 (1–9) + HP4 all shipped, plus full agency and
+the demography HUD: the living, growing, self-sustaining population economy with a real housing
+market is done. The only open threads are deliberate forks, not unbuilt slices:
+- **Population scale-up past ~25** needs the conservation fork above (population-scaled money
+  creation / the shelved Phase 18 credit track) — the user's call.
+- **Dependents pay individual rent** (a pre-existing quirk surfaced by HP2): newborns/children
+  are charged rent they can't pay, so eviction shuffles kids out of family homes. Flagged as a
+  follow-up (household-rent model). Not breaking — the economy stays stable + conserved.
 
 ---
 
