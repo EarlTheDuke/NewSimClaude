@@ -3,6 +3,8 @@ import { createCity, type BrainOption, type ResidentBrainOption } from "./create
 import { SPEED_OPTIONS, type SpeedMultiplier } from "./core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "./utils/serialization";
 import { CanvasRenderer, type Pick, type DisasterMarker, type ThoughtBubble } from "./render/CanvasRenderer";
+import { PixiRenderer } from "./render/PixiRenderer";
+import type { CityRenderer } from "./render/CityRenderer";
 import {
   tickerItems,
   latestDecisionFor,
@@ -149,7 +151,13 @@ el<HTMLSpanElement>("#resBrainTag").textContent = residentAgent
   ? `· ${residentBrain === "rules" ? "rules" : "claude"} brain · ${agenticResidentIds.length} agentic`
   : "· brain off";
 
-const renderer = new CanvasRenderer(canvas, world);
+// Renderer seam (visualization R2): the canvas renderer is the default; opt into
+// the WebGL Pixi renderer with ?renderer=pixi. The default flips to Pixi at R2g
+// (after parity sign-off), at which point ?renderer=canvas is the rollback.
+const usePixi = new URLSearchParams(location.search).get("renderer") === "pixi";
+const renderer: CityRenderer = usePixi
+  ? new PixiRenderer(canvas, world)
+  : new CanvasRenderer(canvas, world);
 let selected: Pick | undefined;
 
 // Thought-bubble lifecycle + narration toggle (presentation-only). The fade is
@@ -603,7 +611,10 @@ window.addEventListener("keydown", (e) => {
 
 let last = performance.now();
 function frame(now: number): void {
-  sim.advanceRealTime(now - last);
+  // Clamp the wall-clock delta (R2 §6.3): a tab/init stall must never inject a
+  // sim-time jump — the renderer may only affect FPS, not sim-time. This bounds
+  // owed-ticks-per-frame; the seeded per-tick logic is unchanged.
+  sim.advanceRealTime(Math.min(now - last, 100));
   last = now;
   renderFrame();
   requestAnimationFrame(frame);
@@ -624,6 +635,7 @@ if (isDev) {
     agent,
     residentAgent,
     renderFrame,
+    renderer,
   };
 }
 

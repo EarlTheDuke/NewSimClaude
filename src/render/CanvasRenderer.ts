@@ -2,6 +2,7 @@ import type { World } from "../world/World";
 import type { Activity, BusinessKind, Business, Resident, Location } from "../world/types";
 import type { DisasterKind } from "../systems/disasters";
 import { skyColor, ambient, windowGlow, dim, hexToRgb, type Rgb } from "./daynight";
+import type { CityRenderer } from "./CityRenderer";
 
 const ACTIVITY_COLOR: Record<Activity, string> = {
   sleeping: "#5b6ee1",
@@ -74,7 +75,7 @@ export interface ThoughtBubble {
  * the hour of day, and buildings light their windows after dark in proportion
  * to how many residents are home. It never mutates the simulation.
  */
-export class CanvasRenderer {
+export class CanvasRenderer implements CityRenderer {
   private readonly ctx: CanvasRenderingContext2D;
 
   constructor(
