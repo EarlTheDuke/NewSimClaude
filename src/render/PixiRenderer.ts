@@ -1,6 +1,6 @@
 import { Application, Container, Graphics, Text } from "pixi.js";
 import type { World } from "../world/World";
-import type { Business, Location } from "../world/types";
+import type { Business, Location, Resident, Activity } from "../world/types";
 import { skyColor, ambient, windowGlow, dimInt, type Rgb } from "./daynight";
 import {
   ROAD_RGB,
@@ -10,6 +10,8 @@ import {
   BUSINESS_RGB,
   BUILDING,
   COLOCATE_DX,
+  ACTIVITY_COLOR,
+  DOT_RADIUS,
 } from "./CanvasRenderer";
 import type { CityRenderer, Pick, DisasterMarker, ThoughtBubble } from "./CityRenderer";
 
@@ -20,6 +22,11 @@ const WIN_GAP = 4;
 const WIN_GOLD = 0xffd17a; // rgba(255, 209, 122) — the lit-window colour
 const PLANK_RGB: Rgb = [84, 84, 92]; // boarded-up plank colour, dimmed by ambient
 
+/** Activity colours as packed ints, for tinting a white resident dot (parity with canvas). */
+const ACTIVITY_INT: Record<Activity, number> = Object.fromEntries(
+  Object.entries(ACTIVITY_COLOR).map(([k, v]) => [k, parseInt(v.slice(1), 16)]),
+) as Record<Activity, number>;
+
 /** The persistent Pixi display objects for one building (created once, mutated per frame). */
 interface BuildingView {
   container: Container;
@@ -27,6 +34,14 @@ interface BuildingView {
   windows: Container;
   planks: Graphics;
   label: Text;
+}
+
+/** Persistent Pixi objects for one resident (created once, mutated per frame). */
+interface ResidentView {
+  container: Container;
+  shadow: Graphics;
+  tick: Graphics;
+  dot: Graphics;
 }
 
 /**
@@ -57,9 +72,11 @@ export class PixiRenderer implements CityRenderer {
   private worldLayer: Container | undefined;
   private roadsGfx: Graphics | undefined;
   private buildingsLayer: Container | undefined;
+  private residentsLayer: Container | undefined;
 
   private roadsBuilt = false;
   private readonly buildingViews = new Map<string, BuildingView>();
+  private readonly residentViews = new Map<string, ResidentView>();
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -83,7 +100,8 @@ export class PixiRenderer implements CityRenderer {
     this.worldLayer = new Container();
     this.roadsGfx = new Graphics();
     this.buildingsLayer = new Container();
-    this.worldLayer.addChild(this.roadsGfx, this.buildingsLayer);
+    this.residentsLayer = new Container();
+    this.worldLayer.addChild(this.roadsGfx, this.buildingsLayer, this.residentsLayer);
     this.app.stage.addChild(this.skyGfx, this.worldLayer);
     this.ready = true;
     // Deferred first paint when the tab's rAF is throttled (background preview);
@@ -118,6 +136,14 @@ export class PixiRenderer implements CityRenderer {
       this.updateBuildingView(view, biz, this.occupantsAt(loc.nodeId), a, glow);
     }
     this.reapBuildings(seen);
+
+    // Residents — one persistent view per id (created lazily, mutated here).
+    const seenR = new Set<string>();
+    for (const r of this.world.residents) {
+      seenR.add(r.id);
+      this.updateResidentView(this.ensureResidentView(r.id), r);
+    }
+    this.reapResidents(seenR);
   }
 
   private ensureRoads(): void {
@@ -212,6 +238,54 @@ export class PixiRenderer implements CityRenderer {
       if (!seen.has(id)) {
         view.container.destroy({ children: true });
         this.buildingViews.delete(id);
+      }
+    }
+  }
+
+  private ensureResidentView(id: string): ResidentView {
+    const existing = this.residentViews.get(id);
+    if (existing) return existing;
+    const container = new Container();
+    const shadow = new Graphics();
+    shadow
+      .ellipse(0, DOT_RADIUS + 1, DOT_RADIUS, DOT_RADIUS * 0.45)
+      .fill({ color: 0x000000, alpha: 0.35 });
+    const tick = new Graphics();
+    tick.visible = false;
+    const dot = new Graphics();
+    dot.circle(0, 0, DOT_RADIUS).fill(0xffffff);
+    dot.stroke({ width: 1, color: 0x000000, alpha: 0.55 });
+    container.addChild(shadow, tick, dot);
+    this.residentsLayer?.addChild(container);
+    const view: ResidentView = { container, shadow, tick, dot };
+    this.residentViews.set(id, view);
+    return view;
+  }
+
+  private updateResidentView(v: ResidentView, r: Resident): void {
+    v.container.position.set(r.move.x, r.move.y);
+    v.dot.tint = ACTIVITY_INT[r.activity];
+    if (r.move.path.length > 0) {
+      const next = this.world.getNode(r.move.path[0]!);
+      const dx = next.x - r.move.x;
+      const dy = next.y - r.move.y;
+      const len = Math.hypot(dx, dy) || 1;
+      v.tick.clear();
+      v.tick
+        .moveTo(0, 0)
+        .lineTo((dx / len) * 9, (dy / len) * 9)
+        .stroke({ width: 2, color: 0xe1d65b, alpha: 0.55 });
+      v.tick.visible = true;
+    } else {
+      v.tick.visible = false;
+    }
+  }
+
+  private reapResidents(seen: Set<string>): void {
+    for (const [id, view] of this.residentViews) {
+      if (!seen.has(id)) {
+        view.container.destroy({ children: true });
+        this.residentViews.delete(id);
       }
     }
   }
