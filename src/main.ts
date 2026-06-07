@@ -2,7 +2,8 @@ import "./style.css";
 import { createCity, type BrainOption, type ResidentBrainOption } from "./createCity";
 import { SPEED_OPTIONS, type SpeedMultiplier } from "./core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "./utils/serialization";
-import { CanvasRenderer, type Pick, type DisasterMarker, type ThoughtBubble } from "./render/CanvasRenderer";
+import { CanvasRenderer, type Pick, type DisasterMarker, type ThoughtBubble, type MapToast } from "./render/CanvasRenderer";
+import type { PopulationEventKind } from "./systems/PopulationSystem";
 import { PixiRenderer } from "./render/PixiRenderer";
 import type { CityRenderer } from "./render/CityRenderer";
 import {
@@ -206,6 +207,26 @@ interface LiveBubble {
 }
 let liveBubbles: LiveBubble[] = [];
 let lastBizDecisionCount = 0;
+
+// Floating map toasts for demographic events (HP3 watchability). A glyph pops at the
+// home where each birth/arrival/coming-of-age/build/parting happens and drifts up as
+// it fades. Driven by PopulationSystem's monotonic event log (seq → toast once).
+const TOAST_TTL_MS = 2600;
+const TOAST_GLYPH: Record<PopulationEventKind, string> = {
+  birth: "👶",
+  arrival: "🧳",
+  grewUp: "🎓",
+  build: "🏠",
+  death: "🕯️",
+};
+interface LiveToast {
+  x: number;
+  y: number;
+  text: string;
+  bornMs: number;
+}
+const liveToasts: LiveToast[] = [];
+let lastToastSeq = 0;
 
 const pauseBtn = button("Pause", () => {
   sim.time.togglePause();
@@ -505,6 +526,27 @@ function syncBubbles(): void {
   liveBubbles = liveBubbles.filter((b) => b.bornMs > cutoff);
 }
 
+// Spawn a floating map toast for each new demographic event, and retire faded ones.
+// Tracks the event log's monotonic seq so each event toasts exactly once; resets if
+// the log was cleared (e.g. after a save/reload). Presentation-only — reads, never mutates.
+function pumpToasts(): void {
+  const evs = population.events();
+  if (evs.length > 0) {
+    if (evs[evs.length - 1]!.seq < lastToastSeq) lastToastSeq = 0; // log reset (restore)
+    const nowMs = performance.now();
+    for (const e of evs) {
+      if (e.seq <= lastToastSeq) continue;
+      const node = world.getNode(e.nodeId);
+      liveToasts.push({ x: node.x, y: node.y, text: TOAST_GLYPH[e.kind], bornMs: nowMs });
+    }
+    lastToastSeq = evs[evs.length - 1]!.seq;
+  }
+  const cutoff = performance.now() - TOAST_TTL_MS;
+  for (let i = liveToasts.length - 1; i >= 0; i--) {
+    if (liveToasts[i]!.bornMs <= cutoff) liveToasts.splice(i, 1);
+  }
+}
+
 function renderTicker(): void {
   if (!narrationOn) return;
   const items = tickerItems(
@@ -648,6 +690,7 @@ function renderFrame(): void {
       ? { kind: todays.kind, headline: todays.headline, targetId: todays.targetId }
       : undefined;
   syncBubbles();
+  pumpToasts();
   const nowMs = performance.now();
   const bubbleViews: ThoughtBubble[] = narrationOn
     ? liveBubbles.map((b) => ({
@@ -656,7 +699,13 @@ function renderFrame(): void {
         alpha: Math.max(0, 1 - (nowMs - b.bornMs) / BUBBLE_TTL_MS),
       }))
     : [];
-  renderer.draw(t.hour + t.minute / 60, selected, marker, bubbleViews);
+  const toastViews: MapToast[] = liveToasts.map((t) => ({
+    x: t.x,
+    y: t.y,
+    text: t.text,
+    alpha: Math.max(0, 1 - (nowMs - t.bornMs) / TOAST_TTL_MS),
+  }));
+  renderer.draw(t.hour + t.minute / 60, selected, marker, bubbleViews, toastViews);
   sampleDemography(t.day);
   renderInspector();
   renderMacro();

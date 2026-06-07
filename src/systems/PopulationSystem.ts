@@ -63,6 +63,17 @@ function residentIndex(id: string): number {
   return Number(id.split("_")[1] ?? 0);
 }
 
+/** A demographic event with a place (HP3 watchability) — drives the map toasts. Ephemeral. */
+export type PopulationEventKind = "birth" | "death" | "arrival" | "grewUp" | "build";
+export interface PopulationEvent {
+  /** Monotonic id, so the renderer can spawn a toast only for events it hasn't seen. */
+  seq: number;
+  day: number;
+  kind: PopulationEventKind;
+  /** The map node where it happened (the home involved). */
+  nodeId: string;
+}
+
 /**
  * Population growth (HP3) — the *birth* of new residents, the people-side twin of
  * {@link BusinessEntrySystem}'s firm birth. Once per sim-day, after the economy,
@@ -92,6 +103,10 @@ export class PopulationSystem implements System {
   private diedCount = 0;
   /** Children who have reached working age (HP3-9), for the demography feed. */
   private grewUpCount = 0;
+  /** Ephemeral demographic event feed with locations (map toasts) — NOT serialized. */
+  private readonly eventLog: PopulationEvent[] = [];
+  private eventSeq = 0;
+  private currentDay = 0;
   /** Fractional growth pressure accrued across eligible days; a whole unit admits one person. */
   private pressureAccumulator = 0;
   /** Day the last person arrived, for the cooldown. */
@@ -144,6 +159,7 @@ export class PopulationSystem implements System {
     if (!this.enabled && !this.mortality && !this.construction && !this.dynamicRent) return; // inert ⇒ byte-identical
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
     const { day } = ctx.time.time();
+    this.currentDay = day; // stamp events logged this tick
 
     // Deaths first (they free homes + jobs the same-day growth can refill), once a
     // year. Then build housing if the town is full, then admit newcomers into it.
@@ -228,6 +244,7 @@ export class PopulationSystem implements System {
       capacity: HOME_BUILD_CAPACITY,
     });
     this.world.reindex();
+    this.logEvent("build", node);
     this.lastBuildDay = day;
   }
 
@@ -326,6 +343,17 @@ export class PopulationSystem implements System {
     return this.housingSlack() === 0;
   }
 
+  /** Recent demographic events with locations (ephemeral) — drives the map toasts. */
+  events(): readonly PopulationEvent[] {
+    return this.eventLog;
+  }
+
+  private logEvent(kind: PopulationEventKind, nodeId: string): void {
+    this.eventSeq += 1;
+    this.eventLog.push({ seq: this.eventSeq, day: this.currentDay, kind, nodeId });
+    if (this.eventLog.length > 50) this.eventLog.shift();
+  }
+
   /** Read-only demography snapshot (HP3-8) for the macro/HUD readout. Never mutates. */
   demography(): {
     population: number;
@@ -362,6 +390,7 @@ export class PopulationSystem implements System {
     if (homeId === undefined) return undefined;
     const r = this.create(homeId, "migrant", NEWCOMER_AGE_YEARS);
     this.migratedCount += 1;
+    this.logEvent("arrival", this.world.getLocation(homeId).nodeId);
     return r;
   }
 
@@ -384,6 +413,7 @@ export class PopulationSystem implements System {
     child.parentId = parent.id;
     this.world.transfer(parent.id, child.id, BIRTH_GIFT); // gift -> child; conserved
     this.bornCount += 1;
+    this.logEvent("birth", this.world.getLocation(parent.homeId).nodeId);
     return child;
   }
 
@@ -444,7 +474,10 @@ export class PopulationSystem implements System {
     // Tally children who turned working-age this year (exactly once each) — for the
     // demography feed's "grew up and started working" event.
     for (const r of this.world.residents) {
-      if (r.origin === "born" && r.age === this.comingOfAgeYears) this.grewUpCount += 1;
+      if (r.origin === "born" && r.age === this.comingOfAgeYears) {
+        this.grewUpCount += 1;
+        this.logEvent("grewUp", this.world.getLocation(r.homeId).nodeId);
+      }
     }
     // Reap the too-old in ascending id order (deterministic), each estate inherited.
     const doomed = this.world.residents
@@ -478,6 +511,7 @@ export class PopulationSystem implements System {
       .sort((a, b) => residentIndex(a.id) - residentIndex(b.id))[0];
     if (!heir) return;
 
+    this.logEvent("death", this.world.getLocation(dead.homeId).nodeId);
     this.world.transfer(dead.id, heir.id, dead.money); // estate -> heir; drains to $0
     if (dead.jobId) {
       const employer = this.world.getBusiness(dead.jobId);

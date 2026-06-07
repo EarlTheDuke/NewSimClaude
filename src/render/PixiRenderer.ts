@@ -19,7 +19,7 @@ import {
   DOT_RADIUS,
   DISASTER_STYLE,
 } from "./CanvasRenderer";
-import type { CityRenderer, Pick, DisasterMarker, ThoughtBubble } from "./CityRenderer";
+import type { CityRenderer, Pick, DisasterMarker, ThoughtBubble, MapToast } from "./CityRenderer";
 
 const WIDTH = 640;
 const HEIGHT = 480;
@@ -100,6 +100,9 @@ export class PixiRenderer implements CityRenderer {
   private roadsGfx: Graphics | undefined;
   private buildingsLayer: Container | undefined;
   private residentsLayer: Container | undefined;
+  private toastLayer: Container | undefined;
+  /** Pooled Text objects for floating map toasts (created lazily, reused per frame). */
+  private readonly toastPool: Text[] = [];
   private hudLayer: Container | undefined; // screen-fixed (never under the camera)
   private sunC: Container | undefined;
   private moonC: Container | undefined;
@@ -151,7 +154,8 @@ export class PixiRenderer implements CityRenderer {
     this.roadsGfx = new Graphics();
     this.buildingsLayer = new Container();
     this.residentsLayer = new Container();
-    this.worldLayer.addChild(this.roadsGfx, this.buildingsLayer, this.residentsLayer);
+    this.toastLayer = new Container(); // floating map toasts, above residents, in world space
+    this.worldLayer.addChild(this.roadsGfx, this.buildingsLayer, this.residentsLayer, this.toastLayer);
     this.app.stage.addChild(this.skyGfx, this.worldLayer);
     this.hudLayer = new Container();
     this.app.stage.addChild(this.hudLayer);
@@ -167,7 +171,13 @@ export class PixiRenderer implements CityRenderer {
     w.cwlc?.renderFrame?.();
   }
 
-  draw(hourFloat: number, selected?: Pick, disaster?: DisasterMarker, bubbles?: ThoughtBubble[]): void {
+  draw(
+    hourFloat: number,
+    selected?: Pick,
+    disaster?: DisasterMarker,
+    bubbles?: ThoughtBubble[],
+    toasts?: MapToast[],
+  ): void {
     if (!this.ready || !this.skyGfx || !this.roadsGfx) return;
     this.updateFollow(selected);
     const a = ambient(hourFloat);
@@ -234,6 +244,31 @@ export class PixiRenderer implements CityRenderer {
     this.updateSkyBadge(hourFloat);
     this.updateDisaster(disaster);
     this.updateBubbles(bubbles ?? []);
+    this.updateToasts(toasts ?? []);
+  }
+
+  /** Floating demographic toasts (HP3): a glyph that pops at a home and drifts up as
+   *  it fades. World-space (pans/zooms with the map). Pooled Text, reused per frame. */
+  private updateToasts(toasts: MapToast[]): void {
+    if (!this.toastLayer) return;
+    for (let i = 0; i < toasts.length; i++) {
+      let t = this.toastPool[i];
+      if (!t) {
+        t = new Text({
+          text: "",
+          style: { fontFamily: "system-ui, sans-serif", fontSize: 16, fill: 0xffffff },
+        });
+        t.anchor.set(0.5, 1);
+        this.toastLayer.addChild(t);
+        this.toastPool[i] = t;
+      }
+      const m = toasts[i]!;
+      t.text = m.text;
+      t.position.set(m.x, m.y - 14 - (1 - m.alpha) * 22); // rises as it fades
+      t.alpha = Math.max(0, Math.min(1, m.alpha));
+      t.visible = true;
+    }
+    for (let i = toasts.length; i < this.toastPool.length; i++) this.toastPool[i]!.visible = false;
   }
 
   /** Legend (bottom-left) + sun/moon badge (top-right), built once in screen space. */

@@ -1,4 +1,4 @@
-import type { Pick, DisasterMarker, ThoughtBubble } from "./CanvasRenderer";
+import type { Pick, DisasterMarker, ThoughtBubble, MapToast } from "./CanvasRenderer";
 
 /**
  * The renderer seam (visualization R2). Both the original {@link CanvasRenderer}
@@ -9,11 +9,17 @@ import type { Pick, DisasterMarker, ThoughtBubble } from "./CanvasRenderer";
  */
 export interface CityRenderer {
   /** Paint a frame for the given hour of day (0..24, fractional for smoothness). */
-  draw(hourFloat: number, selected?: Pick, disaster?: DisasterMarker, bubbles?: ThoughtBubble[]): void;
+  draw(
+    hourFloat: number,
+    selected?: Pick,
+    disaster?: DisasterMarker,
+    bubbles?: ThoughtBubble[],
+    toasts?: MapToast[],
+  ): void;
   /** Map a canvas-space click to the resident or building under it. */
   pick(x: number, y: number): Pick | undefined;
   /** Tear down GPU/DOM resources (Pixi). Optional — the canvas renderer needs none. */
   destroy?(): void;
 }
 
-export type { Pick, DisasterMarker, ThoughtBubble } from "./CanvasRenderer";
+export type { Pick, DisasterMarker, ThoughtBubble, MapToast } from "./CanvasRenderer";

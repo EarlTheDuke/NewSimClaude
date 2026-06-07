@@ -72,6 +72,19 @@ export interface ThoughtBubble {
 }
 
 /**
+ * A floating "map toast" — a short glyph (👶 birth, 🧳 arrival, 🎓 came of age,
+ * 🏠 home built, 🕯️ a parting) that pops at a world position and floats up as it
+ * fades. Position is in WORLD coordinates; `alpha` is a view-layer fade (0..1). Pure
+ * presentation — never touches sim state.
+ */
+export interface MapToast {
+  x: number;
+  y: number;
+  text: string;
+  alpha: number;
+}
+
+/**
  * Read-only view of the world: roads, buildings, and residents painted onto the
  * canvas. Phase 5 makes it breathe — the whole scene is tinted and dimmed by
  * the hour of day, and buildings light their windows after dark in proportion
