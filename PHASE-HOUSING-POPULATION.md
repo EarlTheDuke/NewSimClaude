@@ -14,8 +14,36 @@
 |---|---|---|
 | **HP1** | Home capacity (cheap=small, premium=big; ~18 slots for 12 people = slack) + vacancy-aware re-homing. Fixes the "everyone piles into Home 6" bug. | ✅ Shipped (`fedcefb`, `f20ae72`) |
 | **HP2** | Housing scarcity / dynamic rent / landlord meaning. | Deferred |
-| **HP3** | **Population growth — in-migration → births.** (this doc) | 📋 Designed, awaiting build approval |
-| **HP4** | Housing construction when the town fills (built on HP3's `isHousingConstrained()` trigger). | Deferred |
+| **HP3** | **Population growth — in-migration → births → mortality.** (this doc) | ✅ Shipped (`0e4ff6a`…`fea3eee`, 8 slices) |
+| **HP4** | Housing construction when the town fills (built on HP3's `isHousingConstrained()` trigger — now live). | Deferred (next) |
+
+## HP3 — DELIVERED (8 slices, 370 tests green)
+
+Built slice-by-slice, each flag-gated and committed: HP3-1 inert seam → HP3-2
+`cheapestVacantHome` → HP3-3 capacity-aware eviction fix → HP3-4 spawn primitive →
+HP3-5 growth trigger → HP3-6 death+inheritance → HP3-7 births → HP3-8 housing-full
+hook + stability soak → live wiring in `main.ts`.
+
+**What it does:** the town now grows. In the live game (`populationGrowth` engaged
+in `main.ts`; default OFF in `createCity` so tests/bench are byte-identical) the
+population climbs **12 → 18** (the HP1 housing cap) as it prospers — births grow
+families from within, in-migration backfills labour, and residents age and pass on
+with their estate inherited. A full living demographic cycle, money conserved to the
+cent, deterministic, save/reload-safe.
+
+**Key deviation from the design above (data-driven, see HP3-5 commit):** the plan
+gated growth on *open producer seats* ("plateau when crewed"), but the seed is
+exactly fully crewed, so that gate blocked nearly all growth — defeating the goal.
+Growth instead gates on **housing slack + prosperity** (the prosperity floor also
+serves as the dilution brake the open-seat gate was meant to provide). Result:
+visible growth to the housing cap, self-stabilizing, all 7 firms stay solvent.
+
+**Bonus finding (HP3-3):** the capacity-aware eviction fix incidentally stabilizes
+the supply chain so much that seeds 1/3/42 now sustain *without* the producer wage
+floor (the floor is still decisive at seed 7). The wage-floor A/B was relocated to
+seed 7. Net: a healthier economy.
+
+**HP4 is now unblocked:** `population.isHousingConstrained()` is the build trigger.
 
 ---
 
