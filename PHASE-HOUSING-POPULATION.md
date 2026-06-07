@@ -78,24 +78,36 @@ housing+prosperity gate self-limits as designed; in-migration is a strong stabil
 7. **Soak blind spot:** the HP3-8 soak checked `activeKinds>=4` (firms *solvent*) but an
    *unstaffed* producer is still "active" — so it missed the staffing/production collapse.
 
-**Next steps (ranked):**
-1. ✅ **DONE — Coming-of-age (HP3-9, `bc9f6b5`):** grown children (and adults displaced by a
-   dead firm) take open producer seats each year, so the workers mortality removes are
-   replaced. **Fixes the death spiral** — verified over a 40-year live-clock run: employment
-   holds ~13/16, every producer kind stays staffed (`222222`) and producing, revenue grows to
-   ~1.08M, money conserved. **Mortality re-enabled in the live game.** A real demographic cycle.
-2. **Labour-aware spawn balance:** prefer a working-age migrant when producer seats are open
-   and job-seekers are few; else a birth. (Coming-of-age's employ step already re-seats
-   displaced adults, so this is now a refinement, not a necessity.)
-3. **HP4 — housing construction** (cost = transfer, conserved) to lift the ceiling past 18 →
-   sustained growth instead of a one-time jump. *(Now the top open item.)*
-4. **Make new residents full agents** (add to the decision roster) for lifelike participation —
-   today migrants/grown-children are employed by the population system but don't job-switch,
-   negotiate raises, or spend deliberately.
-5. **Demography HUD** (N / births / deaths / jobless / $-per-capita; the data already exists
-   via `population.demography()`) for watchability.
-6. **Per-capita dilution:** decide whether a fixed money supply is right as N grows, or whether
-   population-scaled money creation (ties to the shelved Phase 18 credit track) is needed.
+**Next steps — ALL DONE (2026-06-07):**
+1. ✅ **Coming-of-age (HP3-9, `bc9f6b5`):** grown children (and adults displaced by a dead firm)
+   take open producer seats each year, so the workers mortality removes are replaced. **Fixes
+   the death spiral** — 40-year run: employment holds ~13/16, every producer kind staffed
+   (`222222`) and producing, revenue grows, money conserved. Mortality re-enabled live.
+2. ⏭️ **Labour-aware spawn balance:** *not needed* — coming-of-age's employ step already
+   re-seats displaced adults, and in-migration backfills via the births→migration fallback.
+3. ✅ **HP4 — housing construction (`95036d4`):** the landlord builds a home when the town is
+   full (cost = conserved transfer → factory), lifting the cap in a staircase. Self-limiting:
+   grows 18 → ~22–25 then settles as prosperity dilutes. No runaway; chain stays staffed.
+4. ✅ **Full agency (`5af4b0c`):** `ResidentAgentSystem` "all" mode reviews every working-age
+   resident, so migrants + grown children job-switch / negotiate / spend like the seeded twelve
+   (newborns excluded until of-age). Stateless, restore-safe.
+5. ✅ **Demography HUD (`0b98cb4`):** live readout of pop / working / homes / births / deaths /
+   arrivals / $-per-capita in the live game.
+6. ✅ **Per-capita dilution — DECIDED: keep the fixed money supply (conservation is sacred).**
+   Measured over 30 years at the full live config: the town grows 12 → ~25 then self-limits;
+   per-capita falls (~1900 → ~1300) BUT **no resident is ever broke** (recirculation keeps
+   everyone solvent — they live paycheck-to-paycheck, which is realistic), and the economy stays
+   healthy. The dominant driver of low resident balances is **~64% of all money sitting in
+   business reserves**, not population growth. Conclusion: dilution is realistic + benign, and
+   the prosperity gate appropriately caps the town at a wealth-supported size.
+   **OPEN FORK (user's call — not taken, would break conservation):** to grow *substantially*
+   larger than ~25, the money supply must scale with population (population-indexed money
+   creation / the shelved Phase 18 **credit** track). That deliberately relaxes "money conserved
+   to the cent," so it is left for an explicit decision rather than done autonomously.
+
+**Track status:** HP1 + HP3 (1–9) + HP4 shipped; the living, growing, self-sustaining
+population economy is complete. HP2 (dynamic rent / landlord depth) remains the only unbuilt
+housing slice; population scale-up is gated on the conservation fork above.
 
 ---
 
