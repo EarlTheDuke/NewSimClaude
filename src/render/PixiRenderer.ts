@@ -5,6 +5,7 @@ import { skyColor, ambient, windowGlow, dimInt, type Rgb } from "./daynight";
 import { worldToScreen as toScreen, screenToWorld, type Camera } from "./camera";
 import { prosperityT, fillFraction, FILL_FULL_INVENTORY } from "./economyVisuals";
 import { fanOutOffset } from "./residentLayout";
+import { occupantsByHome } from "../world/housing";
 import { CAPITAL_BASELINE } from "../systems/constants";
 import {
   ROAD_RGB,
@@ -185,13 +186,24 @@ export class PixiRenderer implements CityRenderer {
     this.roadsGfx.tint = dimInt(ROAD_RGB, a);
 
     // Buildings — one persistent view per location, created lazily, mutated here.
+    // A home's windows now light by how full it is (residents who LIVE there ÷ its
+    // capacity), so the skyline shows occupancy at a glance — full homes glow, a fresh
+    // or empty home is dim. Workplaces keep lighting by who's physically on-site.
+    const homeOcc = occupantsByHome(this.world.residents);
     const seen = new Set<string>();
     for (const loc of this.world.locations) {
       seen.add(loc.id);
       const view = this.ensureBuildingView(loc);
       const biz = this.world.businesses.find((b) => b.locationId === loc.id);
       const isSel = selected?.kind === "business" && !!biz && selected.id === biz.id;
-      this.updateBuildingView(view, biz, this.occupantsAt(loc.nodeId), a, glow, isSel);
+      let litFraction: number;
+      if (loc.type === "home") {
+        const cap = loc.capacity ?? 3;
+        litFraction = cap > 0 ? Math.min(1, (homeOcc.get(loc.id) ?? 0) / cap) : 0;
+      } else {
+        litFraction = Math.min(1, this.occupantsAt(loc.nodeId) / 3);
+      }
+      this.updateBuildingView(view, biz, litFraction, a, glow, isSel);
     }
     this.reapBuildings(seen);
 
@@ -498,7 +510,7 @@ export class PixiRenderer implements CityRenderer {
   private updateBuildingView(
     v: BuildingView,
     biz: Business | undefined,
-    occupants: number,
+    litFraction: number,
     a: number,
     glow: number,
     isSelected: boolean,
@@ -512,7 +524,7 @@ export class PixiRenderer implements CityRenderer {
       const baseRgb = biz ? BUSINESS_RGB[biz.kind] : HOME_RGB;
       v.base.tint = dimInt(baseRgb, a);
       v.planks.visible = false;
-      const lit = glow * (0.12 + 0.88 * (Math.min(occupants, 3) / 3));
+      const lit = glow * (0.12 + 0.88 * Math.max(0, Math.min(1, litFraction)));
       v.windows.visible = lit > 0.02;
       v.windows.alpha = lit;
     }
