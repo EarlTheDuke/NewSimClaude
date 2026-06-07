@@ -23,7 +23,9 @@ const ROWS = 3;
 const SPACING = 160;
 const ORIGIN = 80;
 
-const FIRST_NAMES = [
+// Exported so population growth (HP3) draws newcomer names from the same pool,
+// keyed by resident index, exactly like the seeded residents.
+export const FIRST_NAMES = [
   "Ada", "Bo", "Cy", "Dot", "Eli", "Fay", "Gus", "Hana",
   "Ivo", "Joy", "Kit", "Lux", "Mo", "Nia", "Oz", "Pip",
 ];
@@ -51,7 +53,7 @@ const SHIFTS: ReadonlyArray<{ startHour: number; endHour: number }> = [
  * rotating day off per week (staggered by index) keeps the city from ever going
  * fully idle on the same weekday.
  */
-function scheduleFor(i: number): WorkSchedule {
+export function scheduleFor(i: number): WorkSchedule {
   const shift = SHIFTS[i % SHIFTS.length]!;
   return { startHour: shift.startHour, endHour: shift.endHour, daysOff: [i % 7] };
 }

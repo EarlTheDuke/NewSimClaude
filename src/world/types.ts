@@ -167,6 +167,14 @@ export type Activity =
   | "commuting"
   | "idle";
 
+/**
+ * Where a resident came from (HP3 population growth). The seeded population has
+ * none; growth tags each new arrival — "migrant" for an in-migrant, "born" for a
+ * newborn. Cosmetic/analytic only — it never affects money or the id namespace
+ * (ids stay numeric `res_N`).
+ */
+export type ResidentOrigin = "migrant" | "born";
+
 /** Needs are 0 (critical) .. 100 (fully satisfied). */
 export interface Needs {
   hunger: number; // 100 = full, 0 = starving
@@ -224,6 +232,12 @@ export interface Resident {
   move: Movement;
   /** Consecutive day-boundaries the full rent went unpaid (Phase 4c eviction). 0/absent = current. */
   rentMissedDays?: number;
+  /**
+   * How this resident entered the world (HP3). Absent for the seeded population
+   * (⇒ byte-identical to pre-HP3); "migrant"/"born" on residents added by growth.
+   * Cosmetic/analytic only — never money, never part of the id namespace.
+   */
+  origin?: ResidentOrigin;
 }
 
 /** Serializable slice owned by the World. */
