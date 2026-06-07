@@ -506,6 +506,30 @@ describe("PopulationSystem coming-of-age (HP3-9)", () => {
   });
 });
 
+describe("ResidentAgentSystem full agency (manageAll)", () => {
+  it("manages every working-age resident (migrants, grown children) but not newborns", () => {
+    const { sim, world, residentAgent, population } = createCity({
+      seed: 1,
+      residentBrain: "rules",
+      agenticResidentIds: "all",
+      populationGrowth: true,
+      populationOptions: { prosperityFloor: 9_999_999 }, // suppress auto-growth; spawn manually
+    });
+    const migrant = population.spawnMigrant()!; // age 25 — a working adult
+    const baby = population.spawnBirth()!; // age 0 — a dependent
+    expect(migrant.age).toBeGreaterThanOrEqual(18);
+    expect(baby.age).toBe(0);
+
+    sim.run(TICKS_PER_DAY); // one daily review cycle
+
+    const reviewed = new Set(residentAgent!.decisions().map((d) => d.residentId));
+    expect(reviewed.has("res_0")).toBe(true); // the seeded cohort
+    expect(reviewed.has(migrant.id)).toBe(true); // the in-migrant is a full agent
+    expect(reviewed.has(baby.id)).toBe(false); // the newborn is a dependent, not an agent
+    expect(world.totalMoney()).toBeGreaterThan(0); // sanity
+  });
+});
+
 describe("PopulationSystem construction (HP4)", () => {
   it("builds a new home when the town is full, lifting the cap (money conserved)", () => {
     // prosperityFloor 0 + a short cooldown so migration fills the town and the

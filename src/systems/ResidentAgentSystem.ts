@@ -16,6 +16,16 @@ import { clampResidentAction, DEFAULT_RESIDENT_LIMITS } from "../ai/residentClam
 import { RuleBasedResidentProvider } from "../ai/RuleBasedResidentProvider";
 import { desiredHeadcount } from "../world/archetypes";
 import { occupantsByHome } from "../world/housing";
+import { COMING_OF_AGE_YEARS } from "./constants";
+
+/**
+ * Which residents the agent manages: an explicit id list, or "all" — every
+ * working-age resident, so HP3 newcomers (in-migrants) and grown-up children join
+ * the labour market on the same footing as the seeded cohort. Newborns are excluded
+ * until they come of age. Stateless (derived from resident.age), so there is no
+ * roster to serialize and it round-trips for free.
+ */
+export type AgenticResidents = readonly string[] | "all";
 
 /**
  * The agentic layer for people: once per sim-day, each opted-in resident
@@ -43,12 +53,17 @@ export class ResidentAgentSystem implements System {
   /** Residents with an in-flight async decision — don't double-fire. */
   private readonly pending = new Set<string>();
 
+  private readonly manageAll: boolean;
+  private readonly fixedIds: readonly string[];
+
   constructor(
     private readonly world: World,
     private readonly provider: ResidentDecisionProvider,
-    private readonly agenticResidentIds: readonly string[],
+    agenticResidentIds: AgenticResidents,
     limits: ResidentDecisionLimits = DEFAULT_RESIDENT_LIMITS,
   ) {
+    this.manageAll = agenticResidentIds === "all";
+    this.fixedIds = this.manageAll ? [] : (agenticResidentIds as readonly string[]);
     this.limits = limits;
   }
 
@@ -56,9 +71,18 @@ export class ResidentAgentSystem implements System {
     // Review at each new day's first tick, after the prior day's rent settled.
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
     const { day } = ctx.time.time();
-    for (const id of this.agenticResidentIds) {
-      const r = this.world.getResident(id);
-      if (r) this.review(r, day);
+    if (this.manageAll) {
+      // Every working-age resident is an agent: a newborn is a dependent until it
+      // comes of age, then it lives its own economic life like everyone else — as do
+      // in-migrants. Iterate the residents array (stable, deterministic order).
+      for (const r of this.world.residents) {
+        if ((r.age ?? COMING_OF_AGE_YEARS) >= COMING_OF_AGE_YEARS) this.review(r, day);
+      }
+    } else {
+      for (const id of this.fixedIds) {
+        const r = this.world.getResident(id);
+        if (r) this.review(r, day);
+      }
     }
   }
 

@@ -44,8 +44,12 @@ export interface CitySimOptions extends CityOptions {
   limits?: DecisionLimits;
   /** Which mind runs opted-in residents' life decisions. Default "off". */
   residentBrain?: ResidentBrainOption;
-  /** Residents the resident brain manages. Defaults to none until set. */
-  agenticResidentIds?: string[];
+  /**
+   * Residents the resident brain manages. An explicit id list, or "all" — every
+   * working-age resident (so HP3 migrants and grown children are full agents too).
+   * Defaults to none until set.
+   */
+  agenticResidentIds?: string[] | "all";
   /** Override the resident action safety limits. */
   residentLimits?: ResidentDecisionLimits;
   /**

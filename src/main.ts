@@ -40,7 +40,10 @@ const residentBrain: ResidentBrainOption = "rules";
 // The full living firm economy (Phase 15): EVERY resident is an agent, so the whole
 // labour market is live — workers chase better-paying jobs, firms that fall short
 // of staff bid wages up, and the supply chain reshuffles itself in front of you.
-const agenticResidentIds = Array.from({ length: 12 }, (_, i) => `res_${i}`);
+// "all" = every working-age resident is an agent — so HP3 newcomers and grown-up
+// children live their own economic lives (chase jobs, ask for raises, spend) just
+// like the seeded twelve; newborns are dependents until they come of age.
+const agenticResidentIds = "all" as const;
 
 // Every firm runs the brain too (a rival diner included, Phase 11b — two food
 // sellers competing on price + distance, sharing the goods store's node in a strip
@@ -161,7 +164,7 @@ eventsTagEl.textContent = events ? "· disasters on" : "· disasters off";
 
 el<HTMLSpanElement>("#brainTag").textContent = agent ? `· ${brain === "rules" ? "rules" : "claude"} brain` : "· brain off";
 el<HTMLSpanElement>("#resBrainTag").textContent = residentAgent
-  ? `· ${residentBrain === "rules" ? "rules" : "claude"} brain · ${agenticResidentIds.length} agentic`
+  ? `· ${residentBrain === "rules" ? "rules" : "claude"} brain · all agentic`
   : "· brain off";
 
 // Renderer seam (visualization R2g): the WebGL Pixi renderer is now the default —
