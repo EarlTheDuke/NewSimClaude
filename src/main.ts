@@ -110,6 +110,10 @@ app.innerHTML = `
     <h2>City events <span class="hint" id="eventsTag"></span></h2>
     <div id="eventsLog"><p class="hint">All quiet — disasters strike at the start of a day.</p></div>
   </div>
+  <div class="hud trace">
+    <h2>Town life <span class="hint">· births, arrivals, kids growing up, partings &amp; building</span></h2>
+    <div id="townLife"><p class="hint">The town's comings and goings will appear here as days roll…</p></div>
+  </div>
   <div class="hud god">
     <h2>God Mode <span class="hint">· reach in and meddle (money-conserving)</span></h2>
     <div class="controls" id="godControls"></div>
@@ -147,6 +151,16 @@ const traceLogEl = el<HTMLDivElement>("#traceLog");
 const resTraceLogEl = el<HTMLDivElement>("#resTraceLog");
 const eventsLogEl = el<HTMLDivElement>("#eventsLog");
 const eventsTagEl = el<HTMLSpanElement>("#eventsTag");
+const townLifeEl = el<HTMLDivElement>("#townLife");
+
+// Town-life feed + population history (HP3/HP4 watchability) — rendering-only state.
+// Sampled once per sim-day in renderFrame; the feed narrates demographic events as
+// the cumulative counts tick up, the sparkline traces the town's growth curve.
+const popHistory: number[] = [];
+const townLife: string[] = [];
+let lastDemoDay = -1;
+let lastDemoCounts = { born: 0, died: 0, migrated: 0, grewUp: 0 };
+let lastHomeCount = world.locations.filter((l) => l.type === "home").length;
 const godControlsEl = el<HTMLDivElement>("#godControls");
 const godLogEl = el<HTMLDivElement>("#godLog");
 const expControlsEl = el<HTMLDivElement>("#expControls");
@@ -509,6 +523,34 @@ function renderTicker(): void {
     .join("");
 }
 
+// Sample population once per sim-day and narrate any demographic events since the
+// last sample (cumulative-count deltas, so a multi-day frame jump misses none).
+function sampleDemography(day: number): void {
+  if (day === lastDemoDay) return;
+  lastDemoDay = day;
+  popHistory.push(world.residents.length);
+  if (popHistory.length > 400) popHistory.shift();
+
+  const d = population.demography();
+  const homes = world.locations.filter((l) => l.type === "home").length;
+  const add = (text: string): void => {
+    townLife.push(`<p class="trace-row"><b>Day ${day}</b> ${text}</p>`);
+    if (townLife.length > 60) townLife.shift();
+  };
+  for (let i = 0; i < d.born - lastDemoCounts.born; i++) add(`👶 a child was born`);
+  for (let i = 0; i < d.migrated - lastDemoCounts.migrated; i++) add(`🧳 a newcomer moved to town`);
+  for (let i = 0; i < d.grewUp - lastDemoCounts.grewUp; i++) add(`🎓 a young resident came of age and started working`);
+  for (let i = 0; i < homes - lastHomeCount; i++) add(`🏠 the landlord opened a newly built home`);
+  for (let i = 0; i < d.died - lastDemoCounts.died; i++) add(`🕯️ a resident passed away (estate inherited)`);
+  lastDemoCounts = { born: d.born, died: d.died, migrated: d.migrated, grewUp: d.grewUp };
+  lastHomeCount = homes;
+}
+
+function renderTownLife(): void {
+  if (townLife.length === 0) return;
+  townLifeEl.innerHTML = townLife.slice(-12).reverse().join("");
+}
+
 function renderEvents(): void {
   if (!events) return;
   const entries = events.events();
@@ -565,6 +607,7 @@ function renderMacro(): void {
 
   if (latest) {
     vitalsEl.innerHTML = [
+      vitalCard("Population", String(world.residents.length), popHistory, "#7ee787"),
       vitalCard("GDP / day", money(latest.gdp), history.map((s) => s.gdp), "#58a6ff"),
       vitalCard("Investment / day", money(latest.investment), history.map((s) => s.investment), "#a371f7"),
       vitalCard("Payroll / day", money(latest.payroll), history.map((s) => s.payroll), "#2ea043"),
@@ -614,9 +657,11 @@ function renderFrame(): void {
       }))
     : [];
   renderer.draw(t.hour + t.minute / 60, selected, marker, bubbleViews);
+  sampleDemography(t.day);
   renderInspector();
   renderMacro();
   renderEvents();
+  renderTownLife();
   renderGod();
   renderTrace();
   renderResidentTrace();

@@ -471,6 +471,17 @@ describe("PopulationSystem coming-of-age (HP3-9)", () => {
     expect(world.totalMoney()).toBeCloseTo(start, 6); // seating is non-cash
   });
 
+  it("tallies a child coming of age (demography.grewUp), for the town-life feed", () => {
+    const { sim, population } = createCity({
+      seed: 1,
+      populationOptions: { mortality: true, maxAgeYears: 100, daysPerYear: 2, comingOfAgeYears: 2 },
+    });
+    population.spawnBirth(); // a newborn, origin "born", age 0
+    expect(population.demography().grewUp).toBe(0);
+    sim.run(TICKS_PER_DAY * 6); // ages past the coming-of-age threshold
+    expect(population.demography().grewUp).toBeGreaterThanOrEqual(1);
+  });
+
   it("births + mortality + coming-of-age sustain the WORKFORCE over many years (no death spiral)", () => {
     // The full living cycle on a compressed clock (40y life, 9y adulthood, 30 sim-days
     // /year) so ~36 year-boundaries of births, maturation, and deaths run quickly.

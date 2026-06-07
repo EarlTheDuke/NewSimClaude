@@ -90,6 +90,8 @@ export class PopulationSystem implements System {
   private migratedCount = 0;
   private bornCount = 0;
   private diedCount = 0;
+  /** Children who have reached working age (HP3-9), for the demography feed. */
+  private grewUpCount = 0;
   /** Fractional growth pressure accrued across eligible days; a whole unit admits one person. */
   private pressureAccumulator = 0;
   /** Day the last person arrived, for the cooldown. */
@@ -330,6 +332,7 @@ export class PopulationSystem implements System {
     born: number;
     died: number;
     migrated: number;
+    grewUp: number;
     housingConstrained: boolean;
   } {
     return {
@@ -337,6 +340,7 @@ export class PopulationSystem implements System {
       born: this.bornCount,
       died: this.diedCount,
       migrated: this.migratedCount,
+      grewUp: this.grewUpCount,
       housingConstrained: this.isHousingConstrained(),
     };
   }
@@ -437,6 +441,11 @@ export class PopulationSystem implements System {
       if (r.age === undefined) r.age = this.initialAge(residentIndex(r.id));
     }
     for (const r of this.world.residents) r.age = (r.age ?? 0) + 1;
+    // Tally children who turned working-age this year (exactly once each) — for the
+    // demography feed's "grew up and started working" event.
+    for (const r of this.world.residents) {
+      if (r.origin === "born" && r.age === this.comingOfAgeYears) this.grewUpCount += 1;
+    }
     // Reap the too-old in ascending id order (deterministic), each estate inherited.
     const doomed = this.world.residents
       .filter((r) => (r.age ?? 0) >= this.maxAgeYears)
@@ -503,6 +512,7 @@ export class PopulationSystem implements System {
       migratedCount: this.migratedCount,
       bornCount: this.bornCount,
       diedCount: this.diedCount,
+      grewUpCount: this.grewUpCount,
     };
   }
 
@@ -516,6 +526,7 @@ export class PopulationSystem implements System {
           migratedCount?: number;
           bornCount?: number;
           diedCount?: number;
+          grewUpCount?: number;
         }
       | undefined;
     this.spawnCount = s?.spawnCount ?? 0;
@@ -525,5 +536,6 @@ export class PopulationSystem implements System {
     this.migratedCount = s?.migratedCount ?? 0;
     this.bornCount = s?.bornCount ?? 0;
     this.diedCount = s?.diedCount ?? 0;
+    this.grewUpCount = s?.grewUpCount ?? 0;
   }
 }

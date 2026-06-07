@@ -46,6 +46,12 @@ interface BuildingView {
   selOutline: Graphics;
 }
 
+// Life-stage styling (HP3) — purely visual thresholds so the age structure reads at
+// a glance: children render smaller (a figure that grows toward adult size), elders
+// fade a touch. Absent age (mortality off) ⇒ everyone renders adult ⇒ unchanged.
+const CHILD_MAX_AGE = 18; // below this a resident is a growing child (smaller dot)
+const ELDER_AGE = 60; // at/after this a resident is an elder (slightly faded)
+
 /** Persistent Pixi objects for one resident (created once, mutated per frame). */
 interface ResidentView {
   container: Container;
@@ -578,6 +584,16 @@ export class PixiRenderer implements CityRenderer {
     v.container.position.set(r.move.x + off.dx, r.move.y + off.dy);
     v.dot.tint = ACTIVITY_INT[r.activity];
     v.selGlow.visible = isSelected;
+    // Life-stage size/fade (HP3): a child grows from ~half size to full by adulthood;
+    // an elder fades slightly. Keeps the activity tint intact. No-op when age is unset.
+    const age = r.age;
+    if (age === undefined) {
+      v.container.scale.set(1);
+      v.container.alpha = 1;
+    } else {
+      v.container.scale.set(age < CHILD_MAX_AGE ? 0.55 + 0.45 * (age / CHILD_MAX_AGE) : 1);
+      v.container.alpha = age >= ELDER_AGE ? 0.7 : 1;
+    }
     if (r.move.path.length > 0) {
       const next = this.world.getNode(r.move.path[0]!);
       const dx = next.x - r.move.x;
