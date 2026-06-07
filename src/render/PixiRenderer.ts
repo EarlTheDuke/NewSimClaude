@@ -12,6 +12,7 @@ import {
   COLOCATE_DX,
   ACTIVITY_COLOR,
   DOT_RADIUS,
+  DISASTER_STYLE,
 } from "./CanvasRenderer";
 import type { CityRenderer, Pick, DisasterMarker, ThoughtBubble } from "./CityRenderer";
 
@@ -34,6 +35,7 @@ interface BuildingView {
   windows: Container;
   planks: Graphics;
   label: Text;
+  selOutline: Graphics;
 }
 
 /** Persistent Pixi objects for one resident (created once, mutated per frame). */
@@ -42,6 +44,7 @@ interface ResidentView {
   shadow: Graphics;
   tick: Graphics;
   dot: Graphics;
+  selGlow: Graphics;
 }
 
 /**
@@ -76,6 +79,15 @@ export class PixiRenderer implements CityRenderer {
   private hudLayer: Container | undefined; // screen-fixed (never under the camera)
   private sunC: Container | undefined;
   private moonC: Container | undefined;
+  private overlayWorld: Container | undefined; // world-anchored disaster ring/badge
+  private disasterRing: Graphics | undefined;
+  private disasterBadge: Container | undefined;
+  private disasterBadgeCircle: Graphics | undefined;
+  private disasterGlyph: Text | undefined;
+  private disasterBanner: Container | undefined;
+  private disasterBannerBox: Graphics | undefined;
+  private disasterBannerDot: Graphics | undefined;
+  private disasterBannerText: Text | undefined;
 
   private roadsBuilt = false;
   private readonly buildingViews = new Map<string, BuildingView>();
@@ -109,6 +121,7 @@ export class PixiRenderer implements CityRenderer {
     this.hudLayer = new Container();
     this.app.stage.addChild(this.hudLayer);
     this.buildHud();
+    this.buildDisaster();
     this.ready = true;
     // Deferred first paint when the tab's rAF is throttled (background preview);
     // production's live rAF loop paints next frame regardless.
@@ -116,7 +129,7 @@ export class PixiRenderer implements CityRenderer {
     w.cwlc?.renderFrame?.();
   }
 
-  draw(hourFloat: number, _selected?: Pick, _disaster?: DisasterMarker, _bubbles?: ThoughtBubble[]): void {
+  draw(hourFloat: number, selected?: Pick, disaster?: DisasterMarker, _bubbles?: ThoughtBubble[]): void {
     if (!this.ready || !this.skyGfx || !this.roadsGfx) return;
     const a = ambient(hourFloat);
     const glow = windowGlow(hourFloat);
@@ -139,7 +152,8 @@ export class PixiRenderer implements CityRenderer {
       seen.add(loc.id);
       const view = this.ensureBuildingView(loc);
       const biz = this.world.businesses.find((b) => b.locationId === loc.id);
-      this.updateBuildingView(view, biz, this.occupantsAt(loc.nodeId), a, glow);
+      const isSel = selected?.kind === "business" && !!biz && selected.id === biz.id;
+      this.updateBuildingView(view, biz, this.occupantsAt(loc.nodeId), a, glow, isSel);
     }
     this.reapBuildings(seen);
 
@@ -147,11 +161,13 @@ export class PixiRenderer implements CityRenderer {
     const seenR = new Set<string>();
     for (const r of this.world.residents) {
       seenR.add(r.id);
-      this.updateResidentView(this.ensureResidentView(r.id), r);
+      const isSel = selected?.kind === "resident" && selected.id === r.id;
+      this.updateResidentView(this.ensureResidentView(r.id), r, isSel);
     }
     this.reapResidents(seenR);
 
     this.updateSkyBadge(hourFloat);
+    this.updateDisaster(disaster);
   }
 
   /** Legend (bottom-left) + sun/moon badge (top-right), built once in screen space. */
@@ -230,6 +246,106 @@ export class PixiRenderer implements CityRenderer {
     this.sunC.alpha = Math.min(1, day + 0.02);
   }
 
+  /** Build the (hidden) disaster ring/badge (world-anchored) + banner (screen-fixed). */
+  private buildDisaster(): void {
+    if (!this.worldLayer || !this.hudLayer) return;
+    this.overlayWorld = new Container();
+    this.worldLayer.addChild(this.overlayWorld);
+
+    this.disasterRing = new Graphics();
+    this.disasterRing.visible = false;
+    const badge = new Container();
+    badge.visible = false;
+    const badgeCircle = new Graphics();
+    const glyph = new Text({
+      text: "",
+      style: { fontFamily: "system-ui, sans-serif", fontSize: 11, fontWeight: "bold", fill: 0x0e1116 },
+    });
+    glyph.anchor.set(0.5, 0.5);
+    badge.addChild(badgeCircle, glyph);
+    this.overlayWorld.addChild(this.disasterRing, badge);
+    this.disasterBadge = badge;
+    this.disasterBadgeCircle = badgeCircle;
+    this.disasterGlyph = glyph;
+
+    const banner = new Container();
+    banner.visible = false;
+    const box = new Graphics();
+    const dot = new Graphics();
+    const text = new Text({
+      text: "",
+      style: { fontFamily: "system-ui, sans-serif", fontSize: 12, fontWeight: "bold", fill: 0xe6edf3 },
+    });
+    text.anchor.set(0.5, 0.5);
+    banner.addChild(box, dot, text);
+    this.hudLayer.addChild(banner);
+    this.disasterBanner = banner;
+    this.disasterBannerBox = box;
+    this.disasterBannerDot = dot;
+    this.disasterBannerText = text;
+  }
+
+  /** Flag today's disaster: a ring + glyph over the target + a top-centre banner. */
+  private updateDisaster(disaster?: DisasterMarker): void {
+    const ring = this.disasterRing;
+    const badge = this.disasterBadge;
+    const banner = this.disasterBanner;
+    if (!ring || !badge || !banner) return;
+    if (!disaster) {
+      ring.visible = false;
+      badge.visible = false;
+      banner.visible = false;
+      return;
+    }
+    const style = DISASTER_STYLE[disaster.kind];
+    const color = parseInt(style.color.slice(1), 16);
+    const half = BUILDING / 2;
+    const pos = this.worldPosOf(disaster.targetId);
+    if (pos) {
+      ring.clear();
+      ring.circle(pos.x, pos.y, half + 6).stroke({ width: 2, color });
+      ring.visible = true;
+      badge.position.set(pos.x, pos.y - half - 13);
+      this.disasterBadgeCircle?.clear().circle(0, 0, 8).fill(color);
+      if (this.disasterGlyph) this.disasterGlyph.text = style.glyph;
+      badge.visible = true;
+    } else {
+      ring.visible = false;
+      badge.visible = false;
+    }
+    const text = this.disasterBannerText!;
+    text.text = disaster.headline;
+    text.style.fill = color;
+    const w = Math.min(WIDTH - 40, text.width + 32);
+    const h = 22;
+    const x = (WIDTH - w) / 2;
+    const y = 8;
+    this.disasterBannerBox
+      ?.clear()
+      .rect(x, y, w, h)
+      .fill({ color: 0x0e1116, alpha: 0.82 })
+      .stroke({ width: 1.5, color });
+    this.disasterBannerDot?.clear().circle(x + 12, y + h / 2, 4).fill(color);
+    text.position.set(x + w / 2 + 8, y + h / 2);
+    banner.visible = true;
+  }
+
+  /** World position of a disaster target (a building's slot, or a resident's spot). */
+  private worldPosOf(targetId?: string): { x: number; y: number } | undefined {
+    if (!targetId) return undefined;
+    const biz = this.world.businesses.find((b) => b.id === targetId);
+    if (biz) {
+      const loc = this.world.locations.find((l) => l.id === biz.locationId);
+      if (loc) {
+        const slot = this.buildingSlot(loc);
+        return { x: slot.x, y: slot.y };
+      }
+    }
+    const res = this.world.residents.find((r) => r.id === targetId);
+    if (res) return { x: res.move.x, y: res.move.y };
+    return undefined;
+  }
+
   private ensureRoads(): void {
     if (this.roadsBuilt || !this.roadsGfx) return;
     for (const road of this.world.roads) {
@@ -285,10 +401,13 @@ export class PixiRenderer implements CityRenderer {
     label.anchor.set(0.5, 0.5);
     label.position.set(0, half + 11 + slot.line * 11);
 
-    container.addChild(base, windows, mask, planks, label);
+    const selOutline = new Graphics();
+    selOutline.rect(-half - 2, -half - 2, BUILDING + 4, BUILDING + 4).stroke({ width: 2, color: 0xffffff });
+    selOutline.visible = false;
+    container.addChild(base, windows, mask, planks, label, selOutline);
     this.buildingsLayer?.addChild(container);
 
-    const view: BuildingView = { container, base, windows, planks, label };
+    const view: BuildingView = { container, base, windows, planks, label, selOutline };
     this.buildingViews.set(loc.id, view);
     return view;
   }
@@ -299,6 +418,7 @@ export class PixiRenderer implements CityRenderer {
     occupants: number,
     a: number,
     glow: number,
+    isSelected: boolean,
   ): void {
     if (biz && !biz.active) {
       v.base.tint = dimInt(CLOSED_RGB, a);
@@ -314,6 +434,7 @@ export class PixiRenderer implements CityRenderer {
       v.windows.alpha = lit;
     }
     v.label.tint = dimInt(LABEL_RGB, Math.max(a, 0.7));
+    v.selOutline.visible = isSelected;
   }
 
   /** Remove views whose location is gone (e.g. after a Load swaps the world). */
@@ -339,16 +460,20 @@ export class PixiRenderer implements CityRenderer {
     const dot = new Graphics();
     dot.circle(0, 0, DOT_RADIUS).fill(0xffffff);
     dot.stroke({ width: 1, color: 0x000000, alpha: 0.55 });
-    container.addChild(shadow, tick, dot);
+    const selGlow = new Graphics();
+    selGlow.circle(0, 0, DOT_RADIUS + 3).stroke({ width: 2, color: 0xffffff });
+    selGlow.visible = false;
+    container.addChild(shadow, tick, dot, selGlow);
     this.residentsLayer?.addChild(container);
-    const view: ResidentView = { container, shadow, tick, dot };
+    const view: ResidentView = { container, shadow, tick, dot, selGlow };
     this.residentViews.set(id, view);
     return view;
   }
 
-  private updateResidentView(v: ResidentView, r: Resident): void {
+  private updateResidentView(v: ResidentView, r: Resident, isSelected: boolean): void {
     v.container.position.set(r.move.x, r.move.y);
     v.dot.tint = ACTIVITY_INT[r.activity];
+    v.selGlow.visible = isSelected;
     if (r.move.path.length > 0) {
       const next = this.world.getNode(r.move.path[0]!);
       const dx = next.x - r.move.x;
