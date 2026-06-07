@@ -105,7 +105,11 @@ The unique value, shipped first, at zero risk. Pure read-only overlay over today
   reason + the triggering numbers. `typecheck + test:run + build` green; determinism + soak
   untouched (no sim change).
 
-### R2 — Rendering foundation: port to Pixi.js + camera *(parity-first, gated)*
+### R2 — Rendering foundation: port to Pixi.js + camera *(parity-first, gated)* · ✅ SHIPPED 2026-06-06
+> Shipped R2a–R2i (see [PHASE-RENDER-R2.md](PHASE-RENDER-R2.md)): Pixi v8 behind a swap flag →
+> pixel-exact parity for roads/buildings/residents/HUD/selection/disasters/bubbles + picking →
+> default flipped to Pixi (`?renderer=canvas` rollback) → pan/zoom/follow camera. 328 tests
+> green; sim untouched; every element verified live via Pixi `extract` pixel reads.
 Replace the raw-canvas draw with a Pixi scene graph **at feature parity** (roads, buildings,
 residents, day/night tint, window glow, disaster marker, selection, picking) behind the same
 read-only contract — then add **pan/zoom (drag + scroll) and follow-cam** on the selected

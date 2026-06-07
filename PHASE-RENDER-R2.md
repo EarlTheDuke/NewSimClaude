@@ -1,5 +1,12 @@
 # PHASE-RENDER R2 — Port the renderer to Pixi.js + camera
 
+> **STATUS: ✅ COMPLETE (2026-06-06).** All slices R2a–R2i shipped + verified, 328 tests green.
+> Default renderer is now Pixi (WebGL); `?renderer=canvas` rolls back to the original. Pan/zoom
+> (wheel)/drag + double-click reset + follow-cam on selection are live. Glow halos remain the
+> 3 documented soft-stroke approximations. Next: R3 (sprites — buildings scale with capital,
+> visible workers) per PHASE-RENDER.md.
+
+
 > Companion to [VISION-RENDER.md](VISION-RENDER.md) / [PHASE-RENDER.md](PHASE-RENDER.md). R2 is the
 > **Pixi foundation**: swap the proven `CanvasRenderer` for a `PixiRenderer` behind a flag, reach
 > signed-off **parity first**, then add pan/zoom/follow. House cadence — small flag-gated sub-slices,
