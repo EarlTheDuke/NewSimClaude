@@ -105,9 +105,14 @@ export const MAX_WAGE_MULT = 2; // wage may not exceed this multiple of the job'
  * storefronts richer employers — the lowest-wage producer goes crewless, starves the chain,
  * the factory dies, and the invest/brand engine can't compound (it loses its supply).
  * Flooring producer wages keeps the chain staffed so the engine sustains. Default 0 ⇒
- * today's seeds ⇒ byte-identical; engaged (~0.16) ⇒ producers compete for labour.
+ * today's seeds ⇒ byte-identical; engaged at 0.12 ⇒ producers compete for labour.
+ * Why 0.12: a floor sweep (seeds 1 & 7) showed the engine sustains for any floor ≥ 0.08
+ * (at 0, the factory dies and goods capital never leaves baseline), while the two-diner
+ * truce survives only up to 0.14 — 0.16 pushed producers to near-parity with the diner's
+ * 0.17 base and starved the second diner. 0.12 maximises sustained goods capital/brand
+ * (~2600) AND keeps every producer fully crewed AND preserves the truce.
  */
-export const PRODUCER_WAGE_FLOOR = 0;
+export const PRODUCER_WAGE_FLOOR = 0.12;
 export const JOB_CHANGE_COOLDOWN_DAYS = 5; // min days between a resident's job switches
 export const RAISE_COOLDOWN_DAYS = 7; // min days between a resident's raise requests
 

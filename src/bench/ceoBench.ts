@@ -126,6 +126,9 @@ function setupScenario(config: CeoBenchConfig): {
     wealthElasticity: BENCH_WEALTH_ELASTICITY,
     ownerDividendShare: BENCH_OWNER_DIVIDEND_SHARE,
     brandElasticity: BENCH_BRAND_DEMAND_ELASTICITY,
+    // Freeze the producer wage floor too (Phase 18-pre): it lifts the CEO's input
+    // costs via the cost-plus B2B floor, which would drift historical scores.
+    producerWageFloor: 0,
     residentBrain: config.residentBrain ?? "off",
     agenticResidentIds: config.agenticResidentIds,
   });

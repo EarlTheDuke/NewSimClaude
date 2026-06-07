@@ -119,7 +119,11 @@ describe("MarketSystem (Phase 4 B2B layer)", () => {
         // force*, which is orthogonal to wealth-elastic demand. With the knob on,
         // higher demand legitimately firms prices above base (covered separately
         // in elasticity.test) — that would mask the reversion mechanism here.
-        const { sim, market } = createCity({ seed, wealthElasticity: 0 });
+        // Likewise freeze the producer wage floor (Phase 18-pre): a higher floor
+        // lifts producers' cost-plus B2B floor above base, so prices correctly
+        // settle at cost, not base — the cost-plus mechanism, covered by the
+        // "never trades a staffed processor's output below its input" test below.
+        const { sim, market } = createCity({ seed, wealthElasticity: 0, producerWageFloor: 0 });
         sim.run(TICKS_PER_DAY * 120);
         for (const r of RESOURCES) {
           expect(market.priceBook()[r]).toBeCloseTo(BASE_RESOURCE_PRICE[r], 6);

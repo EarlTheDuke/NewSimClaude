@@ -447,3 +447,65 @@ describe("Phase 13c — the invest loop closes", () => {
     }
   });
 });
+
+/**
+ * Phase 18-pre — the engine SUSTAINS over multiple years (producer wage floor).
+ *
+ * The 13c test above froze brand off and only proved a *one-year* burst — its own
+ * note conceded capital "peaks then decays over multiple years". The real cause was
+ * the shared 12-resident labour pool: once Phase 17's brand demand growth made the
+ * storefronts richer employers, the cheapest producer (mine, seeded 0.05/tick) lost
+ * its crew, which starved the factory, which killed goods' supply, which let the
+ * brand/invest engine decay. {@link PRODUCER_WAGE_FLOOR} (real-world: a mine has to
+ * pay a competitive wage to keep miners) keeps the whole chain staffed so the engine
+ * compounds instead of self-extinguishing.
+ *
+ * This is an A/B that isolates the floor as the cause: the *only* difference between
+ * the two runs is `producerWageFloor`, and it decides whether the engine lives.
+ */
+describe("Phase 18-pre — the engine sustains over multiple years (producer wage floor)", () => {
+  const runEngine = (producerWageFloor: number) => {
+    // Full-live city with the brand demand engine ON (live default elasticity) —
+    // this is the regime that used to collapse the supply chain.
+    const { sim, world } = createCity({
+      seed: 1,
+      brain: "rules",
+      residentBrain: "rules",
+      producerWageFloor,
+      agenticBusinessIds: ["biz_diner", "biz_goods", "biz_farm", "biz_factory", "biz_mine", "biz_bakery"],
+      agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
+    });
+    const startMoney = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 365 * 2); // two years — well past where the engine used to decay
+    const goods = world.getBusiness("biz_goods")!;
+    return {
+      goodsCapital: goods.capital ?? CAPITAL_BASELINE,
+      factoryActive: world.getBusiness("biz_factory")!.active,
+      producersCrewed: ["biz_farm", "biz_mine", "biz_bakery", "biz_factory"].every(
+        (id) => world.getBusiness(id)!.employeeIds.length > 0,
+      ),
+      money: world.totalMoney(),
+      startMoney,
+    };
+  };
+
+  it("compounds with the floor and decays without it — and conserves money either way", () => {
+    const off = runEngine(0); // control: the old behaviour, chain starves
+    const on = runEngine(0.12); // live default: chain stays staffed
+
+    // WITHOUT the floor the engine self-extinguishes: the factory dies and goods'
+    // capital never leaves baseline (it has no supply to sell, so nothing to invest).
+    expect(off.factoryActive).toBe(false);
+    expect(off.goodsCapital).toBeLessThan(CAPITAL_BASELINE * 2);
+
+    // WITH the floor the chain holds and the engine compounds materially.
+    expect(on.factoryActive).toBe(true);
+    expect(on.producersCrewed).toBe(true);
+    expect(on.goodsCapital).toBeGreaterThan(CAPITAL_BASELINE * 5); // ~25x baseline in practice
+    expect(on.goodsCapital).toBeGreaterThan(off.goodsCapital * 5); // the floor is the cause
+
+    // Sacred: the closed economy still balances to the cent in both regimes.
+    expect(on.money).toBeCloseTo(on.startMoney, 2);
+    expect(off.money).toBeCloseTo(off.startMoney, 2);
+  });
+});
