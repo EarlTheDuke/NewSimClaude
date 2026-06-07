@@ -13,6 +13,7 @@ import { NeedsSystem } from "./systems/NeedsSystem";
 import { LifecycleSystem } from "./systems/LifecycleSystem";
 import { BusinessEntrySystem } from "./systems/BusinessEntrySystem";
 import { MacroSystem } from "./systems/MacroSystem";
+import { PopulationSystem } from "./systems/PopulationSystem";
 import { BusinessAgentSystem } from "./systems/BusinessAgentSystem";
 import { ResidentAgentSystem } from "./systems/ResidentAgentSystem";
 import { RuleBasedProvider } from "./ai/RuleBasedProvider";
@@ -77,6 +78,12 @@ export interface CitySimOptions extends CityOptions {
    * system that would otherwise refill the niche it opens.
    */
   businessEntry?: boolean;
+  /**
+   * Toggle population growth (HP3). Defaults to the live {@link POPULATION_GROWTH}
+   * (false); pass true to admit new $0 residents into spare housing over time so
+   * firms gain real customers and the labour pool can staff every firm.
+   */
+  populationGrowth?: boolean;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -98,6 +105,7 @@ export function createCity(options: CitySimOptions = {}): {
   residentAgent?: ResidentAgentSystem;
   events?: EventSystem;
   entry: BusinessEntrySystem;
+  population: PopulationSystem;
   god: GodMode;
 } {
   const seed = options.seed ?? 1;
@@ -181,10 +189,17 @@ export function createCity(options: CitySimOptions = {}): {
   const macro = new MacroSystem(world, market);
   sim.addSystem(macro);
 
+  // Population growth runs LAST — after macro has sampled the fully-settled day —
+  // so a newcomer admitted today is counted from tomorrow and never perturbs the
+  // vitals just measured. Inert unless populationGrowth is on (HP3): with it off
+  // (the default) the seeded city is byte-identical.
+  const population = new PopulationSystem(world, options.populationGrowth);
+  sim.addSystem(population);
+
   // God Mode is a controller, not a system: it never runs in the tick loop, so
   // its mere presence is inert and a hands-off run is unchanged. It reads the
   // sim clock to stamp interventions and mirrors forced disasters into `events`.
   const god = new GodMode(world, market, sim.time, seed, events);
 
-  return { sim, world, market, macro, agent, residentAgent, events, entry, god };
+  return { sim, world, market, macro, agent, residentAgent, events, entry, population, god };
 }

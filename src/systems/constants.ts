@@ -3,7 +3,7 @@
  * chosen so a resident sleeps ~at night, works the day, eats once or twice,
  * and money stays in healthy circulation across the closed economy.
  */
-import type { BusinessKind, ResourceKind, WorkSchedule } from "../world/types";
+import type { BusinessKind, Needs, ResourceKind, WorkSchedule } from "../world/types";
 
 // Daily schedule (hour of day, 0..23)
 export const SLEEP_START_HOUR = 22;
@@ -55,6 +55,27 @@ export const VEHICLE_SPEED_MULT = 1.6; // a vehicle owner covers more ground per
 export const HOME_CAPACITY_MAX = 5; // capacity of the priciest/biggest home
 export const HOME_CAPACITY_MIN = 2; // capacity of the cheapest/smallest home
 export const HOME_MOVE_MIN_SAVING = 6; // min daily rent saving to bother moving home
+
+// Population growth (HP3) — the town can grow over time so firms gain real
+// customers and the labour pool can staff every firm (today's 12 residents are
+// BOTH the whole workforce AND the whole customer base). HP1 seeded housing with
+// slack; growth fills the vacancies. Everything here is default-OFF / inert until
+// engaged, so the seam ships byte-identical.
+//
+// Real-world: a small town that's doing well attracts newcomers (and, later,
+// families have children) — but only as fast as there are homes to live in and
+// work to do, so growth is gated on spare housing + open jobs + prosperity.
+export const POPULATION_GROWTH = false; // master flag: in-migration of $0 newcomers
+export const IN_MIGRATION_COOLDOWN_DAYS = 5; // min days between arrivals (hysteresis, like ENTRY_COOLDOWN_DAYS)
+export const MIGRATION_RATE_PER_DAY = 0.1; // growth pressure accrued per eligible day; ~1 arrival per 10 good days
+export const MIGRATION_PROSPERITY_FLOOR = 600; // median resident cash the town must clear to attract a newcomer
+/**
+ * The fixed needs a newcomer arrives with (HP3). A constant — NOT an RNG draw —
+ * so admitting a person consumes no random numbers and the seeded population's
+ * RNG stream stays byte-identical (determinism is sacred). A content, rested
+ * arrival who'll settle into the daily needs loop like everyone else.
+ */
+export const NEWCOMER_NEEDS: Needs = { hunger: 80, energy: 85, social: 70 };
 
 // Economy
 export const RENT_PER_DAY = 70; // resident -> landlord (fallback when a home has no rent set)
