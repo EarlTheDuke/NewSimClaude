@@ -92,3 +92,19 @@ export function hexToRgb(hex: string): Rgb {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
+
+/**
+ * The integer-tint twin of {@link dim} (visualization R2). Same per-channel
+ * `Math.round(channel * factor)`, packed into a single `0xRRGGBB` number for Pixi
+ * `.tint` — which cannot take `dim()`'s `"rgb(r, g, b)"` string. Applied as the tint
+ * of a **white** display object (white = identity multiply), the rendered colour
+ * equals `dim()` channel-for-channel, modulo the GPU's final 8-bit quantization. Use
+ * this for every Pixi-tinted element so the WebGL look matches the canvas exactly.
+ */
+export function dimInt(rgb: Rgb, factor: number): number {
+  const f = Math.max(0, Math.min(1, factor));
+  const r = Math.round(Math.max(0, Math.min(255, rgb[0] * f)));
+  const g = Math.round(Math.max(0, Math.min(255, rgb[1] * f)));
+  const b = Math.round(Math.max(0, Math.min(255, rgb[2] * f)));
+  return (r << 16) | (g << 8) | b;
+}

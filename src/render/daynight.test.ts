@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ambient, windowGlow, skyColor, dim, hexToRgb, NIGHT_AMBIENT } from "./daynight";
+import { ambient, windowGlow, skyColor, dim, dimInt, hexToRgb, NIGHT_AMBIENT, type Rgb } from "./daynight";
 
 const luminance = (hex: string): number => {
   const [r, g, b] = hexToRgb(hex);
@@ -78,6 +78,36 @@ describe("daynight palette (Phase 5)", () => {
     it("clamps factors outside [0, 1]", () => {
       expect(dim([10, 20, 30], -5)).toBe("rgb(0, 0, 0)");
       expect(dim([10, 20, 30], 5)).toBe("rgb(10, 20, 30)");
+    });
+  });
+
+  describe("dimInt (Pixi tint parity)", () => {
+    const unpack = (n: number): Rgb => [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    const parseDim = (s: string): Rgb => {
+      const m = s.match(/rgb\((\d+), (\d+), (\d+)\)/)!;
+      return [Number(m[1]), Number(m[2]), Number(m[3])];
+    };
+
+    it("packs exactly the channels dim() rounds — so a white object tinted by it matches the canvas", () => {
+      const samples: Rgb[] = [
+        [200, 100, 50],
+        [43, 47, 58], // ROAD_RGB
+        [31, 74, 122], // a building base
+        [174, 180, 189], // LABEL_RGB
+        [255, 255, 255],
+      ];
+      for (const rgb of samples) {
+        for (const f of [0, 0.5, NIGHT_AMBIENT, ambient(0), ambient(12), 0.7, 1]) {
+          expect(unpack(dimInt(rgb, f))).toEqual(parseDim(dim(rgb, f)));
+        }
+      }
+    });
+
+    it("is black at factor 0, the packed original at 1, and clamps out-of-range", () => {
+      expect(dimInt([200, 100, 50], 0)).toBe(0x000000);
+      expect(dimInt([200, 100, 50], 1)).toBe((200 << 16) | (100 << 8) | 50);
+      expect(dimInt([10, 20, 30], -5)).toBe(0);
+      expect(dimInt([10, 20, 30], 5)).toBe((10 << 16) | (20 << 8) | 30);
     });
   });
 

@@ -4,7 +4,7 @@ import type { DisasterKind } from "../systems/disasters";
 import { skyColor, ambient, windowGlow, dim, hexToRgb, type Rgb } from "./daynight";
 import type { CityRenderer } from "./CityRenderer";
 
-const ACTIVITY_COLOR: Record<Activity, string> = {
+export const ACTIVITY_COLOR: Record<Activity, string> = {
   sleeping: "#5b6ee1",
   working: "#5bd16e",
   eating: "#e1a35b",
@@ -23,22 +23,24 @@ const BUSINESS_HEX: Record<BusinessKind, string> = {
   factory: "#5a2f6e",
 };
 
-const BUSINESS_RGB = Object.fromEntries(
+export const BUSINESS_RGB = Object.fromEntries(
   Object.entries(BUSINESS_HEX).map(([k, v]) => [k, hexToRgb(v)]),
 ) as Record<BusinessKind, Rgb>;
 
-const HOME_RGB = hexToRgb("#3a3320");
-const ROAD_RGB: Rgb = [43, 47, 58]; // #2b2f3a
-const CLOSED_RGB: Rgb = [46, 46, 52];
-const LABEL_RGB: Rgb = [174, 180, 189];
+// Shared rendering palette/geometry — exported so the Pixi renderer (R2) reproduces
+// the exact same colours and sizes for parity. The canvas renderer is their origin.
+export const HOME_RGB = hexToRgb("#3a3320");
+export const ROAD_RGB: Rgb = [43, 47, 58]; // #2b2f3a
+export const CLOSED_RGB: Rgb = [46, 46, 52];
+export const LABEL_RGB: Rgb = [174, 180, 189];
 
-const BUILDING = 26;
-const DOT_RADIUS = 5;
+export const BUILDING = 26;
+export const DOT_RADIUS = 5;
 /** Horizontal fan-out for buildings that share one map node (a strip mall). */
-const COLOCATE_DX = 34;
+export const COLOCATE_DX = 34;
 
 /** Per-kind glyph + accent colour for the on-canvas disaster marker. */
-const DISASTER_STYLE: Record<DisasterKind, { color: string; glyph: string }> = {
+export const DISASTER_STYLE: Record<DisasterKind, { color: string; glyph: string }> = {
   fire: { color: "#e0533a", glyph: "!" },
   festival: { color: "#e1d65b", glyph: "*" },
   illness: { color: "#5bd1c0", glyph: "+" },
