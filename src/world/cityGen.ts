@@ -83,6 +83,13 @@ export interface CityOptions {
    * Off by default, so every existing seed/test stays byte-identical.
    */
   secondDiner?: boolean;
+  /**
+   * Override the {@link PRODUCER_WAGE_FLOOR} for this city (Phase 18-pre). Defaults to
+   * the live constant; benchmark + isolated-mechanism tests pass 0 to freeze it, so a
+   * wage-structure change never drifts their signal — the same discipline as the bench's
+   * frozen demand/dividend knobs.
+   */
+  producerWageFloor?: number;
 }
 
 export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
@@ -159,9 +166,10 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
   // growth (default 0 ⇒ the if-block skips ⇒ byte-identical). Applied before baseWagePerTick
   // is set below, so the floor becomes the producer's stable base.
   const producerKinds = new Set(["farm", "mine", "bakery", "factory"]);
-  if (PRODUCER_WAGE_FLOOR > 0) {
+  const wageFloor = options.producerWageFloor ?? PRODUCER_WAGE_FLOOR;
+  if (wageFloor > 0) {
     for (const b of businesses) {
-      if (producerKinds.has(b.kind)) b.wagePerTick = Math.max(b.wagePerTick, PRODUCER_WAGE_FLOOR);
+      if (producerKinds.has(b.kind)) b.wagePerTick = Math.max(b.wagePerTick, wageFloor);
     }
   }
   for (const b of businesses) b.baseWagePerTick = b.wagePerTick;
