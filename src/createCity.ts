@@ -13,7 +13,7 @@ import { NeedsSystem } from "./systems/NeedsSystem";
 import { LifecycleSystem } from "./systems/LifecycleSystem";
 import { BusinessEntrySystem } from "./systems/BusinessEntrySystem";
 import { MacroSystem } from "./systems/MacroSystem";
-import { PopulationSystem } from "./systems/PopulationSystem";
+import { PopulationSystem, type PopulationOptions } from "./systems/PopulationSystem";
 import { BusinessAgentSystem } from "./systems/BusinessAgentSystem";
 import { ResidentAgentSystem } from "./systems/ResidentAgentSystem";
 import { RuleBasedProvider } from "./ai/RuleBasedProvider";
@@ -84,6 +84,8 @@ export interface CitySimOptions extends CityOptions {
    * firms gain real customers and the labour pool can staff every firm.
    */
   populationGrowth?: boolean;
+  /** Override population growth knobs (HP3 rate/cooldown/prosperity). Defaults to the live constants. */
+  populationOptions?: PopulationOptions;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -193,7 +195,7 @@ export function createCity(options: CitySimOptions = {}): {
   // so a newcomer admitted today is counted from tomorrow and never perturbs the
   // vitals just measured. Inert unless populationGrowth is on (HP3): with it off
   // (the default) the seeded city is byte-identical.
-  const population = new PopulationSystem(world, options.populationGrowth);
+  const population = new PopulationSystem(world, options.populationGrowth, options.populationOptions);
   sim.addSystem(population);
 
   // God Mode is a controller, not a system: it never runs in the tick loop, so

@@ -122,3 +122,90 @@ describe("PopulationSystem spawn primitive (HP3-4)", () => {
     expect(a.world.serialize()).toEqual(b.world.serialize());
   });
 });
+
+describe("PopulationSystem growth trigger (HP3-5)", () => {
+  const homeCapacity = (world: ReturnType<typeof createCity>["world"]) =>
+    world.locations.filter((l) => l.type === "home").reduce((s, l) => s + (l.capacity ?? 0), 0);
+
+  it("a prosperous town grows to fill its housing, then plateaus at the cap", () => {
+    // prosperityFloor 0 => the wealth gate is always open, isolating the growth loop.
+    const { sim, world } = createCity({
+      seed: 1,
+      populationGrowth: true,
+      populationOptions: { prosperityFloor: 0 },
+    });
+    const start = world.totalMoney();
+    const cap = homeCapacity(world); // 18 for the default town
+
+    sim.run(TICKS_PER_DAY * 200);
+    expect(world.residents.length).toBe(cap); // grew to the housing ceiling
+    expect(cap).toBeGreaterThan(12);
+
+    // No home was ever pushed past its capacity.
+    const occ = occupantsByHome(world.residents);
+    for (const l of world.locations) {
+      if (l.type === "home") expect(occ.get(l.id) ?? 0).toBeLessThanOrEqual(l.capacity ?? 99);
+    }
+
+    // Plateau: another full year admits no one (housing is the hard ceiling -> HP4),
+    // and the closed economy still balances despite a 50% bigger population.
+    sim.run(TICKS_PER_DAY * 365);
+    expect(world.residents.length).toBe(cap);
+    expect(world.totalMoney()).toBeCloseTo(start, 2);
+  });
+
+  it("seats a newcomer into a short-staffed producer (the headline win)", () => {
+    // residentCount 11 leaves the factory one seat short, with nobody jobless.
+    const { sim, world } = createCity({
+      seed: 1,
+      residentCount: 11,
+      populationGrowth: true,
+      populationOptions: { prosperityFloor: 0 },
+    });
+    expect(world.getBusiness("biz_factory")!.employeeIds.length).toBe(1); // short at seed
+
+    sim.run(TICKS_PER_DAY * 200);
+
+    // The newcomer took the open seat, so the producer is fully crewed (=> full
+    // output): growth is productive, not just more mouths. Every producer crewed.
+    for (const id of ["biz_farm", "biz_mine", "biz_bakery", "biz_factory"]) {
+      expect(world.getBusiness(id)!.employeeIds.length).toBe(2);
+    }
+  });
+
+  it("growth is deterministic and money-conserving", () => {
+    const opts = { seed: 4, populationGrowth: true, populationOptions: { prosperityFloor: 0 } };
+    const a = createCity(opts);
+    const b = createCity(opts);
+    const start = a.world.totalMoney();
+    a.sim.run(TICKS_PER_DAY * 150);
+    b.sim.run(TICKS_PER_DAY * 150);
+    expect(a.world.serialize()).toEqual(b.world.serialize());
+    expect(a.world.residents.length).toBeGreaterThan(12); // it actually grew
+    expect(a.world.totalMoney()).toBeCloseTo(start, 2);
+  });
+
+  it("the real (agentic) economy grows to capacity on the live default floor and stays healthy", () => {
+    const { sim, world } = createCity({
+      seed: 1,
+      brain: "rules",
+      residentBrain: "rules",
+      populationGrowth: true,
+      agenticBusinessIds: ["biz_diner", "biz_goods", "biz_farm", "biz_factory", "biz_mine", "biz_bakery"],
+      agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
+    });
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 365 * 2);
+
+    expect(world.residents.length).toBe(homeCapacity(world)); // reaches the cap on the real economy
+    const occ = occupantsByHome(world.residents);
+    for (const l of world.locations) {
+      if (l.type === "home") expect(occ.get(l.id) ?? 0).toBeLessThanOrEqual(l.capacity ?? 99);
+    }
+    // Healthy: the supply chain survives the bigger population, money is conserved,
+    // and nobody is in the red.
+    expect(new Set(world.businesses.filter((b) => b.active).map((b) => b.kind)).size).toBeGreaterThanOrEqual(4);
+    expect(world.totalMoney()).toBeCloseTo(start, 2);
+    for (const r of world.residents) expect(r.money).toBeGreaterThanOrEqual(0);
+  });
+});
