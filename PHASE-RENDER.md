@@ -119,7 +119,11 @@ which Pixi provides).
 - **GATE:** the city renders in Pixi at visual parity with R1; pan/zoom/follow works; FPS ≥ the
   old renderer; the 1000-day soak + save/reload are byte-identical (sim untouched); tests green.
 
-### R3 — Buildings & people come alive *(visual economic state; sprites)*
+### R3 — Buildings & people come alive *(visual economic state; sprites)* · ✅ SHIPPED 2026-06-06
+> Pixi-only (canvas fallback unchanged): capital **prosperity glow**, **inventory fill bar**, and
+> **worker figures** per active firm, driven by the pure (tested) `economyVisuals.ts` mappings.
+> Verified live (goods capital 2675 → full glow; 2 worker dots = 2 staff). Residents-as-walking-
+> sprites deferred (dots retained). 332 tests green; sim untouched.
 Procedural sprites replacing squares/dots: buildings whose **size/glow scales with capital
 stock**, a **warehouse fill bar for inventory**, **visible little worker figures** for staff
 count, mournful shuttered buildings; residents as small walking figures colored by activity with
