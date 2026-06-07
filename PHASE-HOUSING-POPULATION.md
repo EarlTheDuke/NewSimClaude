@@ -79,18 +79,22 @@ housing+prosperity gate self-limits as designed; in-migration is a strong stabil
    *unstaffed* producer is still "active" — so it missed the staffing/production collapse.
 
 **Next steps (ranked):**
-1. **Coming-of-age (keystone):** newborns become working-age (~18 yr) and join the labour
-   market → births+mortality becomes a TRUE sustainable cycle; re-enable mortality after.
+1. ✅ **DONE — Coming-of-age (HP3-9, `bc9f6b5`):** grown children (and adults displaced by a
+   dead firm) take open producer seats each year, so the workers mortality removes are
+   replaced. **Fixes the death spiral** — verified over a 40-year live-clock run: employment
+   holds ~13/16, every producer kind stays staffed (`222222`) and producing, revenue grows to
+   ~1.08M, money conserved. **Mortality re-enabled in the live game.** A real demographic cycle.
 2. **Labour-aware spawn balance:** prefer a working-age migrant when producer seats are open
-   and job-seekers are few; else a birth. (Could ship before #1 as a partial fix.)
-3. **Strengthen the soak:** assert producers stay staffed / output > 0 over a longer horizon,
-   so a regression like the spiral is caught.
-4. **HP4 — housing construction** (cost = transfer, conserved) to lift the ceiling past 18 →
-   sustained growth instead of a one-time jump.
-5. **Make new residents full agents** (add to the decision roster) for lifelike participation.
-6. **Demography HUD** (N / births / deaths / jobless / $-per-capita; the data already exists
+   and job-seekers are few; else a birth. (Coming-of-age's employ step already re-seats
+   displaced adults, so this is now a refinement, not a necessity.)
+3. **HP4 — housing construction** (cost = transfer, conserved) to lift the ceiling past 18 →
+   sustained growth instead of a one-time jump. *(Now the top open item.)*
+4. **Make new residents full agents** (add to the decision roster) for lifelike participation —
+   today migrants/grown-children are employed by the population system but don't job-switch,
+   negotiate raises, or spend deliberately.
+5. **Demography HUD** (N / births / deaths / jobless / $-per-capita; the data already exists
    via `population.demography()`) for watchability.
-7. **Per-capita dilution:** decide whether a fixed money supply is right as N grows, or whether
+6. **Per-capita dilution:** decide whether a fixed money supply is right as N grows, or whether
    population-scaled money creation (ties to the shelved Phase 18 credit track) is needed.
 
 ---
