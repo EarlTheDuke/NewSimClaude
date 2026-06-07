@@ -52,6 +52,17 @@ mind sets it.
    **Lesson:** the paradox-of-thrift coupling is real + measured. Retain can't ship
    standalone — it needs slice 3 first (so reinvestment *compounds* instead of
    self-limiting), or to be offered to the LM CEO only (no rules-economy disruption).
+   **— SHIPPED 2026-06-06 (commit `94a1b1b`) via the LM-CEO path.** Context changed: the
+   Phase-18-pre producer-wage-floor fix (`PRODUCER_WAGE_FLOOR=0.12`) already closed the
+   investment loop — capital compounds ~25× over 2yr with `payoutRate=1`, no retain needed
+   (NORTH-STAR #3 met). So re-attempting the refuted *rules-brain* retain is now low-value
+   (the engine compounds without it) **and** still risks the demand-pump disruption. Instead
+   we took the doc's endorsed safe path: `setPayout` is now a real lever for the **LM CEO** —
+   `BusinessObservation.payoutRate` surfaces the current stance, and `ClaudeDecisionProvider`
+   offers/parses `setPayout` (prompt + tool schema + observation text). The **rules brain
+   stays silent**, so every rules/off test + soak is byte-identical; only LM runs see it.
+   305 tests green. This fulfils the phase's stated purpose — *give the CEO the
+   retain-vs-distribute choice* — without re-breaking the living economy.
 3. **Make reinvestment pay.** Couple so retained → invested → grows revenue.
    **— Probed 2026-06-06; TARGET_CAPITAL_SCALING (re-fire 14c) REFUTED.** Measured the
    full agentic economy (3 yr, seeds 1 & 7), flag off vs on:
