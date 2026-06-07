@@ -117,6 +117,20 @@ export const HOME_BUILD_CAPACITY = 3; // occupancy of a newly built home
 export const HOME_BUILD_RENT = 60; // daily rent of a newly built home (mid-tier, so it doesn't trigger churn)
 export const HOME_BUILD_COOLDOWN_DAYS = 20; // min days between builds (paces the staircase)
 
+// Dynamic rent (HP2) — rent responds to housing scarcity: as the town fills up rents
+// climb; when there's slack (or the landlord builds more) they ease back. Makes
+// housing a real market and gives the landlord meaning — scarcity lifts its rent
+// income, which (with HP4) funds the construction that relieves the scarcity: a
+// supply-demand loop. Default-OFF ⇒ rents stay at their seeded values ⇒ byte-identical.
+// Real-world: a tight rental market pushes rents up; vacancies and new building pull
+// them down.
+export const DYNAMIC_RENT = false; // master flag
+export const RENT_NEUTRAL_OCCUPANCY = 0.8; // town occupancy at which rent sits at its base
+export const RENT_SCARCITY_SENSITIVITY = 1.0; // how strongly rent responds to occupancy deviation
+export const RENT_MIN_MULT = 0.75; // rent floor as a fraction of base (deep slack)
+export const RENT_MAX_MULT = 1.3; // rent ceiling as a fraction of base (full town)
+export const RENT_ADJUST_FRACTION = 0.1; // daily drift toward the scarcity target (smoothing)
+
 // Economy
 export const RENT_PER_DAY = 70; // resident -> landlord (fallback when a home has no rent set)
 export const BUSINESS_RENT_PER_DAY = 60; // diner/goods -> landlord

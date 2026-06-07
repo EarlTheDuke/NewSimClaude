@@ -24,6 +24,12 @@ import {
   HOME_BUILD_CAPACITY,
   HOME_BUILD_RENT,
   HOME_BUILD_COOLDOWN_DAYS,
+  DYNAMIC_RENT,
+  RENT_NEUTRAL_OCCUPANCY,
+  RENT_SCARCITY_SENSITIVITY,
+  RENT_MIN_MULT,
+  RENT_MAX_MULT,
+  RENT_ADJUST_FRACTION,
 } from "./constants";
 
 /** Tunable growth/mortality knobs; each defaults to the live constant. Tests/tuning override. */
@@ -48,6 +54,8 @@ export interface PopulationOptions {
   construction?: boolean;
   /** Min days between builds (HP4) — paces the construction staircase. */
   buildCooldownDays?: number;
+  /** Whether rent responds to housing scarcity (HP2 dynamic rent). */
+  dynamicRent?: boolean;
 }
 
 /** Numeric index from a `res_N` id — finite for every id we mint (the NaN-id guard). */
@@ -104,6 +112,7 @@ export class PopulationSystem implements System {
   private readonly comingOfAgeYears: number;
   private readonly construction: boolean;
   private readonly buildCooldownDays: number;
+  private readonly dynamicRent: boolean;
   /** Day the last home was built, for the construction cooldown. */
   private lastBuildDay: number;
 
@@ -124,12 +133,13 @@ export class PopulationSystem implements System {
     this.comingOfAgeYears = opts.comingOfAgeYears ?? COMING_OF_AGE_YEARS;
     this.construction = opts.construction ?? HOUSING_CONSTRUCTION;
     this.buildCooldownDays = opts.buildCooldownDays ?? HOME_BUILD_COOLDOWN_DAYS;
+    this.dynamicRent = opts.dynamicRent ?? DYNAMIC_RENT;
     this.lastSpawnDay = -this.cooldownDays;
     this.lastBuildDay = -this.buildCooldownDays;
   }
 
   update(ctx: SystemContext): void {
-    if (!this.enabled && !this.mortality && !this.construction) return; // fully inert ⇒ byte-identical
+    if (!this.enabled && !this.mortality && !this.construction && !this.dynamicRent) return; // inert ⇒ byte-identical
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
     const { day } = ctx.time.time();
 
@@ -138,6 +148,45 @@ export class PopulationSystem implements System {
     if (this.mortality && day > 0 && day % this.daysPerYear === 0) this.ageAndReap();
     if (this.construction) this.construct(day);
     if (this.enabled) this.grow(day);
+    // Finally, reprice rent off the day's settled occupancy (collected next day).
+    if (this.dynamicRent) this.repriceRent();
+  }
+
+  /**
+   * Dynamic rent (HP2): rents drift with housing scarcity. A town-wide multiplier is
+   * derived from overall occupancy — above the neutral occupancy rents climb toward a
+   * ceiling, below it they ease toward a floor — and each home's rent drifts smoothly
+   * toward its own base × that multiplier (premium homes stay proportionally pricier).
+   * This makes housing a market and gives the landlord meaning: scarcity lifts its rent
+   * income, which (with HP4) funds the building that relieves the scarcity.
+   *
+   * Conservation: this only changes the rent *level* — collection is still a capped
+   * resident→landlord transfer in EconomySystem, so no money is minted. Determinism:
+   * occupancy-driven, no RNG. The base is captured lazily (only when dynamic rent is
+   * on), so an off run never writes baseRent and stays byte-identical.
+   */
+  private repriceRent(): void {
+    const occ = occupantsByHome(this.world.residents);
+    let totalOcc = 0;
+    let totalCap = 0;
+    for (const l of this.world.locations) {
+      if (l.type !== "home") continue;
+      totalOcc += occ.get(l.id) ?? 0;
+      totalCap += l.capacity ?? 0;
+    }
+    if (totalCap <= 0) return;
+    const rate = totalOcc / totalCap;
+    const m = Math.max(
+      RENT_MIN_MULT,
+      Math.min(RENT_MAX_MULT, 1 + RENT_SCARCITY_SENSITIVITY * (rate - RENT_NEUTRAL_OCCUPANCY)),
+    );
+    for (const l of this.world.locations) {
+      if (l.type !== "home") continue;
+      if (l.baseRent === undefined) l.baseRent = l.rent ?? 0; // lazily capture the seeded/built base
+      const target = l.baseRent * m;
+      const cur = l.rent ?? l.baseRent;
+      l.rent = Math.round((cur + (target - cur) * RENT_ADJUST_FRACTION) * 100) / 100;
+    }
   }
 
   /**

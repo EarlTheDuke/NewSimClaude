@@ -530,6 +530,61 @@ describe("ResidentAgentSystem full agency (manageAll)", () => {
   });
 });
 
+describe("PopulationSystem dynamic rent (HP2)", () => {
+  it("rent eases under slack and rises under scarcity (money conserved)", () => {
+    const { sim, world, population } = createCity({
+      seed: 1,
+      populationOptions: { dynamicRent: true },
+    });
+    const h = () => world.getLocation("loc_home_0");
+    const base = h().rent ?? 0; // seeded 70
+    const start = world.totalMoney();
+
+    // Seeded occupancy is 12/18 ≈ 0.67, below the neutral 0.8 → rent drifts DOWN.
+    sim.run(TICKS_PER_DAY * 40);
+    const slackRent = h().rent ?? 0;
+    expect(slackRent).toBeLessThan(base);
+    expect(h().baseRent).toBe(base); // the base was captured lazily
+
+    // Fill every home → occupancy 1.0 → scarcity pushes rent back UP past the slack level.
+    while (population.spawnMigrant()) {
+      /* fill all vacancies */
+    }
+    sim.run(TICKS_PER_DAY * 40);
+    expect(h().rent ?? 0).toBeGreaterThan(slackRent);
+
+    expect(world.totalMoney()).toBeCloseTo(start, 2); // only the rent LEVEL changed; nothing minted
+  });
+
+  it("dynamic rent is deterministic in the full living economy", () => {
+    const mk = () =>
+      createCity({
+        seed: 1,
+        brain: "rules",
+        residentBrain: "rules",
+        agenticResidentIds: "all",
+        agenticBusinessIds: ["biz_diner", "biz_diner_2", "biz_goods", "biz_farm", "biz_mine", "biz_bakery", "biz_factory"],
+        secondDiner: true,
+        disasters: true,
+        populationGrowth: true,
+        populationOptions: { births: true, mortality: true, construction: true, dynamicRent: true },
+      });
+    const a = mk();
+    const b = mk();
+    const start = a.world.totalMoney();
+
+    a.sim.run(TICKS_PER_DAY * 365 * 2);
+    b.sim.run(TICKS_PER_DAY * 365 * 2);
+
+    expect(a.world.serialize()).toEqual(b.world.serialize()); // deterministic with the rent market live
+    expect(a.world.totalMoney()).toBeCloseTo(start, 1);
+    // The rent market actually ran: every home captured a base rent.
+    for (const l of a.world.locations) {
+      if (l.type === "home") expect(l.baseRent).toBeDefined();
+    }
+  });
+});
+
 describe("PopulationSystem construction (HP4)", () => {
   it("builds a new home when the town is full, lifting the cap (money conserved)", () => {
     // prosperityFloor 0 + a short cooldown so migration fills the town and the

@@ -81,8 +81,10 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
   populationGrowth: true,
   // ...and when every home is full, the landlord builds more (HP4), so the town keeps
   // growing in a staircase rather than freezing at the seeded cap — self-limiting as
-  // prosperity dilutes, so it settles at a wealth-supported size.
-  populationOptions: { births: true, mortality: true, construction: true },
+  // prosperity dilutes, so it settles at a wealth-supported size. Rents respond to
+  // housing scarcity (HP2): they climb as the town fills and ease as the landlord
+  // builds — a real housing market that gives the landlord meaning.
+  populationOptions: { births: true, mortality: true, construction: true, dynamicRent: true },
 });
 
 const app = document.querySelector<HTMLDivElement>("#app")!;

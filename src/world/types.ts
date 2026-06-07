@@ -30,6 +30,14 @@ export interface Location {
   nodeId: string;
   /** Daily rent for a home (resident -> landlord). Absent/0 for workplaces. */
   rent?: number;
+  /**
+   * The home's reference rent (HP2 dynamic rent) — what it was seeded/built at. The
+   * mutable `rent` drifts around this with housing scarcity; this is the stable base
+   * the multiplier reckons against (like a business's baseWagePerTick). Captured
+   * lazily the first time dynamic rent runs; absent ⇒ read as `rent` ⇒ byte-identical
+   * when dynamic rent is off.
+   */
+  baseRent?: number;
   /** Max occupants for a home (HP1) — its dwelling size. Absent for workplaces. */
   capacity?: number;
 }
