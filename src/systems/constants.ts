@@ -90,6 +90,14 @@ export const POPULATION_MORTALITY = false; // master flag: residents age and die
 export const MAX_AGE_YEARS = 80; // a resident dies once they reach this age; estate -> heir (conserved)
 export const DAYS_PER_YEAR = 365; // sim-days per year, for aging
 
+// Births (HP3-7) — the growth trigger's other flavour: instead of a newcomer
+// arriving from outside, a working parent has a child who is born into the family
+// home. Default-OFF ⇒ growth uses in-migration ⇒ unchanged. Real-world: families
+// grow from within, the newborn supported by their parents until they come of age.
+export const POPULATION_BIRTHS = false; // master flag: growth happens via births, not in-migration
+/** Cash a parent gives a newborn (a parent→child transfer, so birth mints no money). */
+export const BIRTH_GIFT = 100;
+
 // Economy
 export const RENT_PER_DAY = 70; // resident -> landlord (fallback when a home has no rent set)
 export const BUSINESS_RENT_PER_DAY = 60; // diner/goods -> landlord

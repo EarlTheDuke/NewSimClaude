@@ -245,6 +245,11 @@ export interface Resident {
    * their estate passing to an heir. Absent ⇒ byte-identical to pre-HP3 / mortality-off.
    */
   age?: number;
+  /**
+   * The id of this resident's parent (HP3-7 births) — lineage, for analytics/render.
+   * Absent for the seeded cohort and in-migrants. Cosmetic only; never money.
+   */
+  parentId?: string;
 }
 
 /** Serializable slice owned by the World. */

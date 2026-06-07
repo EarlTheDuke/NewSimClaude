@@ -15,6 +15,8 @@ import {
   POPULATION_MORTALITY,
   MAX_AGE_YEARS,
   DAYS_PER_YEAR,
+  POPULATION_BIRTHS,
+  BIRTH_GIFT,
 } from "./constants";
 
 /** Tunable growth/mortality knobs; each defaults to the live constant. Tests/tuning override. */
@@ -31,6 +33,8 @@ export interface PopulationOptions {
   maxAgeYears?: number;
   /** Sim-days per year, for aging (small values compress the demographic clock in tests). */
   daysPerYear?: number;
+  /** Whether growth happens via births (newborn in a parent's home) instead of in-migration. */
+  births?: boolean;
 }
 
 /** Numeric index from a `res_N` id — finite for every id we mint (the NaN-id guard). */
@@ -79,6 +83,7 @@ export class PopulationSystem implements System {
   private readonly mortality: boolean;
   private readonly maxAgeYears: number;
   private readonly daysPerYear: number;
+  private readonly births: boolean;
 
   constructor(
     private readonly world: World,
@@ -93,6 +98,7 @@ export class PopulationSystem implements System {
     this.mortality = opts.mortality ?? POPULATION_MORTALITY;
     this.maxAgeYears = opts.maxAgeYears ?? MAX_AGE_YEARS;
     this.daysPerYear = opts.daysPerYear ?? DAYS_PER_YEAR;
+    this.births = opts.births ?? POPULATION_BIRTHS;
     this.lastSpawnDay = -this.cooldownDays;
   }
 
@@ -131,9 +137,15 @@ export class PopulationSystem implements System {
     const toSpawn = Math.min(want, slack);
     let spawned = 0;
     for (let i = 0; i < toSpawn; i++) {
-      const r = this.spawnMigrant();
-      if (!r) break; // housing filled mid-loop
-      this.seat(r); // take an open producer seat if one exists (productive growth)
+      // When births are on, a family grows from within first (a newborn in a parent's
+      // home — a dependent until coming-of-age, which is future work). If no parent has
+      // room, fall back to in-migration: a working-age newcomer who fills an open job.
+      // This keeps a births+mortality town sustainable — as the working generation ages
+      // out, migrants replace the labour newborns can't yet provide.
+      const born = this.births ? this.spawnBirth() : undefined;
+      const r = born ?? this.spawnMigrant();
+      if (!r) break; // no eligible parent AND no free home — growth waits
+      if (!born) this.seat(r); // newcomers take open producer seats; newborns don't work yet
       spawned += 1;
     }
     this.pressureAccumulator -= spawned;
@@ -201,6 +213,33 @@ export class PopulationSystem implements System {
     const homeId = cheapestVacantHome(this.world.residents, this.world.locations);
     if (homeId === undefined) return undefined;
     return this.create(homeId, "migrant", NEWCOMER_AGE_YEARS);
+  }
+
+  /**
+   * A birth (HP3-7): a working parent has a child born into the family home. The
+   * parent is the lowest-index employed resident whose home still has a free slot
+   * and who can afford the gift. The newborn starts at age 0, jobless (a dependent),
+   * and is funded by a parent→child {@link World.transfer} of {@link BIRTH_GIFT} —
+   * money relocates between two holders, so nothing is minted. Returns undefined when
+   * no eligible parent exists (so growth waits, just like a full town). Exposed
+   * publicly for tests/tooling.
+   */
+  spawnBirth(): Resident | undefined {
+    const occ = occupantsByHome(this.world.residents);
+    const parent = this.world.residents
+      .filter((r) => r.jobId !== "" && r.money >= BIRTH_GIFT && this.homeHasSlot(r.homeId, occ))
+      .sort((a, b) => residentIndex(a.id) - residentIndex(b.id))[0];
+    if (!parent) return undefined;
+    const child = this.create(parent.homeId, "born", 0);
+    child.parentId = parent.id;
+    this.world.transfer(parent.id, child.id, BIRTH_GIFT); // gift -> child; conserved
+    return child;
+  }
+
+  /** Whether a home has room for one more occupant, given a precomputed occupancy map. */
+  private homeHasSlot(homeId: string, occ: Map<string, number>): boolean {
+    const home = this.world.getLocation(homeId);
+    return (occ.get(homeId) ?? 0) < (home.capacity ?? 99);
   }
 
   /**

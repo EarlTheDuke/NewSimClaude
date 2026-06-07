@@ -276,3 +276,84 @@ describe("PopulationSystem mortality (HP3-6)", () => {
     expect(world.residents.length).toBeGreaterThanOrEqual(12); // only grew, nobody died
   });
 });
+
+describe("PopulationSystem births (HP3-7)", () => {
+  it("a working parent has a child in the family home, funded by a conserved gift", () => {
+    const { world, population } = createCity({
+      seed: 1,
+      populationGrowth: true,
+      populationOptions: { births: true, prosperityFloor: 0 },
+    });
+    const before = world.totalMoney();
+    const beforeCount = world.residents.length;
+
+    const child = population.spawnBirth();
+    expect(child).toBeDefined();
+    expect(child!.id).toBe("res_12"); // numeric id continues the namespace (finite index)
+    expect(child!.origin).toBe("born");
+    expect(child!.age).toBe(0);
+    expect(child!.money).toBe(100); // received the gift (BIRTH_GIFT)
+    expect(child!.jobId).toBe(""); // a dependent, not a worker
+
+    const parent = world.getResident(child!.parentId!)!;
+    expect(parent.jobId).not.toBe(""); // a working parent
+    expect(child!.homeId).toBe(parent.homeId); // born into the family home
+
+    expect(world.residents).toHaveLength(beforeCount + 1);
+    expect(world.totalMoney()).toBeCloseTo(before, 6); // gift relocated, nothing minted
+  });
+
+  it("births grow the town to its housing cap, then plateau", () => {
+    const { sim, world } = createCity({
+      seed: 1,
+      populationGrowth: true,
+      populationOptions: { births: true, prosperityFloor: 0 },
+    });
+    const cap = world.locations.filter((l) => l.type === "home").reduce((s, l) => s + (l.capacity ?? 0), 0);
+    const start = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY * 365);
+    expect(world.residents.length).toBe(cap);
+    expect(world.residents.filter((r) => r.origin === "born").length).toBeGreaterThan(0); // grew via families
+    const occ = occupantsByHome(world.residents);
+    for (const l of world.locations) {
+      if (l.type === "home") expect(occ.get(l.id) ?? 0).toBeLessThanOrEqual(l.capacity ?? 99);
+    }
+    expect(world.totalMoney()).toBeCloseTo(start, 2);
+  });
+
+  it("births are deterministic and money-conserving", () => {
+    const opts = { seed: 3, populationGrowth: true, populationOptions: { births: true, prosperityFloor: 0 } };
+    const a = createCity(opts);
+    const b = createCity(opts);
+    const start = a.world.totalMoney();
+    a.sim.run(TICKS_PER_DAY * 200);
+    b.sim.run(TICKS_PER_DAY * 200);
+    expect(a.world.serialize()).toEqual(b.world.serialize());
+    expect(a.world.residents.filter((r) => r.origin === "born").length).toBeGreaterThan(0);
+    expect(a.world.totalMoney()).toBeCloseTo(start, 2);
+  });
+
+  it("births + mortality sustain a living town over many years (conserved, never collapses)", () => {
+    // Births grow families; as the working generation ages out, in-migration backfills
+    // the labour (the fallback) — so the town neither dies out nor overfills.
+    const { sim, world } = createCity({
+      seed: 1,
+      populationGrowth: true,
+      populationOptions: { births: true, mortality: true, maxAgeYears: 8, daysPerYear: 30, prosperityFloor: 0 },
+    });
+    const start = world.totalMoney();
+    const cap = world.locations.filter((l) => l.type === "home").reduce((s, l) => s + (l.capacity ?? 0), 0);
+
+    sim.run(TICKS_PER_DAY * 365 * 2); // ~24 year-boundaries of births + deaths
+
+    expect(world.residents.length).toBeGreaterThan(0); // didn't die out
+    expect(world.residents.length).toBeLessThanOrEqual(cap); // never overran housing
+    const occ = occupantsByHome(world.residents);
+    for (const l of world.locations) {
+      if (l.type === "home") expect(occ.get(l.id) ?? 0).toBeLessThanOrEqual(l.capacity ?? 99);
+    }
+    expect(world.totalMoney()).toBeCloseTo(start, 2);
+    for (const r of world.residents) expect(r.money).toBeGreaterThanOrEqual(0);
+  });
+});
