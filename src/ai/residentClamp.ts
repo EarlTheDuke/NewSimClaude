@@ -62,7 +62,9 @@ export function clampResidentAction(
 
   if (action.reHomeTo !== undefined && !structuralTaken) {
     const opt = o.homeOptions.find((h) => h.homeId === action.reHomeTo);
-    if (opt && opt.homeId !== o.homeId) {
+    // Must be a listed, different home with a FREE slot (HP1) — you can't move into
+    // a full dwelling, however cheap.
+    if (opt && opt.homeId !== o.homeId && opt.hasVacancy) {
       out.reHomeTo = opt.homeId;
       structuralTaken = true;
     }

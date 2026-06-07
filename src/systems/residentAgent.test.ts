@@ -34,8 +34,9 @@ function baseObs(over: Partial<ResidentObservation> = {}): ResidentObservation {
       { businessId: "biz_landlord", name: "Keystone Housing", wagePerTick: 0.5, hiring: false },
     ],
     homeOptions: [
-      { homeId: "loc_home_5", name: "Home 6", rent: 50 },
-      { homeId: "loc_home_3", name: "Home 4", rent: 58 },
+      { homeId: "loc_home_5", name: "Home 6", rent: 50, capacity: 2, occupants: 1, hasVacancy: true },
+      { homeId: "loc_home_3", name: "Home 4", rent: 58, capacity: 3, occupants: 1, hasVacancy: true },
+      { homeId: "loc_home_4", name: "Home 5", rent: 54, capacity: 2, occupants: 2, hasVacancy: false },
     ],
     ...over,
   };
@@ -75,6 +76,12 @@ describe("clampResidentAction", () => {
     );
     expect(out.reHomeTo).toBe("loc_home_5");
     expect(out.negotiateRaise).toBe(true);
+  });
+
+  it("drops a re-home to a full home — no free slot (HP1)", () => {
+    // loc_home_4 in the fixture is at capacity (hasVacancy: false).
+    const out = clampResidentAction({ reHomeTo: "loc_home_4" }, baseObs(), DEFAULT_RESIDENT_LIMITS);
+    expect(out.reHomeTo).toBeUndefined();
   });
 
   it("drops a raise at the wage cap", () => {
@@ -160,13 +167,25 @@ describe("ResidentAgentSystem", () => {
     expect(residentAgent!.decisions()[0]!.fallback).toBe(false);
   });
 
-  it("re-homes a resident to a listed home", () => {
-    const provider = new MockResidentProvider({ fixed: { action: { reHomeTo: "loc_home_5" }, reason: "cheaper" } });
+  it("re-homes a resident to a listed home with a vacancy (HP1)", () => {
+    const provider = new MockResidentProvider({ fixed: { action: { reHomeTo: "loc_home_1" }, reason: "a home with a free unit" } });
+    const { sim, world } = createCity({ seed: 1, residentBrain: provider, agenticResidentIds: ["res_0"] });
+    expect(world.getResident("res_0")!.homeId).toBe("loc_home_0"); // seeded here
+
+    sim.run(TICKS_PER_DAY);
+
+    // loc_home_1 (capacity 4) has room, so the move lands.
+    expect(world.getResident("res_0")!.homeId).toBe("loc_home_1");
+  });
+
+  it("won't re-home into a full dwelling (HP1 capacity)", () => {
+    // loc_home_5 is the cheapest, smallest home (capacity 2) and starts full.
+    const provider = new MockResidentProvider({ fixed: { action: { reHomeTo: "loc_home_5" }, reason: "try the cheapest" } });
     const { sim, world } = createCity({ seed: 1, residentBrain: provider, agenticResidentIds: ["res_0"] });
 
     sim.run(TICKS_PER_DAY);
 
-    expect(world.getResident("res_0")!.homeId).toBe("loc_home_5");
+    expect(world.getResident("res_0")!.homeId).toBe("loc_home_0"); // stayed put — no free slot
   });
 
   it("buys a vehicle, conserving money through the goods store", () => {

@@ -15,6 +15,7 @@ import type {
 import { clampResidentAction, DEFAULT_RESIDENT_LIMITS } from "../ai/residentClamp";
 import { RuleBasedResidentProvider } from "../ai/RuleBasedResidentProvider";
 import { desiredHeadcount } from "../world/archetypes";
+import { occupantsByHome } from "../world/housing";
 
 /**
  * The agentic layer for people: once per sim-day, each opted-in resident
@@ -109,7 +110,7 @@ export class ResidentAgentSystem implements System {
     const clamped = clampResidentAction(decision.action, req.observation, this.limits);
 
     if (clamped.switchJobTo !== undefined) this.applyJobSwitch(r, clamped.switchJobTo, day);
-    if (clamped.reHomeTo !== undefined) r.homeId = clamped.reHomeTo;
+    if (clamped.reHomeTo !== undefined) this.applyReHome(r, clamped.reHomeTo);
     if (clamped.buyVehicle) this.applyBuyVehicle(r);
     if (clamped.sellVehicle) this.applySellVehicle(r);
     if (clamped.negotiateRaise) this.applyRaise(r, req.observation.jobBaseWage, day);
@@ -126,6 +127,17 @@ export class ResidentAgentSystem implements System {
       reason: decision.reason,
       usage: decision.usage,
     });
+  }
+
+  /** Move home only if the target still has a free slot (HP1) — an atomic capacity
+   *  check that also covers a stale async decision. Occupancy is non-cash, so this
+   *  never touches the money invariant. */
+  private applyReHome(r: Resident, targetId: string): void {
+    const target = this.world.getLocation(targetId);
+    const capacity = target.capacity ?? 99;
+    // r still lives in its old home here, so it isn't counted in the target.
+    const occupants = occupantsByHome(this.world.residents).get(targetId) ?? 0;
+    if (occupants < capacity) r.homeId = targetId;
   }
 
   private applyJobSwitch(r: Resident, newJobId: string, day: number): void {
@@ -200,9 +212,14 @@ export class ResidentAgentSystem implements System {
         hiring: b.employeeIds.length < desiredHeadcount(b.kind),
       }));
 
+    const occByHome = occupantsByHome(this.world.residents);
     const homeOptions: HomeOption[] = this.world.locations
       .filter((l) => l.type === "home" && l.id !== r.homeId)
-      .map((l) => ({ homeId: l.id, name: l.name, rent: l.rent ?? 0 }));
+      .map((l) => {
+        const occupants = occByHome.get(l.id) ?? 0;
+        const capacity = l.capacity ?? 99;
+        return { homeId: l.id, name: l.name, rent: l.rent ?? 0, capacity, occupants, hasVacancy: occupants < capacity };
+      });
 
     const vehicleSellerOpen = this.world.getBusiness("biz_goods")?.active ?? false;
 

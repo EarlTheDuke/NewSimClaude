@@ -4,6 +4,7 @@ import type {
   ResidentDecisionProvider,
   ResidentDecisionRequest,
 } from "./residentTypes";
+import { HOME_MOVE_MIN_SAVING } from "../systems/constants";
 
 /**
  * The deterministic control mind for residents, and the safety net.
@@ -46,15 +47,18 @@ export class RuleBasedResidentProvider implements ResidentDecisionProvider {
       notes.push(`${bestJob.name} pays better, switching`);
     }
 
+    // Re-home only to a home with a FREE slot (HP1) and only for a *meaningful*
+    // saving — so people stay settled in their own home instead of all racing into
+    // the single cheapest one. A full home is no option, however cheap.
     const cheaper = o.homeOptions
-      .filter((h) => h.rent < o.rent)
+      .filter((h) => h.hasVacancy && h.rent <= o.rent - HOME_MOVE_MIN_SAVING)
       .reduce<typeof o.homeOptions[number] | undefined>(
         (best, h) => (!best || h.rent < best.rent ? h : best),
         undefined,
       );
     if (cheaper && o.money > 200) {
       action.reHomeTo = cheaper.homeId;
-      notes.push(`cheaper home (${cheaper.name}), moving to save rent`);
+      notes.push(`cheaper home with a free unit (${cheaper.name}), moving to save rent`);
     }
 
     if (

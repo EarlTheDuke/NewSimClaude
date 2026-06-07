@@ -27,6 +27,12 @@ export interface HomeOption {
   name: string;
   /** Daily rent. */
   rent: number;
+  /** The dwelling's max occupants (HP1). */
+  capacity: number;
+  /** How many residents currently live there. */
+  occupants: number;
+  /** Whether there is a free slot to move into (occupants < capacity). */
+  hasVacancy: boolean;
 }
 
 /**

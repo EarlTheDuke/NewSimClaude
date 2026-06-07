@@ -164,7 +164,7 @@ export class ClaudeResidentProvider implements ResidentDecisionProvider {
     const jobs = o.jobOptions
       .map((j) => `${j.businessId} (${j.name}, wage ${j.wagePerTick}${j.hiring ? "" : ", not hiring"})`)
       .join("; ");
-    const homes = o.homeOptions.map((h) => `${h.homeId} (${h.name}, rent ${h.rent})`).join("; ");
+    const homes = o.homeOptions.map((h) => `${h.homeId} (${h.name}, rent ${h.rent}${h.hasVacancy ? "" : ", FULL"})`).join("; ");
     return [
       `You are ${o.name}, day ${o.day}.`,
       `Money ${round(o.money)}.`,
