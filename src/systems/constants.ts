@@ -97,6 +97,13 @@ export const DAYS_PER_YEAR = 365; // sim-days per year, for aging
 export const POPULATION_BIRTHS = false; // master flag: growth happens via births, not in-migration
 /** Cash a parent gives a newborn (a parent→child transfer, so birth mints no money). */
 export const BIRTH_GIFT = 100;
+/**
+ * Age (years) a child becomes a working adult (HP3-9 coming-of-age). Once a born
+ * resident reaches this, the yearly demographic step seats them into an open job —
+ * so grown children replace the workers mortality removes, and a births+mortality
+ * town sustains its labour force instead of decaying into idle dependents.
+ */
+export const COMING_OF_AGE_YEARS = 18;
 
 // Economy
 export const RENT_PER_DAY = 70; // resident -> landlord (fallback when a home has no rent set)

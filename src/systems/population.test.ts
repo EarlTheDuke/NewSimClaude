@@ -445,3 +445,63 @@ describe("PopulationSystem births (HP3-7)", () => {
     for (const r of world.residents) expect(r.money).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("PopulationSystem coming-of-age (HP3-9)", () => {
+  it("a grown child takes an open job when it comes of age", () => {
+    // residentCount 11 leaves the factory one seat short with nobody jobless; a
+    // compressed clock (2 sim-days/year, adulthood at 2) lets the child mature fast.
+    const { sim, world, population } = createCity({
+      seed: 1,
+      residentCount: 11,
+      populationOptions: { mortality: true, maxAgeYears: 100, daysPerYear: 2, comingOfAgeYears: 2 },
+    });
+    expect(world.getBusiness("biz_factory")!.employeeIds.length).toBe(1); // short at seed
+
+    const child = population.spawnBirth()!; // res_11: a dependent, age 0, jobless
+    expect(child.age).toBe(0);
+    expect(child.jobId).toBe("");
+    const start = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY * 6); // cross enough year-boundaries to reach adulthood
+
+    const grown = world.getResident(child.id)!;
+    expect(grown.age ?? 0).toBeGreaterThanOrEqual(2); // came of age
+    expect(grown.jobId).not.toBe(""); // and took a job...
+    expect(world.getBusiness("biz_factory")!.employeeIds).toContain(child.id); // ...the open seat
+    expect(world.totalMoney()).toBeCloseTo(start, 6); // seating is non-cash
+  });
+
+  it("births + mortality + coming-of-age sustain the WORKFORCE over many years (no death spiral)", () => {
+    // The full living cycle on a compressed clock (40y life, 9y adulthood, 30 sim-days
+    // /year) so ~36 year-boundaries of births, maturation, and deaths run quickly.
+    // Without coming-of-age this config death-spirals: the workforce collapses to ~5
+    // and every producer goes unstaffed. With it, grown children (and displaced
+    // adults) keep the seats filled.
+    const { sim, world } = createCity({
+      seed: 1,
+      brain: "rules",
+      residentBrain: "rules",
+      agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
+      agenticBusinessIds: ["biz_diner", "biz_diner_2", "biz_goods", "biz_farm", "biz_mine", "biz_bakery", "biz_factory"],
+      secondDiner: true,
+      disasters: true,
+      populationGrowth: true,
+      populationOptions: { births: true, mortality: true, maxAgeYears: 40, daysPerYear: 30, comingOfAgeYears: 9 },
+    });
+    const start = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY * 365 * 3); // ~36 compressed year-boundaries
+
+    // The labour force did NOT collapse — employment stays high (vs ~5 without it).
+    const emp = world.residents.filter((r) => r.jobId !== "").length;
+    expect(emp).toBeGreaterThanOrEqual(10);
+    // Every producer KIND still has a staffed firm, so the supply chain is alive
+    // (the assertion the old soak lacked — an *unstaffed* producer is still "active").
+    for (const k of ["farm", "mine", "bakery", "factory", "diner", "goods"] as const) {
+      expect(world.businesses.some((b) => b.kind === k && b.active && b.employeeIds.length > 0)).toBe(true);
+    }
+    // Sacred invariants hold across the whole living cycle.
+    expect(world.totalMoney()).toBeCloseTo(start, 1);
+    for (const r of world.residents) expect(r.money).toBeGreaterThanOrEqual(0);
+  });
+});

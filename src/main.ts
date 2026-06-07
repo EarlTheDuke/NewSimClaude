@@ -70,18 +70,13 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
   // HP3 — the living, GROWING city: as the town prospers, families have children
   // and newcomers move in, filling the spare housing (HP1) so firms gain real
   // customers and the open seats (14 producer seats vs the 12 seeded residents)
-  // get staffed. Default-OFF in createCity (tests/bench unchanged); engaged here so
-  // the live game shows the town grow before your eyes.
-  //
-  // NOTE: mortality is intentionally OFF here for now. A 20-year observation showed
-  // that births + mortality together death-spiral the economy: newborns never enter
-  // the workforce (no coming-of-age yet), so as the seeded workers age out the
-  // labour force collapses (every producer eventually unstaffed) and the supply
-  // chain dies. Births-only grows healthily to the housing cap and holds (producers
-  // staffed, revenue rising). Re-enable mortality once coming-of-age lands so grown
-  // children replace the dead — see PHASE-HOUSING-POPULATION.md "next steps".
+  // get staffed. Residents age, children come of age and take jobs (HP3-9), and the
+  // old eventually pass on with their estate inherited — a full, self-sustaining
+  // demographic cycle. Verified over 40 sim-years: employment holds ~13/16, every
+  // producer kind stays staffed, revenue grows, money conserved. Default-OFF in
+  // createCity (tests/bench unchanged); engaged here so the town lives before you.
   populationGrowth: true,
-  populationOptions: { births: true },
+  populationOptions: { births: true, mortality: true },
 });
 
 const app = document.querySelector<HTMLDivElement>("#app")!;

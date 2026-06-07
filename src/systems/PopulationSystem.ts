@@ -17,6 +17,7 @@ import {
   DAYS_PER_YEAR,
   POPULATION_BIRTHS,
   BIRTH_GIFT,
+  COMING_OF_AGE_YEARS,
 } from "./constants";
 
 /** Tunable growth/mortality knobs; each defaults to the live constant. Tests/tuning override. */
@@ -35,6 +36,8 @@ export interface PopulationOptions {
   daysPerYear?: number;
   /** Whether growth happens via births (newborn in a parent's home) instead of in-migration. */
   births?: boolean;
+  /** Age (years) at which a child becomes a working adult and can be employed. */
+  comingOfAgeYears?: number;
 }
 
 /** Numeric index from a `res_N` id — finite for every id we mint (the NaN-id guard). */
@@ -88,6 +91,7 @@ export class PopulationSystem implements System {
   private readonly maxAgeYears: number;
   private readonly daysPerYear: number;
   private readonly births: boolean;
+  private readonly comingOfAgeYears: number;
 
   constructor(
     private readonly world: World,
@@ -103,6 +107,7 @@ export class PopulationSystem implements System {
     this.maxAgeYears = opts.maxAgeYears ?? MAX_AGE_YEARS;
     this.daysPerYear = opts.daysPerYear ?? DAYS_PER_YEAR;
     this.births = opts.births ?? POPULATION_BIRTHS;
+    this.comingOfAgeYears = opts.comingOfAgeYears ?? COMING_OF_AGE_YEARS;
     this.lastSpawnDay = -this.cooldownDays;
   }
 
@@ -330,6 +335,17 @@ export class PopulationSystem implements System {
       .filter((r) => (r.age ?? 0) >= this.maxAgeYears)
       .sort((a, b) => residentIndex(a.id) - residentIndex(b.id));
     for (const d of doomed) this.reap(d);
+
+    // Coming of age (HP3-9): grown children — and any of-age jobless adult, e.g. a
+    // worker freed by a dead firm — take an open producer seat (id order). This is
+    // what replaces the workers mortality just removed, so a births+mortality town
+    // sustains its labour force instead of decaying into idle dependents (the death
+    // spiral the 20-year observation exposed). Seating is non-cash, so conservation
+    // is untouched; deterministic (id order, no RNG).
+    const ofAge = this.world.residents
+      .filter((r) => r.jobId === "" && (r.age ?? 0) >= this.comingOfAgeYears)
+      .sort((a, b) => residentIndex(a.id) - residentIndex(b.id));
+    for (const r of ofAge) this.seat(r);
   }
 
   /**
