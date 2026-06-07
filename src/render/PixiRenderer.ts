@@ -4,6 +4,7 @@ import type { Business, Location, Resident, Activity } from "../world/types";
 import { skyColor, ambient, windowGlow, dimInt, type Rgb } from "./daynight";
 import { worldToScreen as toScreen, screenToWorld, type Camera } from "./camera";
 import { prosperityT, fillFraction, FILL_FULL_INVENTORY } from "./economyVisuals";
+import { fanOutOffset } from "./residentLayout";
 import { CAPITAL_BASELINE } from "../systems/constants";
 import {
   ROAD_RGB,
@@ -52,6 +53,8 @@ interface ResidentView {
   tick: Graphics;
   dot: Graphics;
   selGlow: Graphics;
+  offX: number; // last applied fan-out offset (kept so pick() hits the drawn dot)
+  offY: number;
 }
 
 /** A pooled thought-bubble (R1 overlay): a rounded callout + tail + fitted text. */
@@ -186,12 +189,27 @@ export class PixiRenderer implements CityRenderer {
     }
     this.reapBuildings(seen);
 
-    // Residents — one persistent view per id (created lazily, mutated here).
+    // Residents — one persistent view per id. Co-located, stationary residents fan
+    // out into a ring (so the crowd is countable); movers keep their road position.
+    const atNode = new Map<string, string[]>();
+    for (const r of this.world.residents) {
+      if (r.move.path.length === 0 && r.move.atNodeId) {
+        const arr = atNode.get(r.move.atNodeId);
+        if (arr) arr.push(r.id);
+        else atNode.set(r.move.atNodeId, [r.id]);
+      }
+    }
+    for (const arr of atNode.values()) arr.sort(); // stable order → stable offsets
     const seenR = new Set<string>();
     for (const r of this.world.residents) {
       seenR.add(r.id);
       const isSel = selected?.kind === "resident" && selected.id === r.id;
-      this.updateResidentView(this.ensureResidentView(r.id), r, isSel);
+      let off = { dx: 0, dy: 0 };
+      if (r.move.path.length === 0 && r.move.atNodeId) {
+        const group = atNode.get(r.move.atNodeId);
+        if (group && group.length > 1) off = fanOutOffset(group.indexOf(r.id), group.length);
+      }
+      this.updateResidentView(this.ensureResidentView(r.id), r, isSel, off);
     }
     this.reapResidents(seenR);
 
@@ -544,13 +562,20 @@ export class PixiRenderer implements CityRenderer {
     selGlow.visible = false;
     container.addChild(shadow, tick, dot, selGlow);
     this.residentsLayer?.addChild(container);
-    const view: ResidentView = { container, shadow, tick, dot, selGlow };
+    const view: ResidentView = { container, shadow, tick, dot, selGlow, offX: 0, offY: 0 };
     this.residentViews.set(id, view);
     return view;
   }
 
-  private updateResidentView(v: ResidentView, r: Resident, isSelected: boolean): void {
-    v.container.position.set(r.move.x, r.move.y);
+  private updateResidentView(
+    v: ResidentView,
+    r: Resident,
+    isSelected: boolean,
+    off: { dx: number; dy: number },
+  ): void {
+    v.offX = off.dx;
+    v.offY = off.dy;
+    v.container.position.set(r.move.x + off.dx, r.move.y + off.dy);
     v.dot.tint = ACTIVITY_INT[r.activity];
     v.selGlow.visible = isSelected;
     if (r.move.path.length > 0) {
@@ -604,7 +629,12 @@ export class PixiRenderer implements CityRenderer {
     const wy = world.y;
     let best: { id: string; d: number } | undefined;
     for (const r of this.world.residents) {
-      const d = Math.hypot(r.move.x - wx, r.move.y - wy);
+      // Hit-test the DRAWN dot (true position + its fan-out offset) so a click on a
+      // fanned-out dot selects that resident, not whoever is nearest the node centre.
+      const v = this.residentViews.get(r.id);
+      const rx = r.move.x + (v?.offX ?? 0);
+      const ry = r.move.y + (v?.offY ?? 0);
+      const d = Math.hypot(rx - wx, ry - wy);
       if (d <= DOT_RADIUS + 4 && (!best || d < best.d)) best = { id: r.id, d };
     }
     if (best) return { kind: "resident", id: best.id };
