@@ -2,6 +2,7 @@ import { Application, Container, Graphics, Text } from "pixi.js";
 import type { World } from "../world/World";
 import type { Business, Location, Resident, Activity } from "../world/types";
 import { skyColor, ambient, windowGlow, dimInt, type Rgb } from "./daynight";
+import { worldToScreen as toScreen, screenToWorld, type Camera } from "./camera";
 import {
   ROAD_RGB,
   CLOSED_RGB,
@@ -102,6 +103,11 @@ export class PixiRenderer implements CityRenderer {
   // so bubble ellipsis breakpoints match (§6.4).
   private readonly measureCtx = document.createElement("canvas").getContext("2d");
 
+  // Camera (R2h/R2i) — view-only, never serialized, never feeds the sim.
+  private readonly cam: Camera = { tx: 0, ty: 0, scale: 1 };
+  private follow = false;
+  private lastSelId: string | undefined;
+
   private roadsBuilt = false;
   private readonly buildingViews = new Map<string, BuildingView>();
   private readonly residentViews = new Map<string, ResidentView>();
@@ -137,6 +143,7 @@ export class PixiRenderer implements CityRenderer {
     this.buildDisaster();
     this.bubbleLayer = new Container();
     this.hudLayer.addChild(this.bubbleLayer);
+    this.attachCamera();
     this.ready = true;
     // Deferred first paint when the tab's rAF is throttled (background preview);
     // production's live rAF loop paints next frame regardless.
@@ -146,6 +153,7 @@ export class PixiRenderer implements CityRenderer {
 
   draw(hourFloat: number, selected?: Pick, disaster?: DisasterMarker, bubbles?: ThoughtBubble[]): void {
     if (!this.ready || !this.skyGfx || !this.roadsGfx) return;
+    this.updateFollow(selected);
     const a = ambient(hourFloat);
     const glow = windowGlow(hourFloat);
 
@@ -532,11 +540,13 @@ export class PixiRenderer implements CityRenderer {
 
   pick(x: number, y: number): Pick | undefined {
     if (!this.ready) return undefined;
-    // R2f: no camera yet, so canvas space == world space. R2i adds the inverse
-    // camera transform here; the hit-test below (verbatim from the canvas renderer)
-    // is unchanged — resident first (≤9px), then building AABB (≤13px).
-    const wx = x;
-    const wy = y;
+    // R2i: map the canvas-space click through the inverse camera transform, then run
+    // the verbatim canvas hit-test in WORLD units — resident first (≤9px), then
+    // building AABB (≤13px). At pan 0 / zoom 1 the inverse is the identity, so this
+    // is byte-identical to the canvas pick.
+    const world = screenToWorld(x, y, this.cam);
+    const wx = world.x;
+    const wy = world.y;
     let best: { id: string; d: number } | undefined;
     for (const r of this.world.residents) {
       const d = Math.hypot(r.move.x - wx, r.move.y - wy);
@@ -554,9 +564,103 @@ export class PixiRenderer implements CityRenderer {
     return undefined;
   }
 
-  /** World→screen (identity until R2h adds the camera transform). */
+  /** World→screen through the live camera (for screen-space bubble placement). */
   private worldToScreen(x: number, y: number): { x: number; y: number } {
-    return { x, y };
+    return toScreen(x, y, this.cam);
+  }
+
+  private applyCamera(): void {
+    this.worldLayer?.position.set(this.cam.tx, this.cam.ty);
+    this.worldLayer?.scale.set(this.cam.scale);
+  }
+
+  /** Keep the 640×480 world from being panned entirely out of view. */
+  private clampCamera(): void {
+    const s = this.cam.scale;
+    this.cam.tx = Math.max(WIDTH - WIDTH * s - 100, Math.min(100, this.cam.tx));
+    this.cam.ty = Math.max(HEIGHT - HEIGHT * s - 100, Math.min(100, this.cam.ty));
+  }
+
+  /** Pointer-drag pan, wheel zoom-to-cursor (clamped), double-click reset. View-only. */
+  private attachCamera(): void {
+    const c = this.canvas;
+    const toCanvas = (e: { clientX: number; clientY: number }) => {
+      const rect = c.getBoundingClientRect();
+      return {
+        x: ((e.clientX - rect.left) / rect.width) * WIDTH,
+        y: ((e.clientY - rect.top) / rect.height) * HEIGHT,
+      };
+    };
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    c.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      const p = toCanvas(e);
+      lastX = p.x;
+      lastY = p.y;
+      this.follow = false; // manual control wins
+    });
+    window.addEventListener("pointerup", () => {
+      dragging = false;
+    });
+    c.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const p = toCanvas(e);
+      this.cam.tx += p.x - lastX;
+      this.cam.ty += p.y - lastY;
+      lastX = p.x;
+      lastY = p.y;
+      this.clampCamera();
+      this.applyCamera();
+    });
+    c.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const p = toCanvas(e);
+        const w = screenToWorld(p.x, p.y, this.cam);
+        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        this.cam.scale = Math.max(0.5, Math.min(4, this.cam.scale * factor));
+        this.cam.tx = p.x - w.x * this.cam.scale; // keep the world point under the cursor fixed
+        this.cam.ty = p.y - w.y * this.cam.scale;
+        this.follow = false;
+        this.clampCamera();
+        this.applyCamera();
+      },
+      { passive: false },
+    );
+    c.addEventListener("dblclick", () => {
+      this.cam.tx = 0;
+      this.cam.ty = 0;
+      this.cam.scale = 1;
+      this.follow = false;
+      this.applyCamera();
+    });
+  }
+
+  /** Follow-cam: when a fresh selection is made, ease the camera to centre it; any
+   *  manual pan/zoom cancels follow (set in the input handlers). */
+  private updateFollow(selected?: Pick): void {
+    if (selected && selected.id !== this.lastSelId) {
+      this.follow = true;
+      this.lastSelId = selected.id;
+    }
+    if (!selected) {
+      this.lastSelId = undefined;
+      this.follow = false;
+    }
+    if (this.follow && selected) {
+      const wp = this.worldPosOf(selected.id);
+      if (wp) {
+        const targetTx = WIDTH / 2 - wp.x * this.cam.scale;
+        const targetTy = HEIGHT / 2 - wp.y * this.cam.scale;
+        this.cam.tx += (targetTx - this.cam.tx) * 0.15;
+        this.cam.ty += (targetTy - this.cam.ty) * 0.15;
+        this.clampCamera();
+        this.applyCamera();
+      }
+    }
   }
 
   /**
@@ -570,7 +674,8 @@ export class PixiRenderer implements CityRenderer {
       if (b.alpha <= 0.02) continue;
       const wp = this.worldPosOf(b.businessId);
       if (!wp) continue;
-      const screen = this.worldToScreen(wp.x, wp.y - BUILDING / 2 - 6);
+      const sa = this.worldToScreen(wp.x, wp.y);
+      const screen = { x: sa.x, y: sa.y - (BUILDING / 2) * this.cam.scale - 6 };
       const v = this.getBubble(used++);
       const fitted = this.fitText(b.text, 172);
       const padX = 7;
