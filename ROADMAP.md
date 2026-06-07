@@ -16,18 +16,36 @@ against [NORTH-STAR.md](NORTH-STAR.md). Phases 0–8 are [MASTER-PLAN.md](MASTER
   it.** Add the mechanism to the live world, but keep it OFF (or frozen) in the CEO bench
   so the skill signal stays clean. This is the NORTH-STAR tension — honor it every time.
 
-## Where we are
+## Where we are (updated 2026-06-06)
 
-**Phase 16 — Retain vs Distribute** is in progress. Slice 1 (the `payoutRate` seam) shipped
-and is byte-identical. Slice 2 (engage the rules brain) was attempted and **reverted**: a
-standalone retain rule broke the invest loop and the owner-dividend gap, because *retaining
-cash only pays if reinvestment compounds* — and today it can't, since demand is capped. That
-revert is the bridge to Phase 17: **the demand ceiling is the thing blocking the whole
-investment loop.**
+**Phases 16 + 17 shipped; the investment loop is closed; the macro track 18–21 is SHELVED.**
+
+- **Phase 17 — Demand growth (brand lever)** ✅ shipped a–d (`BRAND_DEMAND_ELASTICITY=0.3` live;
+  a `brand` lever for the LM CEO, bench-frozen). See [PHASE17-DEMAND-GROWTH.md](PHASE17-DEMAND-GROWTH.md).
+- **Sustain-the-engine (Phase 18-pre)** ✅ — the long-standing compounding blocker (engine
+  self-extinguished since 13c/14c) was root-caused to shared-labour-pool fragility and fixed
+  with `PRODUCER_WAGE_FLOOR=0.12` (a floor sweep found 0.12 dominates). **NORTH-STAR move #3
+  (close the investment loop) is structurally achieved** — capital compounds ~25× over 2yr.
+- **Phase 16 — Retain vs Distribute** ✅ functionally complete: slice 1 (payout seam), slice 2
+  (the `setPayout` retain lever wired for the **LM CEO**; rules brain silent → byte-identical),
+  slice 3 (reinvestment compounds — met by the wage-floor fix, not the refuted target-scaling).
+  **Slice 4 (reframe the CEO bench to reward growth) remains PARKED — needs sign-off** (it moves
+  historical bench baselines). See [PHASE16-RETAIN-DISTRIBUTE.md](PHASE16-RETAIN-DISTRIBUTE.md).
+
+### ⏸ SHELVED 2026-06-06 — the macro track (Phases 18–21)
+
+The structural macro phases below are a **liked, greenlit direction but deliberately shelved**
+while the project moves to a different area. They are documented here at direction level; pick
+any of them up later from this roadmap.
+
+- **Phase 18 (Credit & Finance)** is **fully designed** (slice-by-slice, adversarially verified)
+  in **[PHASE18-CREDIT.md](PHASE18-CREDIT.md)** — resume straight from that doc when greenlit.
+- **Phases 19 (Population), 20 (Government), 21 (Trade)** stay at the direction level below; draft
+  their detailed `PHASEN-*.md` at the phase boundary (the house convention) when picked up.
 
 ---
 
-## Phase 17 — Demand can grow (the market expands) · *unblocks Phase 16*
+## Phase 17 — Demand can grow (the market expands) · ✅ SHIPPED (as the brand lever)
 
 - **Gap closed:** the fixed demand ceiling (audit Tier-1 #2, first relief) **and** Phase 16's
   slice 3 ("make reinvestment pay").
@@ -46,7 +64,7 @@ investment loop.**
 - **Then:** finish Phase 16 — slice 3 (retain → reinvest → grow now compounds) and slice 4
   (reframe the CEO bench to reward *growth* from working capital, with an anti-hoard guard).
 
-## Phase 18 — Credit & Finance (banking)
+## Phase 18 — Credit & Finance (banking) · ⏸ SHELVED — fully planned in [PHASE18-CREDIT.md](PHASE18-CREDIT.md)
 
 - **Gap closed:** no finance (audit Tier-1 #1) — the single biggest missing subsystem.
 - **Why:** the *other* way to fund growth besides retained earnings; the direct complement
@@ -61,7 +79,7 @@ investment loop.**
   later, careful item.
 - **Depends on:** Phase 17 (credit only pays if there's growth to fund).
 
-## Phase 19 — Population & Demographics
+## Phase 19 — Population & Demographics · ⏸ SHELVED (direction-level; draft detail at boundary)
 
 - **Gap closed:** fixed population (audit Tier-1 #2, structural) — the hardest ceiling.
 - **Why:** births / deaths / aging / migration / household formation let the market and
@@ -76,7 +94,7 @@ investment loop.**
 - **Risk:** determinism (deterministic demographic schedule only) and conservation (a death's
   cash is transferred, never lost).
 
-## Phase 20 — Government & Fiscal
+## Phase 20 — Government & Fiscal · ⏸ SHELVED (direction-level; draft detail at boundary)
 
 - **Gap closed:** no government (audit Tier-1 #3) — adds the missing **G** to GDP.
 - **Mechanics:** a **Treasury** holder; taxes (sales / income / corporate) as transfers in;
@@ -86,7 +104,7 @@ investment loop.**
   the firm-CEO bench so it doesn't perturb that skill signal.
 - **Risk:** conservation (every tax/transfer routes through the treasury holder).
 
-## Phase 21 — External Trade
+## Phase 21 — External Trade · ⏸ SHELVED (direction-level; draft detail at boundary)
 
 - **Gap closed:** closed economy (audit Tier-1 #4).
 - **Mechanics:** a **port** that buys exports and sells imports at world prices — injects
