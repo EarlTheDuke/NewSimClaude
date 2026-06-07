@@ -51,7 +51,7 @@ const agenticResidentIds = Array.from({ length: 12 }, (_, i) => `res_${i}`);
 // is the watchable AI city economy the project is for; the decision traces narrate
 // every move. (Set agenticBusinessIds back to just the storefronts for the calmer,
 // pre-Phase-15 view.)
-const { sim, world, market, macro, agent, residentAgent, events, god } = createCity({
+const { sim, world, market, macro, agent, residentAgent, events, god, population } = createCity({
   seed: 1,
   brain,
   residentBrain,
@@ -67,6 +67,15 @@ const { sim, world, market, macro, agent, residentAgent, events, god } = createC
   ],
   secondDiner: true,
   disasters: true,
+  // HP3 — the living, GROWING city: as the town prospers, newcomers move in and
+  // families have children, filling the spare housing (HP1) so firms gain real
+  // customers and the open seats (14 producer seats vs the 12 seeded residents)
+  // finally get staffed. Births grow it from within first, in-migration backfills
+  // the labour; residents age and eventually pass on, their estate inherited — a
+  // living demographic cycle. Default-OFF in createCity (tests/bench unchanged);
+  // engaged here so the live game shows the town grow before your eyes.
+  populationGrowth: true,
+  populationOptions: { births: true, mortality: true },
 });
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -634,6 +643,7 @@ if (isDev) {
     macro,
     agent,
     residentAgent,
+    population,
     renderFrame,
     renderer,
   };
