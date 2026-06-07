@@ -47,6 +47,13 @@ interface ResidentView {
   selGlow: Graphics;
 }
 
+/** A pooled thought-bubble (R1 overlay): a rounded callout + tail + fitted text. */
+interface BubbleView {
+  container: Container;
+  gfx: Graphics;
+  text: Text;
+}
+
 /**
  * The WebGL renderer (visualization R2) — a retained Pixi.js scene graph that
  * implements the same read-only {@link CityRenderer} contract as the canvas
@@ -89,6 +96,12 @@ export class PixiRenderer implements CityRenderer {
   private disasterBannerDot: Graphics | undefined;
   private disasterBannerText: Text | undefined;
 
+  private bubbleLayer: Container | undefined;
+  private readonly bubblePool: BubbleView[] = [];
+  // Shared offscreen 2D context to measure text exactly like the canvas renderer,
+  // so bubble ellipsis breakpoints match (§6.4).
+  private readonly measureCtx = document.createElement("canvas").getContext("2d");
+
   private roadsBuilt = false;
   private readonly buildingViews = new Map<string, BuildingView>();
   private readonly residentViews = new Map<string, ResidentView>();
@@ -122,6 +135,8 @@ export class PixiRenderer implements CityRenderer {
     this.app.stage.addChild(this.hudLayer);
     this.buildHud();
     this.buildDisaster();
+    this.bubbleLayer = new Container();
+    this.hudLayer.addChild(this.bubbleLayer);
     this.ready = true;
     // Deferred first paint when the tab's rAF is throttled (background preview);
     // production's live rAF loop paints next frame regardless.
@@ -129,7 +144,7 @@ export class PixiRenderer implements CityRenderer {
     w.cwlc?.renderFrame?.();
   }
 
-  draw(hourFloat: number, selected?: Pick, disaster?: DisasterMarker, _bubbles?: ThoughtBubble[]): void {
+  draw(hourFloat: number, selected?: Pick, disaster?: DisasterMarker, bubbles?: ThoughtBubble[]): void {
     if (!this.ready || !this.skyGfx || !this.roadsGfx) return;
     const a = ambient(hourFloat);
     const glow = windowGlow(hourFloat);
@@ -168,6 +183,7 @@ export class PixiRenderer implements CityRenderer {
 
     this.updateSkyBadge(hourFloat);
     this.updateDisaster(disaster);
+    this.updateBubbles(bubbles ?? []);
   }
 
   /** Legend (bottom-left) + sun/moon badge (top-right), built once in screen space. */
@@ -514,8 +530,94 @@ export class PixiRenderer implements CityRenderer {
     return n;
   }
 
-  pick(_x: number, _y: number): Pick | undefined {
-    return undefined; // wired in R2f (canvas-space) and R2i (under the camera)
+  pick(x: number, y: number): Pick | undefined {
+    if (!this.ready) return undefined;
+    // R2f: no camera yet, so canvas space == world space. R2i adds the inverse
+    // camera transform here; the hit-test below (verbatim from the canvas renderer)
+    // is unchanged — resident first (≤9px), then building AABB (≤13px).
+    const wx = x;
+    const wy = y;
+    let best: { id: string; d: number } | undefined;
+    for (const r of this.world.residents) {
+      const d = Math.hypot(r.move.x - wx, r.move.y - wy);
+      if (d <= DOT_RADIUS + 4 && (!best || d < best.d)) best = { id: r.id, d };
+    }
+    if (best) return { kind: "resident", id: best.id };
+    for (const loc of this.world.locations) {
+      const slot = this.buildingSlot(loc);
+      const half = BUILDING / 2;
+      if (Math.abs(slot.x - wx) <= half && Math.abs(slot.y - wy) <= half) {
+        const biz = this.world.businesses.find((b) => b.locationId === loc.id);
+        if (biz) return { kind: "business", id: biz.id };
+      }
+    }
+    return undefined;
+  }
+
+  /** World→screen (identity until R2h adds the camera transform). */
+  private worldToScreen(x: number, y: number): { x: number; y: number } {
+    return { x, y };
+  }
+
+  /**
+   * The R1 thought bubbles, pooled in screen space but anchored over the deciding
+   * firm via worldPosOf + worldToScreen. `alpha` is the unchanged wall-clock fade
+   * computed in main.ts (presentation only — never sim state).
+   */
+  private updateBubbles(bubbles: ThoughtBubble[]): void {
+    let used = 0;
+    for (const b of bubbles) {
+      if (b.alpha <= 0.02) continue;
+      const wp = this.worldPosOf(b.businessId);
+      if (!wp) continue;
+      const screen = this.worldToScreen(wp.x, wp.y - BUILDING / 2 - 6);
+      const v = this.getBubble(used++);
+      const fitted = this.fitText(b.text, 172);
+      const padX = 7;
+      const h = 18;
+      const w = fitted.width + padX * 2;
+      v.gfx.clear();
+      v.gfx
+        .roundRect(-w / 2, -h, w, h, 5)
+        .fill({ color: 0x0e1116, alpha: 0.9 })
+        .stroke({ width: 1, color: 0x58a6ff });
+      v.gfx.moveTo(-4, 0).lineTo(4, 0).lineTo(0, 5).closePath().fill({ color: 0x0e1116, alpha: 0.9 });
+      v.text.text = fitted.text;
+      v.text.position.set(0, -h / 2);
+      v.container.position.set(screen.x, screen.y);
+      v.container.alpha = b.alpha;
+      v.container.visible = true;
+    }
+    for (let i = used; i < this.bubblePool.length; i++) this.bubblePool[i]!.container.visible = false;
+  }
+
+  private getBubble(i: number): BubbleView {
+    const existing = this.bubblePool[i];
+    if (existing) return existing;
+    const container = new Container();
+    const gfx = new Graphics();
+    const text = new Text({
+      text: "",
+      style: { fontFamily: "system-ui, sans-serif", fontSize: 11, fontWeight: "bold", fill: 0xe6edf3 },
+    });
+    text.anchor.set(0.5, 0.5);
+    container.addChild(gfx, text);
+    this.bubbleLayer?.addChild(container);
+    const v: BubbleView = { container, gfx, text };
+    this.bubblePool[i] = v;
+    return v;
+  }
+
+  /** Truncate to fit `maxW` using the shared canvas measureText (matches the canvas bubble). */
+  private fitText(text: string, maxW: number): { text: string; width: number } {
+    const ctx = this.measureCtx;
+    if (!ctx) return { text, width: text.length * 6 };
+    ctx.font = "bold 11px system-ui, sans-serif";
+    if (ctx.measureText(text).width <= maxW) return { text, width: ctx.measureText(text).width };
+    let t = text;
+    while (t.length > 1 && ctx.measureText(`${t}…`).width > maxW) t = t.slice(0, -1);
+    const out = `${t}…`;
+    return { text: out, width: ctx.measureText(out).width };
   }
 
   destroy(): void {
