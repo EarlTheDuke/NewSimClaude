@@ -385,6 +385,9 @@ svg.spark {
 .ticker .fallback {
   color: #d29922;
 }
+.ticker.hidden {
+  display: none;
+}
 
 .whynow {
   margin-top: 10px;

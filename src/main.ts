@@ -2,7 +2,7 @@ import "./style.css";
 import { createCity, type BrainOption, type ResidentBrainOption } from "./createCity";
 import { SPEED_OPTIONS, type SpeedMultiplier } from "./core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "./utils/serialization";
-import { CanvasRenderer, type Pick, type DisasterMarker } from "./render/CanvasRenderer";
+import { CanvasRenderer, type Pick, type DisasterMarker, type ThoughtBubble } from "./render/CanvasRenderer";
 import {
   tickerItems,
   latestDecisionFor,
@@ -152,6 +152,19 @@ el<HTMLSpanElement>("#resBrainTag").textContent = residentAgent
 const renderer = new CanvasRenderer(canvas, world);
 let selected: Pick | undefined;
 
+// Thought-bubble lifecycle + narration toggle (presentation-only). The fade is
+// wall-clock (performance.now) — it animates the view and never touches sim state,
+// so determinism is untouched.
+let narrationOn = true;
+const BUBBLE_TTL_MS = 4500;
+interface LiveBubble {
+  businessId: string;
+  summary: string;
+  bornMs: number;
+}
+let liveBubbles: LiveBubble[] = [];
+let lastBizDecisionCount = 0;
+
 const pauseBtn = button("Pause", () => {
   sim.time.togglePause();
   syncControls();
@@ -177,6 +190,17 @@ controlsEl.append(
     renderFrame();
   }),
 );
+
+// Decision-narration toggle (thought bubbles + ticker), default on.
+const narrationBtn = button("Narration: on", () => {
+  narrationOn = !narrationOn;
+  narrationBtn.textContent = `Narration: ${narrationOn ? "on" : "off"}`;
+  narrationBtn.classList.toggle("active", narrationOn);
+  tickerEl.classList.toggle("hidden", !narrationOn);
+  renderFrame();
+});
+narrationBtn.classList.add("active");
+controlsEl.append(narrationBtn);
 
 // God Mode — every act is money-conserving; we redraw right away so the
 // intervention (glyph, needs, prices) shows on the next painted frame.
@@ -415,7 +439,32 @@ function renderResidentTrace(): void {
  * latest moves (businesses + residents) with the one-line reason behind each.
  * The "news feed" of the AI economy; reads the same logs the panels do.
  */
+/**
+ * Spawn/expire the floating thought bubbles. A new business decision spawns a
+ * bubble over that firm (one live bubble per firm — newest wins); each fades over
+ * BUBBLE_TTL_MS. The wall-clock fade is presentation-only — never sim state.
+ */
+function syncBubbles(): void {
+  if (!agent) return;
+  const log = agent.decisions();
+  if (log.length > lastBizDecisionCount) {
+    const nowMs = performance.now();
+    for (const e of log.slice(lastBizDecisionCount)) {
+      liveBubbles = liveBubbles.filter((b) => b.businessId !== e.businessId);
+      liveBubbles.push({
+        businessId: e.businessId,
+        summary: summarizeBusinessAction(e.action),
+        bornMs: nowMs,
+      });
+    }
+    lastBizDecisionCount = log.length;
+  }
+  const cutoff = performance.now() - BUBBLE_TTL_MS;
+  liveBubbles = liveBubbles.filter((b) => b.bornMs > cutoff);
+}
+
 function renderTicker(): void {
+  if (!narrationOn) return;
   const items = tickerItems(
     agent?.decisions() ?? [],
     residentAgent?.decisions() ?? [],
@@ -518,7 +567,16 @@ function renderFrame(): void {
     todays && todays.day === t.day
       ? { kind: todays.kind, headline: todays.headline, targetId: todays.targetId }
       : undefined;
-  renderer.draw(t.hour + t.minute / 60, selected, marker);
+  syncBubbles();
+  const nowMs = performance.now();
+  const bubbleViews: ThoughtBubble[] = narrationOn
+    ? liveBubbles.map((b) => ({
+        businessId: b.businessId,
+        text: b.summary,
+        alpha: Math.max(0, 1 - (nowMs - b.bornMs) / BUBBLE_TTL_MS),
+      }))
+    : [];
+  renderer.draw(t.hour + t.minute / 60, selected, marker, bubbleViews);
   renderInspector();
   renderMacro();
   renderEvents();

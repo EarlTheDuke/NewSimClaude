@@ -58,6 +58,17 @@ export interface DisasterMarker {
 }
 
 /**
+ * A floating "thought bubble" over a business — its latest decision, shown the
+ * moment its brain decides and fading out. `alpha` is a presentation-only fade
+ * (0..1) computed from wall-clock in the view layer; it never touches sim state.
+ */
+export interface ThoughtBubble {
+  businessId: string;
+  text: string;
+  alpha: number;
+}
+
+/**
  * Read-only view of the world: roads, buildings, and residents painted onto the
  * canvas. Phase 5 makes it breathe — the whole scene is tinted and dimmed by
  * the hour of day, and buildings light their windows after dark in proportion
@@ -76,7 +87,7 @@ export class CanvasRenderer {
   }
 
   /** Paint a frame for the given hour of day (0..24, fractional for smoothness). */
-  draw(hourFloat: number, selected?: Pick, disaster?: DisasterMarker): void {
+  draw(hourFloat: number, selected?: Pick, disaster?: DisasterMarker, bubbles?: ThoughtBubble[]): void {
     const { ctx, canvas, world } = this;
     const a = ambient(hourFloat);
     const glow = windowGlow(hourFloat);
@@ -119,6 +130,77 @@ export class CanvasRenderer {
     this.drawLegend();
     this.drawSky(hourFloat);
     if (disaster) this.drawDisaster(disaster);
+    if (bubbles && bubbles.length > 0) this.drawThoughtBubbles(bubbles);
+  }
+
+  /**
+   * Decision narration (Phase R1): a fading callout over each business that just
+   * decided, showing the lever(s) it pulled. Placed above the building, drawn last
+   * so it sits over everything. Pure read-only paint — the bubble list + fade are
+   * computed in the view layer.
+   */
+  private drawThoughtBubbles(bubbles: ThoughtBubble[]): void {
+    for (const b of bubbles) {
+      if (b.alpha <= 0.02) continue;
+      const pos = this.locateTarget(b.businessId);
+      if (pos) this.drawBubble(pos.x, pos.y - BUILDING / 2 - 6, b.text, b.alpha);
+    }
+  }
+
+  /** One rounded callout with a downward tail, its text fitted to a max width. */
+  private drawBubble(cx: number, anchorY: number, text: string, alpha: number): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.font = "bold 11px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const padX = 7;
+    const h = 18;
+    const label = this.fitText(text, 172);
+    const w = ctx.measureText(label).width + padX * 2;
+    const x = cx - w / 2;
+    const y = anchorY - h;
+
+    this.roundRectPath(x, y, w, h, 5);
+    ctx.fillStyle = "rgba(14, 17, 22, 0.9)";
+    ctx.fill();
+    ctx.strokeStyle = "#58a6ff";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(cx - 4, y + h);
+    ctx.lineTo(cx + 4, y + h);
+    ctx.lineTo(cx, y + h + 5);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(14, 17, 22, 0.9)";
+    ctx.fill();
+
+    ctx.fillStyle = "#e6edf3";
+    ctx.fillText(label, cx, y + h / 2 + 0.5);
+    ctx.restore();
+  }
+
+  /** Trace a rounded-rect path (arcTo — universally supported). */
+  private roundRectPath(x: number, y: number, w: number, h: number, r: number): void {
+    const { ctx } = this;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /** Truncate `text` with an ellipsis so it fits within `maxW` at the current font. */
+  private fitText(text: string, maxW: number): string {
+    const { ctx } = this;
+    if (ctx.measureText(text).width <= maxW) return text;
+    let t = text;
+    while (t.length > 1 && ctx.measureText(`${t}…`).width > maxW) t = t.slice(0, -1);
+    return `${t}…`;
   }
 
   private drawResident(r: Resident, isSelected: boolean): void {
