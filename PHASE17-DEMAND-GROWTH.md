@@ -302,3 +302,26 @@ Each slice defaults to a no-op: `brand`/`brandSpent` absent ⇒ `?? BRAND_BASELI
   supply-chain/labour fix + a capital-discounted utilization signal** — a deeper follow-up
   (a dedicated supply-chain phase, or folded into Phase 18 credit). **Phase 16 slices 3+4
   remain parked behind that** (retain-to-reinvest only compounds once the engine sustains).
+
+### Update 2026-06-06 — root cause found + a working fix (engagement needs a re-tune)
+
+The compounding blocker is now **diagnosed, with a proven fix**. A 3-year full-agentic probe
+(seeds 1 & 7) isolated the cause: under brand-grown demand the **lowest-wage producer (mine,
+0.05/tick) loses its crew to the storefronts (0.17–0.20), starving the chain so the factory
+dies** — goods then loses its supply, utilization collapses, and the invest/brand engine
+decays to baseline. **Shoring up producer wages fixes it:** with producers floored at ~0.16
+the chain stays staffed and goods capital + brand **sustain ~1700–2100 over 3 years** (vs
+decaying to 0) — the engine compounds. This confirms the blocker is the **shared-labour-pool
+fragility (P10-3)**, not the utilization signal.
+
+- **Shipped:** the `PRODUCER_WAGE_FLOOR` seam (constants + cityGen, default 0 ⇒
+  byte-identical, 303 green; commit `361e8b9`).
+- **Not engaged — needs a re-tune (real fork, deferred):** setting it to 0.16 keeps the live
+  economy healthy (the 3-year soak passes) but **squeezes the storefronts** — producers and
+  storefronts share one labour pool, so competitive producer wages raise B2B cost-plus prices
+  off base and break the two-diner truce into a monopoly (4 isolated-mechanism tests shift).
+  This is exactly the *"pricing-band re-tune + fresh soak"* the tuning study foresaw: a careful
+  trade-off (staff the chain *without* squeezing storefronts), with genuine direction choices —
+  thread the floor value, widen the labour pool structurally (more residents / Phase 19
+  population), or accept + re-baseline the truce. The seam is in place to engage once the
+  approach is chosen; this is the keystone that then unblocks Phase 16 slices 3+4.
