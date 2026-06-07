@@ -78,6 +78,14 @@ export interface BusinessObservation {
    * pre-Phase-16 mock observations.
    */
   dayDistributed?: number;
+  /**
+   * The firm's current payout fraction — the share of each day's distributable
+   * surplus it pays out as dividends, the rest retained as working capital to
+   * reinvest (Phase 16, set by {@link BusinessAction.setPayout}). Lets a mind see
+   * its current retain-vs-distribute stance before changing it. Undefined ⇒ 1.0
+   * (full distribution), so pre-Phase-16 / mock observations read as today.
+   */
+  payoutRate?: number;
   /** Residents currently available to hire (jobId === ""). */
   unemployedCount: number;
   /**

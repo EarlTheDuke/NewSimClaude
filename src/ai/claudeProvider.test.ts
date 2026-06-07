@@ -64,6 +64,18 @@ describe("ClaudeDecisionProvider (modernized — the LM-as-CEO mind)", () => {
     expect(decision.usage?.inputTokens).toBe(12);
   });
 
+  it("offers the retain-vs-distribute lever (setPayout) and parses it (Phase 16)", async () => {
+    const { client, captured } = stub({ setPayout: 0.5, reason: "retain to fund growth" });
+    const provider = new ClaudeDecisionProvider({ client });
+    const decision = await provider.decide({ observation: obs({ payoutRate: 0.6 }), limits: DEFAULT_LIMITS });
+
+    const props = captured().tools[0].input_schema.properties as Record<string, unknown>;
+    expect(props).toHaveProperty("setPayout"); // the lever is offered
+    expect(decision.action.setPayout).toBe(0.5); // and parsed back
+    // the firm's current retain stance is surfaced so the CEO can change it deliberately
+    expect(captured().messages[0].content as string).toMatch(/retain/i);
+  });
+
   it("surfaces the strategic signals in the observation it sends", async () => {
     const { client, captured } = stub({ reason: "hold" });
     const provider = new ClaudeDecisionProvider({ client });

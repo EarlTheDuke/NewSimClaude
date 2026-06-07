@@ -102,7 +102,11 @@ export class ClaudeDecisionProvider implements DecisionProvider {
         "willingness-to-pay and grow your demand when you have room to sell more; " +
         "raise the wage to attract or keep " +
         "staff when short-handed, and ease it back when fully crewed and cash is " +
-        "tight; hire when you are profitable and short-handed. Values outside the " +
+        "tight; hire when you are profitable and short-handed. Decide how much of " +
+        "your profit to pay out versus retain: set the payout fraction below 1 to " +
+        "keep cash as working capital to reinvest and grow (lower it when you have a " +
+        "growth opportunity to fund; keep it near 1 to pay out when you don't). " +
+        "Values outside the " +
         "limits are clamped, so stay within them. Always give a one-sentence reason.",
       tool_choice: { type: "tool", name: "set_business_plan" },
       tools: [
@@ -132,6 +136,10 @@ export class ClaudeDecisionProvider implements DecisionProvider {
                 type: "number",
                 description: `Cash to spend on marketing/quality this day (0-${limits.maxBrandPerReview}); builds brand equity that lifts customers' willingness-to-pay and grows demand, with diminishing returns + decay. Omit for none.`,
               },
+              setPayout: {
+                type: "number",
+                description: `Fraction of profit to pay out as dividends, 0-1 (current ${o.payoutRate ?? 1}); the rest is retained as cash to reinvest. Lower it to fund growth, raise toward 1 to pay out. Omit to keep.`,
+              },
               reason: { type: "string", description: "One sentence: why." },
             },
             required: ["reason"],
@@ -153,6 +161,7 @@ export class ClaudeDecisionProvider implements DecisionProvider {
     if (typeof input.invest === "number") action.invest = input.invest;
     if (typeof input.setWage === "number") action.setWage = input.setWage;
     if (typeof input.brand === "number") action.brand = input.brand;
+    if (typeof input.setPayout === "number") action.setPayout = input.setPayout;
 
     const usage: ProviderUsage = {
       inputTokens: response.usage.input_tokens,
@@ -186,6 +195,9 @@ export class ClaudeDecisionProvider implements DecisionProvider {
     if (o.brand !== undefined) lines.push(`Brand equity ${round(o.brand)} — marketing spend lifts it, growing how much customers will pay and buy.`);
     const distNote = o.dayDistributed !== undefined ? `, distributed ${round(o.dayDistributed)}` : "";
     lines.push(`Yesterday: revenue ${round(o.dayRevenue)}, wages ${round(o.dayWages)}, rent/COGS ${round(o.dayRent)}${distNote}, net cash ${round(o.dayProfit)}.`);
+    if (o.payoutRate !== undefined && o.payoutRate < 1) {
+      lines.push(`You currently retain ${Math.round((1 - o.payoutRate) * 100)}% of your surplus as working capital (paying out the rest).`);
+    }
     lines.push(`Choose this day's plan.`);
     return lines.join(" ");
   }

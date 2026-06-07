@@ -313,6 +313,7 @@ export class BusinessAgentSystem implements System {
       dayRent,
       dayProfit,
       dayDistributed,
+      payoutRate: biz.payoutRate, // Phase 16 — current retain-vs-distribute stance (undefined ⇒ full payout)
       unemployedCount: this.world.residents.filter((r) => r.jobId === "").length,
       // Phase 12c — surface the two signals the invest lever reads: how much
       // equipment this firm owns, and how hard it ran yesterday relative to
