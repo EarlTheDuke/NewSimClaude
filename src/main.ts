@@ -92,6 +92,7 @@ app.innerHTML = `
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
     <div class="stats" id="stats"></div>
+    <div class="stats" id="popline" title="Live demography (HP3/HP4)"></div>
   </div>
   <div class="stage">
     <canvas id="city" width="${WIDTH}" height="${HEIGHT}"></canvas>
@@ -134,6 +135,7 @@ app.innerHTML = `
 const clockEl = el<HTMLSpanElement>("#clock");
 const dayEl = el<HTMLSpanElement>("#day");
 const statsEl = el<HTMLDivElement>("#stats");
+const popLineEl = el<HTMLDivElement>("#popline");
 const controlsEl = el<HTMLDivElement>("#controls");
 const inspectorEl = el<HTMLDivElement>("#inspector");
 const vitalsEl = el<HTMLDivElement>("#vitals");
@@ -585,6 +587,15 @@ function renderFrame(): void {
   statsEl.textContent = `tick ${t.totalTicks.toLocaleString()} · ${sim.time.getSpeed()}x · ${
     sim.time.isPaused() ? "paused" : "running"
   }`;
+  // Live demography (HP3/HP4) — read-only. Shows the town growing and turning over.
+  const demo = population.demography();
+  const jobless = world.residents.filter((r) => r.jobId === "").length;
+  const homes = world.locations.filter((l) => l.type === "home").length;
+  const perCap = Math.round(world.totalMoney() / Math.max(1, demo.population));
+  popLineEl.textContent =
+    `pop ${demo.population} · ${demo.population - jobless} working / ${jobless} not · ` +
+    `${homes} homes${demo.housingConstrained ? " (full)" : ""} · ` +
+    `births ${demo.born} · deaths ${demo.died} · arrivals ${demo.migrated} · $${perCap.toLocaleString()}/head`;
   syncControls();
   const todays = events?.latest();
   const marker: DisasterMarker | undefined =
