@@ -84,7 +84,12 @@ Each phase is independently shippable and ends with a **GATE** (what the user mu
 browser before moving on). Phases 1–2 are specced here; 3–7 are scoped at direction level and
 get a detailed slice breakdown at their boundary (house convention).
 
-### R1 — Decision narrative MVP *(the moat; canvas; no engine or sim change)* ← recommended start
+### R1 — Decision narrative MVP *(the moat; canvas; no engine or sim change)* · ✅ SHIPPED 2026-06-06
+> Shipped in 3 slices — R1a pure `DecisionNarration` model + 14 tests (`43ec49d`), R1b live
+> ticker + click-to-"why now?" (`c14c14c`), R1c canvas thought bubbles + narration toggle
+> (`bf4c2b2`). Gate verified live (pixel A/B: bubbles 30→0 on toggle; ticker populated with
+> real reasons; why-now backed by numbers). 323 tests green; sim untouched. A dev-only
+> `window.cwlc` handle was added for render-gate verification (stripped from prod builds).
 The unique value, shipped first, at zero risk. Pure read-only overlay over today's renderer.
 - **Thought bubbles:** when a business's brain decides, a callout pops over its building showing
   the lever(s) (`price→$x`, `+1 hire`, `invest $y`, `brand $z`, `payout 0.5`) and a one-line
