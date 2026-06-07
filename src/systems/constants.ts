@@ -76,6 +76,19 @@ export const MIGRATION_PROSPERITY_FLOOR = 600; // median resident cash the town 
  * arrival who'll settle into the daily needs loop like everyone else.
  */
 export const NEWCOMER_NEEDS: Needs = { hunger: 80, energy: 85, social: 70 };
+/** Age (years) an in-migrant arrives at — a working adult; newborns start at 0 (HP3). */
+export const NEWCOMER_AGE_YEARS = 25;
+
+// Population mortality (HP3) — residents age and eventually die, with their estate
+// passing to an heir so the closed economy is untouched. The exit path that lets
+// births (HP3-7) sustain a living demographic cycle instead of just filling housing
+// once. Default-OFF ⇒ no aging, no death ⇒ byte-identical.
+//
+// Real-world: people grow old and pass on; what they leave is inherited, not
+// destroyed. A town stays alive through the turnover of generations.
+export const POPULATION_MORTALITY = false; // master flag: residents age and die (with inheritance)
+export const MAX_AGE_YEARS = 80; // a resident dies once they reach this age; estate -> heir (conserved)
+export const DAYS_PER_YEAR = 365; // sim-days per year, for aging
 
 // Economy
 export const RENT_PER_DAY = 70; // resident -> landlord (fallback when a home has no rent set)

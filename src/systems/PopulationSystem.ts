@@ -11,9 +11,13 @@ import {
   MIGRATION_RATE_PER_DAY,
   MIGRATION_PROSPERITY_FLOOR,
   NEWCOMER_NEEDS,
+  NEWCOMER_AGE_YEARS,
+  POPULATION_MORTALITY,
+  MAX_AGE_YEARS,
+  DAYS_PER_YEAR,
 } from "./constants";
 
-/** Tunable growth knobs; each defaults to the live constant. Tests/tuning override. */
+/** Tunable growth/mortality knobs; each defaults to the live constant. Tests/tuning override. */
 export interface PopulationOptions {
   /** Growth pressure accrued per eligible day (a whole unit admits one person). */
   ratePerDay?: number;
@@ -21,6 +25,17 @@ export interface PopulationOptions {
   cooldownDays?: number;
   /** Median resident cash the town must clear to attract a newcomer. */
   prosperityFloor?: number;
+  /** Whether residents age and die (with inheritance). */
+  mortality?: boolean;
+  /** Age (years) at which a resident dies. */
+  maxAgeYears?: number;
+  /** Sim-days per year, for aging (small values compress the demographic clock in tests). */
+  daysPerYear?: number;
+}
+
+/** Numeric index from a `res_N` id — finite for every id we mint (the NaN-id guard). */
+function residentIndex(id: string): number {
+  return Number(id.split("_")[1] ?? 0);
 }
 
 /**
@@ -61,6 +76,9 @@ export class PopulationSystem implements System {
   private readonly ratePerDay: number;
   private readonly cooldownDays: number;
   private readonly prosperityFloor: number;
+  private readonly mortality: boolean;
+  private readonly maxAgeYears: number;
+  private readonly daysPerYear: number;
 
   constructor(
     private readonly world: World,
@@ -72,14 +90,25 @@ export class PopulationSystem implements System {
     this.ratePerDay = opts.ratePerDay ?? MIGRATION_RATE_PER_DAY;
     this.cooldownDays = opts.cooldownDays ?? IN_MIGRATION_COOLDOWN_DAYS;
     this.prosperityFloor = opts.prosperityFloor ?? MIGRATION_PROSPERITY_FLOOR;
+    this.mortality = opts.mortality ?? POPULATION_MORTALITY;
+    this.maxAgeYears = opts.maxAgeYears ?? MAX_AGE_YEARS;
+    this.daysPerYear = opts.daysPerYear ?? DAYS_PER_YEAR;
     this.lastSpawnDay = -this.cooldownDays;
   }
 
   update(ctx: SystemContext): void {
-    if (!this.enabled) return;
+    if (!this.enabled && !this.mortality) return; // fully inert ⇒ byte-identical
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
     const { day } = ctx.time.time();
 
+    // Deaths first (they free homes + jobs the same-day growth can refill), once a
+    // year. Then growth admits newcomers.
+    if (this.mortality && day > 0 && day % this.daysPerYear === 0) this.ageAndReap();
+    if (this.enabled) this.grow(day);
+  }
+
+  /** The in-migration trigger (HP3-5): admit newcomers when the town is healthy. */
+  private grow(day: number): void {
     // The town only attracts newcomers when it's healthy (all pure reads of the
     // fully-settled day): spare homes to live in AND a prosperous-enough populace.
     //  - Housing slack is the HARD ceiling — growth halts at the HP1 cap (18 slots)
@@ -171,7 +200,7 @@ export class PopulationSystem implements System {
   spawnMigrant(): Resident | undefined {
     const homeId = cheapestVacantHome(this.world.residents, this.world.locations);
     if (homeId === undefined) return undefined;
-    return this.create(homeId, "migrant");
+    return this.create(homeId, "migrant", NEWCOMER_AGE_YEARS);
   }
 
   /**
@@ -181,7 +210,7 @@ export class PopulationSystem implements System {
    * id namespace, draws no RNG, and reindexes so the newcomer is immediately visible
    * to every system and lookup.
    */
-  private create(homeId: string, origin: ResidentOrigin): Resident {
+  private create(homeId: string, origin: ResidentOrigin, age: number): Resident {
     const index = this.baseCount + this.spawnCount;
     this.spawnCount += 1;
     const home = this.world.getLocation(homeId);
@@ -203,11 +232,68 @@ export class PopulationSystem implements System {
       activity: "sleeping",
       destinationId: homeId,
       origin,
+      age,
       move: { x: node.x, y: node.y, atNodeId: home.nodeId, path: [], segmentProgress: 0 },
     };
     this.world.residents.push(r);
     this.world.reindex();
     return r;
+  }
+
+  /**
+   * Age the town one year (HP3-6) and reap anyone who has reached {@link maxAgeYears}.
+   * Runs once per sim-year. The seeded cohort is lazily given a deterministic spread
+   * of ages the first time (so a realistic age mix appears the moment mortality
+   * engages, without baking ages into the seed — keeping mortality-off byte-identical).
+   */
+  private ageAndReap(): void {
+    for (const r of this.world.residents) {
+      if (r.age === undefined) r.age = this.initialAge(residentIndex(r.id));
+    }
+    for (const r of this.world.residents) r.age = (r.age ?? 0) + 1;
+    // Reap the too-old in ascending id order (deterministic), each estate inherited.
+    const doomed = this.world.residents
+      .filter((r) => (r.age ?? 0) >= this.maxAgeYears)
+      .sort((a, b) => residentIndex(a.id) - residentIndex(b.id));
+    for (const d of doomed) this.reap(d);
+  }
+
+  /**
+   * Remove a resident who has died, conserving money: the estate is transferred to
+   * the heir (the lowest-id living resident) BEFORE removal — `World.transfer` caps
+   * at the balance, so the decedent drains to exactly $0 and removing them changes
+   * `totalMoney` by nothing. Their job seat is freed and any firm they owned passes
+   * to the heir, so no business is left with a dead owner. Never reaps the last
+   * resident (there'd be no heir, which would vanish their money).
+   */
+  private reap(dead: Resident): void {
+    const heir = this.world.residents
+      .filter((r) => r.id !== dead.id)
+      .sort((a, b) => residentIndex(a.id) - residentIndex(b.id))[0];
+    if (!heir) return;
+
+    this.world.transfer(dead.id, heir.id, dead.money); // estate -> heir; drains to $0
+    if (dead.jobId) {
+      const employer = this.world.getBusiness(dead.jobId);
+      const i = employer?.employeeIds.indexOf(dead.id) ?? -1;
+      if (employer && i >= 0) employer.employeeIds.splice(i, 1);
+    }
+    for (const b of this.world.businesses) {
+      if (b.ownerId === dead.id) b.ownerId = heir.id; // no dead owners left behind
+    }
+    const idx = this.world.residents.findIndex((r) => r.id === dead.id);
+    if (idx >= 0) this.world.residents.splice(idx, 1);
+    this.world.reindex();
+  }
+
+  /**
+   * A deterministic starting age in [0, maxAge) for the seeded cohort, spread by
+   * resident index so the town has a realistic age mix the moment mortality engages.
+   * No RNG; only ever applied to seeded residents (new arrivals get an explicit age).
+   */
+  private initialAge(index: number): number {
+    const span = Math.max(1, this.baseCount);
+    return Math.floor(((index % span) / span) * this.maxAgeYears);
   }
 
   serialize(): unknown {

@@ -238,6 +238,13 @@ export interface Resident {
    * Cosmetic/analytic only — never money, never part of the id namespace.
    */
   origin?: ResidentOrigin;
+  /**
+   * Age in years (HP3 mortality). Absent until mortality engages — the seeded
+   * cohort is lazily given a spread of realistic ages the first time, and new
+   * arrivals get an explicit age at creation. A resident dies at MAX_AGE_YEARS,
+   * their estate passing to an heir. Absent ⇒ byte-identical to pre-HP3 / mortality-off.
+   */
+  age?: number;
 }
 
 /** Serializable slice owned by the World. */

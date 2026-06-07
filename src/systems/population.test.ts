@@ -209,3 +209,70 @@ describe("PopulationSystem growth trigger (HP3-5)", () => {
     for (const r of world.residents) expect(r.money).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("PopulationSystem mortality (HP3-6)", () => {
+  // daysPerYear 2 compresses the demographic clock so a death fires on day 2;
+  // maxAge 100 keeps the rest of the (age-spread) cohort alive so only the victim dies.
+  const fast = { mortality: true, maxAgeYears: 100, daysPerYear: 2 };
+
+  it("a resident at max age dies; estate -> heir, firm -> heir, job freed, money conserved", () => {
+    const { sim, world } = createCity({ seed: 1, populationOptions: fast });
+    // res_3 owns the farm (ownerOf(3)) and works at the mine (staffable[3]).
+    expect(world.getBusiness("biz_farm")!.ownerId).toBe("res_3");
+    expect(world.getBusiness("biz_mine")!.employeeIds).toContain("res_3");
+    world.getResident("res_3")!.age = 100; // at the death age
+
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 2); // cross the (compressed) year boundary
+
+    expect(world.getResident("res_3")).toBeUndefined(); // died
+    expect(world.residents).toHaveLength(11);
+    expect(world.totalMoney()).toBeCloseTo(start, 6); // estate inherited, none destroyed
+    // The heir (lowest-id living resident) took over the farm; no dead owner remains.
+    expect(world.getBusiness("biz_farm")!.ownerId).toBe("res_0");
+    expect(world.getResident("res_0")).toBeDefined();
+    // The decedent's job seat was freed.
+    expect(world.getBusiness("biz_mine")!.employeeIds).not.toContain("res_3");
+    // Every business owner is a living resident.
+    for (const b of world.businesses) expect(world.getResident(b.ownerId)).toBeDefined();
+  });
+
+  it("aging + death survive save/reload (the same death reproduces)", () => {
+    const opts = { seed: 1, populationOptions: fast };
+    const a = createCity(opts);
+    a.world.getResident("res_3")!.age = 99; // ages to 100 at the day-2 boundary
+    a.sim.run(TICKS_PER_DAY); // day 1: no death yet
+
+    const json = snapshotToJSON(a.sim.serialize());
+    const b = createCity(opts);
+    b.sim.restore(snapshotFromJSON(json));
+
+    a.sim.run(TICKS_PER_DAY); // day 2: res_3 dies
+    b.sim.run(TICKS_PER_DAY);
+    expect(a.world.getResident("res_3")).toBeUndefined(); // it really died
+    expect(b.world.serialize()).toEqual(a.world.serialize());
+  });
+
+  it("mortality + growth together stay deterministic and money-conserving", () => {
+    const opts = {
+      seed: 7,
+      populationGrowth: true,
+      populationOptions: { mortality: true, maxAgeYears: 8, daysPerYear: 30, prosperityFloor: 0 },
+    };
+    const a = createCity(opts);
+    const b = createCity(opts);
+    const start = a.world.totalMoney();
+    a.sim.run(TICKS_PER_DAY * 150); // many year-boundaries -> births, deaths, migration
+    b.sim.run(TICKS_PER_DAY * 150);
+    expect(a.world.serialize()).toEqual(b.world.serialize());
+    expect(a.world.totalMoney()).toBeCloseTo(start, 2);
+    for (const r of a.world.residents) expect(r.money).toBeGreaterThanOrEqual(0);
+  });
+
+  it("with mortality off, the seeded cohort is never aged (byte-identical)", () => {
+    const { sim, world } = createCity({ seed: 1, populationGrowth: true, populationOptions: { prosperityFloor: 0 } });
+    sim.run(TICKS_PER_DAY * 400);
+    expect(world.getResident("res_0")!.age).toBeUndefined(); // no lazy-init without mortality
+    expect(world.residents.length).toBeGreaterThanOrEqual(12); // only grew, nobody died
+  });
+});
