@@ -45,6 +45,54 @@ seed 7. Net: a healthier economy.
 
 **HP4 is now unblocked:** `population.isHousingConstrained()` is the build trigger.
 
+## HP3 — observed behavior (20-year instrumented runs) & next steps
+
+A 20-year observation of the live config (agentic + entry + disasters + growth) surfaced
+a major finding. Three configs, employed / producer-staffing[farm,mine,bakery,factory] /
+median money / yearly revenue at year 20:
+
+| Config | yr5 | yr10 | yr20 | verdict |
+|---|---|---|---|---|
+| **births + mortality** (was live) | emp11 prod2121 med537 | emp7 prod1100 med71 | **emp5 prod0000 med59 rev526k** | **DEATH SPIRAL** |
+| in-migration + mortality | emp10 prod2011 | emp11 prod2021 | emp10 prod2020 med104 rev877k | healthy (workers replaced) |
+| **births only** (now live) | emp11 prod2121 med537 | emp11 prod2210 med702 | **emp10 prod2120 med685 rev908k** | **healthy & growing** |
+
+**Working:** money conserved to the cent across all configs/decades; deterministic; the
+population visibly grows 12→18; more people → more revenue (825k→908k) in healthy configs;
+housing+prosperity gate self-limits as designed; in-migration is a strong stabilizer.
+
+**Broken / limitations:**
+1. **Death spiral (births+mortality):** newborns never enter the workforce (no coming-of-age),
+   mortality kills the seeded workers, births preempt the working-age migrant inflow → labour
+   force collapses (12→5), every producer ends up unstaffed, supply chain dies, wealth/revenue
+   crater. **Mitigated** by dropping mortality from the live config (`02595b9`).
+2. **Coming-of-age gap:** newborns are dependents forever → a growing permanently-idle pool
+   (jobless 8→11) even when healthy. Not realistic, not productive.
+3. **New residents aren't full agents:** migrants/newborns aren't in `agenticResidentIds`, so
+   they never job-switch / negotiate / spend deliberately. Migrants are seated once; newborns never.
+4. **Births preempt migration:** the working-age inflow that stabilizes the labour force only
+   fires when no parent has room — it should yield to migration during a labour shortage.
+5. **Plateau at 18 is a hard wall:** "grows once, then static" until HP4 lifts the ceiling.
+6. **Per-capita dilution:** fixed money supply ÷ more people → low individual wealth (~100 in
+   migration configs); money pools in firms/owners.
+7. **Soak blind spot:** the HP3-8 soak checked `activeKinds>=4` (firms *solvent*) but an
+   *unstaffed* producer is still "active" — so it missed the staffing/production collapse.
+
+**Next steps (ranked):**
+1. **Coming-of-age (keystone):** newborns become working-age (~18 yr) and join the labour
+   market → births+mortality becomes a TRUE sustainable cycle; re-enable mortality after.
+2. **Labour-aware spawn balance:** prefer a working-age migrant when producer seats are open
+   and job-seekers are few; else a birth. (Could ship before #1 as a partial fix.)
+3. **Strengthen the soak:** assert producers stay staffed / output > 0 over a longer horizon,
+   so a regression like the spiral is caught.
+4. **HP4 — housing construction** (cost = transfer, conserved) to lift the ceiling past 18 →
+   sustained growth instead of a one-time jump.
+5. **Make new residents full agents** (add to the decision roster) for lifelike participation.
+6. **Demography HUD** (N / births / deaths / jobless / $-per-capita; the data already exists
+   via `population.demography()`) for watchability.
+7. **Per-capita dilution:** decide whether a fixed money supply is right as N grows, or whether
+   population-scaled money creation (ties to the shelved Phase 18 credit track) is needed.
+
 ---
 
 # HP3 — Population Growth (In-Migration → Births): The Living City
