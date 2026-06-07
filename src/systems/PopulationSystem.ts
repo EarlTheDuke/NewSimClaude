@@ -65,6 +65,10 @@ export class PopulationSystem implements System {
 
   /** Monotonic count of people spawned this run — drives unique numeric ids. */
   private spawnCount = 0;
+  /** Lifetime demographic tallies (HP3-8), for the demography readout. */
+  private migratedCount = 0;
+  private bornCount = 0;
+  private diedCount = 0;
   /** Fractional growth pressure accrued across eligible days; a whole unit admits one person. */
   private pressureAccumulator = 0;
   /** Day the last person arrived, for the cooldown. */
@@ -129,7 +133,9 @@ export class PopulationSystem implements System {
     if (!eligible) return;
 
     // Pressure builds slowly on healthy days; one whole unit admits one person.
-    this.pressureAccumulator += this.ratePerDay;
+    // Clamp it to what housing can actually absorb (HP3-8): growth can't bank a
+    // backlog that would flood the town the day a single home frees up.
+    this.pressureAccumulator = Math.min(this.pressureAccumulator + this.ratePerDay, slack);
     if (day - this.lastSpawnDay < this.cooldownDays) return; // space arrivals out
     const want = Math.floor(this.pressureAccumulator);
     if (want < 1) return;
@@ -198,6 +204,32 @@ export class PopulationSystem implements System {
   }
 
   /**
+   * Whether the town is out of housing (HP3-8) — every home is at capacity. The
+   * trigger HP4 (housing construction) will read to decide when to build more homes,
+   * and the renderer can surface "full" to the viewer. Pure, recomputed (never stale).
+   */
+  isHousingConstrained(): boolean {
+    return this.housingSlack() === 0;
+  }
+
+  /** Read-only demography snapshot (HP3-8) for the macro/HUD readout. Never mutates. */
+  demography(): {
+    population: number;
+    born: number;
+    died: number;
+    migrated: number;
+    housingConstrained: boolean;
+  } {
+    return {
+      population: this.world.residents.length,
+      born: this.bornCount,
+      died: this.diedCount,
+      migrated: this.migratedCount,
+      housingConstrained: this.isHousingConstrained(),
+    };
+  }
+
+  /**
    * Admit one in-migrant: a brand-new resident who arrives from outside with **$0**
    * and no job, placed in the cheapest home that still has a free slot. Returns the
    * new resident, or `undefined` when every home is full (housing is the hard gate —
@@ -212,7 +244,9 @@ export class PopulationSystem implements System {
   spawnMigrant(): Resident | undefined {
     const homeId = cheapestVacantHome(this.world.residents, this.world.locations);
     if (homeId === undefined) return undefined;
-    return this.create(homeId, "migrant", NEWCOMER_AGE_YEARS);
+    const r = this.create(homeId, "migrant", NEWCOMER_AGE_YEARS);
+    this.migratedCount += 1;
+    return r;
   }
 
   /**
@@ -233,6 +267,7 @@ export class PopulationSystem implements System {
     const child = this.create(parent.homeId, "born", 0);
     child.parentId = parent.id;
     this.world.transfer(parent.id, child.id, BIRTH_GIFT); // gift -> child; conserved
+    this.bornCount += 1;
     return child;
   }
 
@@ -322,6 +357,7 @@ export class PopulationSystem implements System {
     }
     const idx = this.world.residents.findIndex((r) => r.id === dead.id);
     if (idx >= 0) this.world.residents.splice(idx, 1);
+    this.diedCount += 1;
     this.world.reindex();
   }
 
@@ -340,15 +376,28 @@ export class PopulationSystem implements System {
       spawnCount: this.spawnCount,
       pressureAccumulator: this.pressureAccumulator,
       lastSpawnDay: this.lastSpawnDay,
+      migratedCount: this.migratedCount,
+      bornCount: this.bornCount,
+      diedCount: this.diedCount,
     };
   }
 
   restore(state: unknown): void {
     const s = state as
-      | { spawnCount?: number; pressureAccumulator?: number; lastSpawnDay?: number }
+      | {
+          spawnCount?: number;
+          pressureAccumulator?: number;
+          lastSpawnDay?: number;
+          migratedCount?: number;
+          bornCount?: number;
+          diedCount?: number;
+        }
       | undefined;
     this.spawnCount = s?.spawnCount ?? 0;
     this.pressureAccumulator = s?.pressureAccumulator ?? 0;
     this.lastSpawnDay = s?.lastSpawnDay ?? -this.cooldownDays;
+    this.migratedCount = s?.migratedCount ?? 0;
+    this.bornCount = s?.bornCount ?? 0;
+    this.diedCount = s?.diedCount ?? 0;
   }
 }

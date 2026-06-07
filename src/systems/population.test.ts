@@ -3,6 +3,7 @@ import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "../utils/serialization";
 import { occupantsByHome } from "../world/housing";
+import { ENTREPRENEUR_MIN_SAVINGS } from "./constants";
 
 const THIRTY_DAYS = TICKS_PER_DAY * 30;
 
@@ -207,6 +208,93 @@ describe("PopulationSystem growth trigger (HP3-5)", () => {
     expect(new Set(world.businesses.filter((b) => b.active).map((b) => b.kind)).size).toBeGreaterThanOrEqual(4);
     expect(world.totalMoney()).toBeCloseTo(start, 2);
     for (const r of world.residents) expect(r.money).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("HP3-8 — population growth stability soak", () => {
+  const livingCity = (seed: number) =>
+    createCity({
+      seed,
+      brain: "rules",
+      residentBrain: "rules",
+      disasters: true,
+      populationGrowth: true,
+      agenticBusinessIds: ["biz_diner", "biz_goods", "biz_farm", "biz_factory", "biz_mine", "biz_bakery"],
+      agenticResidentIds: Array.from({ length: 12 }, (_, i) => `res_${i}`),
+      // births + mortality with a compressed clock so a few sim-years exercise real
+      // demographic turnover (births, deaths, inheritance, ownership reassignment).
+      populationOptions: { births: true, mortality: true, maxAgeYears: 50, daysPerYear: 90 },
+    });
+
+  for (const seed of [1, 7]) {
+    it(`holds every invariant over 3 years of the full living + growing economy (seed ${seed})`, () => {
+      const { sim, world, population } = livingCity(seed);
+      const start = world.totalMoney();
+      const cap = world.locations.filter((l) => l.type === "home").reduce((s, l) => s + (l.capacity ?? 0), 0);
+
+      sim.run(TICKS_PER_DAY * 365 * 3);
+
+      // Population grew yet stayed bounded by housing; the town is alive.
+      expect(world.residents.length).toBeGreaterThan(12); // it grew
+      expect(world.residents.length).toBeLessThanOrEqual(cap); // never outran its homes
+      const occ = occupantsByHome(world.residents);
+      for (const l of world.locations) {
+        if (l.type === "home") expect(occ.get(l.id) ?? 0).toBeLessThanOrEqual(l.capacity ?? 99);
+      }
+      // Real turnover happened (the demographic cycle ran).
+      const demo = population.demography();
+      expect(demo.born + demo.migrated).toBeGreaterThan(0);
+      expect(demo.died).toBeGreaterThan(0);
+
+      // SACRED: money conserved to the cent, no negatives, no NaN, needs bounded.
+      expect(world.totalMoney()).toBeCloseTo(start, 2);
+      for (const r of world.residents) {
+        expect(r.money).toBeGreaterThanOrEqual(0);
+        expect(Number.isFinite(r.money)).toBe(true);
+        for (const v of Object.values(r.needs)) {
+          expect(v).toBeGreaterThanOrEqual(0);
+          expect(v).toBeLessThanOrEqual(100);
+        }
+      }
+      for (const b of world.businesses) expect(b.cash).toBeGreaterThanOrEqual(0);
+
+      // The supply chain survived the bigger, churning population.
+      expect(new Set(world.businesses.filter((b) => b.active).map((b) => b.kind)).size).toBeGreaterThanOrEqual(4);
+      // Every active firm has a LIVING owner — mortality reassigns on death.
+      for (const b of world.businesses) {
+        if (b.active) expect(world.getResident(b.ownerId)).toBeDefined();
+      }
+      // Wealth isn't flattened to subsistence: someone can still bankroll a firm,
+      // so business entry can keep refounding dead niches under growth.
+      expect(world.residents.some((r) => r.money >= ENTREPRENEUR_MIN_SAVINGS)).toBe(true);
+    });
+  }
+
+  it("the full living economy is deterministic and round-trips mid-run", () => {
+    const a = livingCity(1);
+    a.sim.run(TICKS_PER_DAY * 200);
+    const json = snapshotToJSON(a.sim.serialize());
+
+    const b = livingCity(1);
+    b.sim.restore(snapshotFromJSON(json));
+
+    a.sim.run(TICKS_PER_DAY * 120);
+    b.sim.run(TICKS_PER_DAY * 120);
+    expect(b.world.serialize()).toEqual(a.world.serialize());
+  });
+
+  it("exposes housing-constrained as the HP4 build trigger", () => {
+    const { sim, world, population } = createCity({
+      seed: 1,
+      populationGrowth: true,
+      populationOptions: { prosperityFloor: 0 },
+    });
+    expect(population.isHousingConstrained()).toBe(false); // slack at seed
+    sim.run(TICKS_PER_DAY * 200); // fill the town
+    expect(world.residents.length).toBe(
+      world.locations.filter((l) => l.type === "home").reduce((s, l) => s + (l.capacity ?? 0), 0),
+    );
+    expect(population.isHousingConstrained()).toBe(true); // full -> HP4 would build
   });
 });
 
