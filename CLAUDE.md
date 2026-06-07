@@ -16,6 +16,10 @@ This file auto-loads every session in this repo. It is the operating manual; the
 4. **[PHASE9-PLAYTEST.md](PHASE9-PLAYTEST.md)** — where routine progress and the live
    Phase 12 plan actually live. Update this for day-to-day work (NORTH-STAR.md only when the
    *direction* genuinely changes).
+5. **[VISION-RENDER.md](VISION-RENDER.md) + [PHASE-RENDER.md](PHASE-RENDER.md)** — the
+   visualization track: the "10× more watchable" vision and its phased, browser-gated plan
+   (decision-narrative moat → Pixi foundation → sprites/vehicles/flow → charts/story → sound).
+   Read these before any rendering/UX work. *Rendering only reads* — these never touch the sim.
 
 ## Non-negotiable invariants (breaking one is a bug, not a tradeoff)
 - **Determinism is sacred.** Seeded RNG only; no `Math.random`, no wall-clock, no
