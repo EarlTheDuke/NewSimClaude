@@ -467,3 +467,16 @@ export const BENCH_OWNER_DIVIDEND_SHARE = 0;
  * Un-frozen deliberately as the versioned Phase-16 slice-4 bench re-baseline.
  */
 export const BENCH_BRAND_DEMAND_ELASTICITY = 0;
+/**
+ * Phase 16 slice 4 — the GROWTH benchmark (opt-in `growth: true`). The classic
+ * bench above is a *preservation* scenario ($50k start) whose flaw is that a CEO
+ * can "win" by simply hoarding cash. The growth bench instead starts the firm with
+ * modest working capital and scores **productive value built** (capital + brand +
+ * inventory + cash capped at working capital), so parked cash can't win and the
+ * only way to score is to grow a bigger, more productive firm. These two knobs are
+ * frozen *separately* from the live game (like the BENCH_* knobs above) so the
+ * growth score stays reproducible as the live economy is re-tuned.
+ */
+export const BENCH_GROWTH_START_CAPITAL = 5_000;
+/** The brand-demand growth path the growth bench runs at (the live lever, frozen here). */
+export const BENCH_GROWTH_BRAND_ELASTICITY = 0.3;

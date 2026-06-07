@@ -28,7 +28,11 @@ import {
   BENCH_WEALTH_ELASTICITY,
   BENCH_OWNER_DIVIDEND_SHARE,
   BENCH_BRAND_DEMAND_ELASTICITY,
+  BENCH_GROWTH_START_CAPITAL,
+  BENCH_GROWTH_BRAND_ELASTICITY,
   CAPITAL_BASELINE,
+  BRAND_BASELINE,
+  BUSINESS_RESERVE,
 } from "../systems/constants";
 import type {
   BusinessAction,
@@ -59,6 +63,21 @@ export interface CeoBenchConfig {
   residentBrain?: ResidentBrainOption;
   /** Residents the resident brain manages — the churn that exercises hire/setWage. */
   agenticResidentIds?: string[];
+  /**
+   * Phase 16 slice 4 — run the GROWTH scenario instead of the classic preservation
+   * one. Starts the firm with modest working capital ({@link BENCH_GROWTH_START_CAPITAL}),
+   * turns on the brand demand-growth path ({@link BENCH_GROWTH_BRAND_ELASTICITY}), and the
+   * headline score becomes {@link CeoBenchResult.growthScore} — productive value built, with
+   * parked cash discounted, so hoarding can't win. Default false ⇒ the classic bench,
+   * byte-identical.
+   */
+  growth?: boolean;
+  /**
+   * Seed the CEO firm's `payoutRate` (Phase 16) at genesis — the fraction of surplus it
+   * distributes vs retains. Used to exercise the `setPayout` lever in the bench (the rules
+   * brain itself stays silent on it). Undefined ⇒ 1.0 (full distribution).
+   */
+  targetPayoutRate?: number;
 }
 
 /** The scorecard for one CEO run. */
@@ -76,8 +95,17 @@ export interface CeoBenchResult {
   finalInventoryValue: number;
   /** Productive capital above baseline at depreciated book (Phase 15 F1) — counts toward the score. */
   finalCapitalValue: number;
-  /** The score: cash + inventory value + capital value at the final turn. */
+  /** Brand equity above baseline (Phase 17) — the demand-side productive asset; counts toward the growth score. */
+  finalBrandValue: number;
+  /** The classic score: cash + inventory value + capital value at the final turn. */
   finalNetWorth: number;
+  /**
+   * Phase 16 slice 4 — the GROWTH score: productive value built (capital + brand +
+   * inventory) plus cash *capped at working capital*, minus the start, so parked cash
+   * cannot win. This is the headline metric in `growth: true` runs; in classic runs it
+   * is still reported but `finalNetWorth` is the headline.
+   */
+  growthScore: number;
   /** finalNetWorth − startNetWorth: what the CEO's stewardship added (or lost). */
   profit: number;
   /** False if any dollar was minted or burned across the run (must stay true). */
@@ -112,7 +140,9 @@ function setupScenario(config: CeoBenchConfig): {
   finish: () => CeoBenchResult;
 } {
   const targetId = config.targetBusinessId ?? DEFAULT_TARGET;
-  const startCapital = config.startCapital ?? BENCH_START_CAPITAL;
+  const growth = config.growth ?? false;
+  const startCapital =
+    config.startCapital ?? (growth ? BENCH_GROWTH_START_CAPITAL : BENCH_START_CAPITAL);
   const turns = Math.max(1, Math.floor(config.turns ?? BENCH_TURNS));
 
   const { sim, world, macro, agent } = createCity({
@@ -125,7 +155,9 @@ function setupScenario(config: CeoBenchConfig): {
     // stays a clean skill signal (all profit stays in the firm).
     wealthElasticity: BENCH_WEALTH_ELASTICITY,
     ownerDividendShare: BENCH_OWNER_DIVIDEND_SHARE,
-    brandElasticity: BENCH_BRAND_DEMAND_ELASTICITY,
+    // Growth mode turns on the (frozen) brand demand-growth path so a CEO can grow
+    // its market; the classic preservation bench keeps it frozen off.
+    brandElasticity: growth ? BENCH_GROWTH_BRAND_ELASTICITY : BENCH_BRAND_DEMAND_ELASTICITY,
     // Freeze the producer wage floor too (Phase 18-pre): it lifts the CEO's input
     // costs via the cost-plus B2B floor, which would drift historical scores.
     producerWageFloor: 0,
@@ -139,6 +171,8 @@ function setupScenario(config: CeoBenchConfig): {
   // Genesis recapitalization: set the storefront's opening balance. Money
   // conservation is measured from here, over the run.
   ceo.cash = startCapital;
+  // Phase 16 — seed the firm's payout stance, to exercise the setPayout lever.
+  if (config.targetPayoutRate !== undefined) ceo.payoutRate = config.targetPayoutRate;
 
   // Phase 15 F1 — net worth counts the CEO's *productive capital* too, at its
   // depreciated above-baseline book value (invest is cash->capital 1:1, then the
@@ -149,8 +183,19 @@ function setupScenario(config: CeoBenchConfig): {
   // (capital wears out) becomes a real decision. Baseline capital is the common
   // endowment every firm starts with, so only what the CEO built above it counts.
   const capitalValue = (): number => (ceo.capital ?? CAPITAL_BASELINE) - CAPITAL_BASELINE;
-  const netWorth = (): number => ceo.cash + ceo.inventory * ceo.price + capitalValue();
+  const brandValue = (): number => (ceo.brand ?? BRAND_BASELINE) - BRAND_BASELINE;
+  const inventoryValue = (): number => ceo.inventory * ceo.price;
+  const netWorth = (): number => ceo.cash + inventoryValue() + capitalValue();
+  // Phase 16 slice 4 — the GROWTH score: productive value built (capital + brand +
+  // inventory) plus cash *capped at working capital* (BUSINESS_RESERVE). Parked cash
+  // above what the firm needs to operate does not count, so a CEO cannot win by
+  // hoarding — only by growing a bigger, more productive firm. (A live cost-of-carry
+  // on idle cash — savings interest — is the cleaner long-run fix; that lives in the
+  // shelved Phase 18 credit work, so until then the score discounts hoarded cash.)
+  const productiveWorth = (): number =>
+    Math.min(ceo.cash, BUSINESS_RESERVE) + inventoryValue() + capitalValue() + brandValue();
   const startNetWorth = netWorth();
+  const startProductiveWorth = productiveWorth();
   const startMoney = world.totalMoney();
   const brainId = typeof config.brain === "string" ? config.brain : config.brain.id;
 
@@ -169,7 +214,9 @@ function setupScenario(config: CeoBenchConfig): {
       finalInventory: ceo.inventory,
       finalInventoryValue: ceo.inventory * ceo.price,
       finalCapitalValue: capitalValue(),
+      finalBrandValue: brandValue(),
       finalNetWorth,
+      growthScore: productiveWorth() - startProductiveWorth,
       profit: finalNetWorth - startNetWorth,
       moneyConserved: Math.abs(moneyDelta) < 1e-6,
       moneyDelta,
@@ -239,11 +286,13 @@ export function formatCeoScorecard(results: CeoBenchResult[]): string {
   const head = results[0]!;
 
   const rows: [string, (r: CeoBenchResult) => string][] = [
+    ["GROWTH SCORE", (r) => money(r.growthScore)],
     ["FINAL NET WORTH", (r) => money(r.finalNetWorth)],
     ["  profit", (r) => `${r.profit >= 0 ? "+" : "−"}${money(Math.abs(r.profit))}`],
     ["  cash", (r) => money(r.finalCash)],
     ["  inventory", (r) => `${r.finalInventory} @ ${money(r.finalInventoryValue)}`],
     ["  capital", (r) => money(r.finalCapitalValue)],
+    ["  brand", (r) => money(r.finalBrandValue)],
     ["survived", (r) => (r.survived ? "yes" : "BANKRUPT")],
     ["decisions", (r) => `${r.decisions}${r.fellBack > 0 ? ` (${r.fellBack} fell back)` : ""}`],
     ["city GDP", (r) => money(r.cityGdp)],

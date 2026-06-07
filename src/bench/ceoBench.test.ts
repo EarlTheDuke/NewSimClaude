@@ -83,6 +83,56 @@ describe("CEO benchmark (Phase 10d)", () => {
     });
   });
 
+  // Phase 16 slice 4 — the GROWTH benchmark. The classic bench above can be "won"
+  // by hoarding cash; the growth bench scores productive value built (capital +
+  // brand + inventory) with cash capped at working capital, so hoarding can't win
+  // and the only path to a high score is to grow a bigger, more productive firm.
+  describe("growth scenario reframe (Phase 16 slice 4)", () => {
+    it("the rules CEO grows the firm far past the no-op baseline (skill, amplified)", () => {
+      const off = runCeoBenchmark({ seed: SEED, brain: "off", growth: true });
+      const rules = runCeoBenchmark({ seed: SEED, brain: "rules", growth: true });
+      expect(rules.growthScore).toBeGreaterThan(off.growthScore + 500);
+      // It builds real productive assets, not just a cash pile.
+      expect(rules.finalCapitalValue).toBeGreaterThan(0);
+      expect(rules.finalBrandValue).toBeGreaterThan(0); // the growth path is live in this mode
+    });
+
+    it("a pure cash-hoarder cannot win the growth bench (the anti-hoard guard)", () => {
+      // A CEO that just sits on a huge pile (no skill, retain everything, never deploy).
+      const hoarder = runCeoBenchmark({
+        seed: SEED,
+        brain: "off",
+        growth: true,
+        targetPayoutRate: 0, // retain all surplus → cash accumulates
+        startCapital: 50_000, // a giant pile to "preserve"
+      });
+      const rules = runCeoBenchmark({ seed: SEED, brain: "rules", growth: true });
+      // The hoarder has far MORE raw net worth (it's sitting on the pile)...
+      expect(hoarder.finalNetWorth).toBeGreaterThan(rules.finalNetWorth);
+      // ...yet LOSES on the growth score, because parked cash above working capital
+      // doesn't count — only productive value built does.
+      expect(hoarder.growthScore).toBeLessThan(rules.growthScore);
+    });
+
+    it("setPayout is a real, correct-sign lever: over-retaining starves demand and scores worse", () => {
+      // Same skilled CEO, two payout stances. Retaining EVERYTHING (payout 0) hoards
+      // cash but starves the closed economy's demand pump (its own customers), so it
+      // grows the firm LESS than a balanced payout — proof the lever moves the score
+      // and the naive retain-everything "exploit" is not the winning move.
+      const balanced = runCeoBenchmark({ seed: SEED, brain: "rules", growth: true, targetPayoutRate: 0.5 });
+      const retainAll = runCeoBenchmark({ seed: SEED, brain: "rules", growth: true, targetPayoutRate: 0 });
+      expect(balanced.growthScore).toBeGreaterThan(retainAll.growthScore + 300);
+    });
+
+    it("conserves money and is deterministic in growth mode (the sacred invariants hold)", () => {
+      const a = runCeoBenchmark({ seed: SEED, brain: "rules", growth: true });
+      const b = runCeoBenchmark({ seed: SEED, brain: "rules", growth: true });
+      expect(a.moneyConserved).toBe(true);
+      expect(a.moneyDelta).toBeCloseTo(0, 4);
+      expect(a).toEqual(b);
+    });
+  });
+
   describe("lever ablation (Phase 15 F2)", () => {
     it("measures each control's worth and catches a dormant lever", () => {
       // A churn scenario — a diner CEO with a live labour market around it — gives
