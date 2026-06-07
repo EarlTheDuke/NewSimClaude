@@ -325,3 +325,37 @@ fragility (P10-3)**, not the utilization signal.
   thread the floor value, widen the labour pool structurally (more residents / Phase 19
   population), or accept + re-baseline the truce. The seam is in place to engage once the
   approach is chosen; this is the keystone that then unblocks Phase 16 slices 3+4.
+
+### Update 2026-06-06 (later) — ENGAGED at 0.12; compounding DoD MET ✅
+
+The fork is resolved. The re-tune was a *value* choice, and 0.16 was simply too high. A
+fresh floor sweep (`{0, 0.08, 0.10, 0.12, 0.14, 0.16}`, seeds 1 & 7) measured both the
+engine **and** the truce at each value:
+
+- **Engine sustains for any floor ≥ 0.08** (at 0, the factory dies and goods capital never
+  leaves baseline ~107). Best at **0.12**: goods capital/brand **~2600 over 3yr (~1700–2500
+  at 2yr)** with *all four producers fully crewed*.
+- **The two-diner truce holds for every floor ≤ 0.14** and breaks only at **0.16** (it
+  pushed producers to near-parity with the diner's 0.17 base and starved diner_2 — the
+  monopoly the earlier engage saw).
+
+So **0.12 dominates**: it maximises sustained capital/brand, keeps the whole chain staffed,
+AND preserves the truce — collapsing the "4 broken tests" of the 0.16 attempt down to **one**
+genuine confounder. Engaged (`PRODUCER_WAGE_FLOOR = 0.12`, commit `42eaaae`):
+
+- **`capital.test` — new A/B compounding test** (the now-met DoD): with the floor the
+  factory survives and goods capital compounds ~25× baseline over 2 years; without it the
+  factory dies and capital stays ~baseline. Money conserved both ways.
+- **One freeze only** — `market.test`'s mean-revert-to-base test pins `producerWageFloor: 0`
+  (a higher floor correctly firms B2B prices above base via cost-plus, already covered by the
+  Phase 15 B "never below input" test). `competition.test` and `elasticity.test` now pass
+  untouched at 0.12.
+- **Bench frozen** at `producerWageFloor: 0` (same discipline as the other `BENCH_*` knobs).
+- **304 tests green**, build green, live app reloads clean.
+
+**NORTH-STAR move #3 (close the investment loop) is now structurally achieved**: brand pulls
+demand, the chain stays staffed, and the invest/brand engine compounds over multiple years
+instead of self-extinguishing. **Phase 16 slices 3+4 are unblocked.** The deeper structural
+relief for the shared-labour-pool tension remains **Phase 19 (population growth)** — the floor
+is the realistic near-term fix (a mine must pay competitively to keep miners); population is
+the eventual "more workers so producers *and* storefronts can both staff up" answer.
