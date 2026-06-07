@@ -3,6 +3,8 @@ import type { World } from "../world/World";
 import type { Business, Location, Resident, Activity } from "../world/types";
 import { skyColor, ambient, windowGlow, dimInt, type Rgb } from "./daynight";
 import { worldToScreen as toScreen, screenToWorld, type Camera } from "./camera";
+import { prosperityT, fillFraction, FILL_FULL_INVENTORY } from "./economyVisuals";
+import { CAPITAL_BASELINE } from "../systems/constants";
 import {
   ROAD_RGB,
   CLOSED_RGB,
@@ -32,9 +34,13 @@ const ACTIVITY_INT: Record<Activity, number> = Object.fromEntries(
 /** The persistent Pixi display objects for one building (created once, mutated per frame). */
 interface BuildingView {
   container: Container;
+  glow: Graphics;
   base: Graphics;
   windows: Container;
   planks: Graphics;
+  bar: Container; // inventory warehouse bar (track + fill), shown for businesses
+  fill: Graphics; // the fill rect, scaled per frame by inventory
+  workers: Container; // staff-count figures
   label: Text;
   selOutline: Graphics;
 }
@@ -390,6 +396,12 @@ export class PixiRenderer implements CityRenderer {
     container.position.set(slot.x, slot.y);
     const half = BUILDING / 2;
 
+    // Prosperity glow (R3a) — a soft gold halo behind the building, scaled + faded
+    // per frame by the firm's capital. Built once at a base radius.
+    const glow = new Graphics();
+    glow.circle(0, 0, BUILDING).fill(0xffd27a);
+    glow.visible = false;
+
     // White base rect (centred) — tinted per frame to the dimmed building colour.
     const base = new Graphics();
     base.rect(-half, -half, BUILDING, BUILDING).fill(0xffffff);
@@ -428,10 +440,33 @@ export class PixiRenderer implements CityRenderer {
     const selOutline = new Graphics();
     selOutline.rect(-half - 2, -half - 2, BUILDING + 4, BUILDING + 4).stroke({ width: 2, color: 0xffffff });
     selOutline.visible = false;
-    container.addChild(base, windows, mask, planks, label, selOutline);
+
+    // Inventory warehouse bar (R3b): a dark track + a green fill scaled per frame.
+    const barW = BUILDING;
+    const barH = 3;
+    const barY = half + 3;
+    const bar = new Container();
+    const track = new Graphics();
+    track.rect(-barW / 2, barY, barW, barH).fill({ color: 0x2b2f3a, alpha: 0.85 });
+    const fill = new Graphics();
+    fill.rect(0, 0, barW, barH).fill(0x3fb950);
+    fill.position.set(-barW / 2, barY);
+    bar.addChild(track, fill);
+    bar.visible = false;
+
+    // Worker figures (R3c): up to 5 small dots above the building, shown by headcount.
+    const workers = new Container();
+    for (let i = 0; i < 5; i++) {
+      const wd = new Graphics();
+      wd.circle(-8 + i * 4, -half - 4, 1.5).fill(0xc9d1d9);
+      wd.visible = false;
+      workers.addChild(wd);
+    }
+
+    container.addChild(glow, base, windows, mask, planks, bar, workers, label, selOutline);
     this.buildingsLayer?.addChild(container);
 
-    const view: BuildingView = { container, base, windows, planks, label, selOutline };
+    const view: BuildingView = { container, glow, base, windows, planks, bar, fill, workers, label, selOutline };
     this.buildingViews.set(loc.id, view);
     return view;
   }
@@ -459,6 +494,26 @@ export class PixiRenderer implements CityRenderer {
     }
     v.label.tint = dimInt(LABEL_RGB, Math.max(a, 0.7));
     v.selOutline.visible = isSelected;
+    // Visual economic state (R3): prosperity glow (capital), inventory bar, worker
+    // figures (headcount) — active firms only; homes + shuttered show none.
+    if (biz && biz.active) {
+      const t = prosperityT(biz.capital ?? CAPITAL_BASELINE, CAPITAL_BASELINE);
+      v.glow.visible = t > 0.02;
+      v.glow.alpha = t * 0.55;
+      v.glow.scale.set(0.6 + 0.7 * t);
+      v.bar.visible = true;
+      v.fill.scale.x = fillFraction(biz.inventory, FILL_FULL_INVENTORY);
+      const crew = Math.min(biz.employeeIds.length, v.workers.children.length);
+      v.workers.children.forEach((c, i) => {
+        c.visible = i < crew;
+      });
+    } else {
+      v.glow.visible = false;
+      v.bar.visible = false;
+      v.workers.children.forEach((c) => {
+        c.visible = false;
+      });
+    }
   }
 
   /** Remove views whose location is gone (e.g. after a Load swaps the world). */
