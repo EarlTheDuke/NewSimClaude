@@ -57,6 +57,15 @@ export interface BusinessObservation {
    */
   baseWagePerTick: number;
   /**
+   * The effective wage ceiling this firm may post (Initiative #1 S1) — `base × wageCapMult`.
+   * In the default city this equals `base × MAX_WAGE_MULT` (the old fixed cap), so a mind
+   * reading it behaves identically; when the city frees the wage (a higher `wageCapMult`) this
+   * rises, and the mind knows it now has headroom to bid above the old 2× ceiling for scarce
+   * labour. Optional — absent on a mock observation, in which case `base × MAX_WAGE_MULT` is
+   * assumed (the pre-S1 behaviour).
+   */
+  maxWage?: number;
+  /**
    * True when the firm has an unfilled seat (`employeeCount < DESIRED_HEADCOUNT`)
    * — the cue to bid wages up to attract/keep staff (Phase 15 A). When a producer
    * is poached down to an empty seat this is how its mind knows to compete for

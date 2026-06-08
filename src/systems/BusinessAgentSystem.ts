@@ -12,7 +12,7 @@ import type {
 } from "../ai/types";
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
-import { BUSINESS_RESERVE, CAPITAL_BASELINE, MAX_WAGE_MULT, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY } from "./constants";
+import { BUSINESS_RESERVE, CAPITAL_BASELINE, WAGE_CAP_MULT, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY } from "./constants";
 import { ARCHETYPES, desiredHeadcount } from "../world/archetypes";
 import type { MarketSystem } from "./MarketSystem";
 
@@ -69,6 +69,12 @@ export class BusinessAgentSystem implements System {
      * keeps the rules brain from spending on a dead lever (preserving rules>off).
      */
     private readonly brandElasticity: number = BRAND_DEMAND_ELASTICITY,
+    /**
+     * Free-market wage cap (Initiative #1 S1) — the multiple of base wage a firm may post.
+     * Defaults to {@link WAGE_CAP_MULT} (= MAX_WAGE_MULT = 2), keeping the default city
+     * byte-identical; raise it to let firms bid above the old 2× ceiling for scarce labour.
+     */
+    private readonly wageCapMult: number = WAGE_CAP_MULT,
   ) {
     this.limits = limits;
   }
@@ -223,8 +229,10 @@ export class BusinessAgentSystem implements System {
 
   /**
    * Phase 15 A — post a new wage and bring the team along. The proposal is clamped
-   * to `[base, base*MAX_WAGE_MULT]`: a firm competes by paying *above* the role's
-   * base, never below it, never past the cap. Sitting staff are re-rated *up* to
+   * to `[base, base*wageCapMult]`: a firm competes by paying *above* the role's
+   * base, never below it, never past the cap (the cap is {@link WAGE_CAP_MULT} by
+   * default = the old fixed 2×; a freed-wage city raises it — Initiative #1 S1).
+   * Sitting staff are re-rated *up* to
    * the new posted rate (you can compete for the workers you already have, not just
    * new hires — the wage actually paid lives on the resident, so without this a
    * raise wouldn't reach them) but never cut below what they already earn — no
@@ -234,7 +242,7 @@ export class BusinessAgentSystem implements System {
    */
   private applySetWage(biz: Business, wage: number): void {
     const base = biz.baseWagePerTick ?? biz.wagePerTick;
-    const posted = Math.max(base, Math.min(base * MAX_WAGE_MULT, wage));
+    const posted = Math.max(base, Math.min(base * this.wageCapMult, wage));
     biz.wagePerTick = posted;
     for (const id of biz.employeeIds) {
       const r = this.world.getResident(id);
@@ -307,6 +315,7 @@ export class BusinessAgentSystem implements System {
       employeeCount: biz.employeeIds.length,
       wagePerTick: biz.wagePerTick,
       baseWagePerTick: biz.baseWagePerTick ?? biz.wagePerTick,
+      maxWage: (biz.baseWagePerTick ?? biz.wagePerTick) * this.wageCapMult, // S1 — the effective wage ceiling (base × cap)
       understaffed: biz.employeeIds.length < desiredHeadcount(biz.kind),
       dayRevenue,
       dayWages,

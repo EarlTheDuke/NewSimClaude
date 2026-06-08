@@ -19,6 +19,8 @@ import { ResidentAgentSystem } from "./systems/ResidentAgentSystem";
 import { RuleBasedProvider } from "./ai/RuleBasedProvider";
 import { RuleBasedResidentProvider } from "./ai/RuleBasedResidentProvider";
 import type { DecisionLimits, DecisionProvider } from "./ai/types";
+import { DEFAULT_LIMITS } from "./ai/clamp";
+import { WAGE_CAP_MULT, MAX_WAGE_MULT } from "./systems/constants";
 import type { ResidentDecisionLimits, ResidentDecisionProvider } from "./ai/residentTypes";
 
 /**
@@ -76,6 +78,15 @@ export interface CitySimOptions extends CityOptions {
    * score a clean skill signal, free of the dividend's wealth-concentration noise.
    */
   ownerDividendShare?: number;
+  /**
+   * Free-market wage cap (Initiative #1 S1) — the multiple of base wage a firm may post via
+   * `setWage`. Defaults to the live {@link WAGE_CAP_MULT} (= 2 = the old fixed cap), so an
+   * unset city is **byte-identical** to today. Raise it (e.g. 8) to free the wage: firms then
+   * bid above the old 2× ceiling for scarce labour and the labour-vs-capital split floats. When
+   * raised, the coarse absolute wage clamp ({@link DecisionLimits.maxWagePerTick}) is lifted in
+   * step so the per-firm cap, not the safety rail, governs.
+   */
+  wageCapMult?: number;
   /**
    * Toggle business birth (Phase 15 D). Defaults to the live `BUSINESS_ENTRY`;
    * lifecycle/bankruptcy tests pass `false` to isolate a death from the entry
@@ -145,13 +156,23 @@ export function createCity(options: CitySimOptions = {}): {
   const brain = options.brain ?? "off";
   if (brain !== "off") {
     const provider: DecisionProvider = brain === "rules" ? new RuleBasedProvider() : brain;
+    // Free-market wage cap (S1). Default keeps the old fixed 2× and the coarse safety rail
+    // untouched ⇒ byte-identical. When the wage is freed (a higher mult), lift the absolute
+    // clamp in step so the per-firm cap, not the rail, is what binds.
+    const wageCapMult = options.wageCapMult ?? WAGE_CAP_MULT;
+    const limits =
+      options.limits ??
+      (wageCapMult > MAX_WAGE_MULT
+        ? { ...DEFAULT_LIMITS, maxWagePerTick: Math.max(DEFAULT_LIMITS.maxWagePerTick, wageCapMult) }
+        : undefined);
     agent = new BusinessAgentSystem(
       world,
       provider,
       options.agenticBusinessIds ?? DEFAULT_AGENTIC,
-      options.limits,
+      limits,
       market,
       options.brandElasticity,
+      wageCapMult,
     );
     sim.addSystem(agent);
   }

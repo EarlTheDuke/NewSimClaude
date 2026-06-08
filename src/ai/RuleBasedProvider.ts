@@ -136,10 +136,27 @@ export class RuleBasedProvider implements DecisionProvider {
     // run its cash below reserve eases back toward base, so wages settle where
     // vacancies clear instead of ratcheting to the ceiling and sticking there.
     const base = o.baseWagePerTick;
-    const wageCap = base * MAX_WAGE_MULT;
+    // The wage ceiling this firm may post. Defaults to the old fixed 2× cap; in a freed-wage
+    // city (Initiative #1 S1) o.maxWage is higher, opening real headroom to bid for scarce labour.
+    const wageCap = o.maxWage ?? base * MAX_WAGE_MULT;
+    const freeMarket = wageCap > base * MAX_WAGE_MULT; // the cap has been lifted past the old ceiling
     if (o.understaffed && o.wagePerTick < wageCap) {
-      action.setWage = Math.min(wageCap, o.wagePerTick * 1.1);
-      notes.push("short-handed, raising the wage to attract staff");
+      if (freeMarket) {
+        // Free labour market: always bid up to fill the seat (as the capped market does), and
+        // bid *harder* when labour is genuinely scarce — no one left in the jobless pool to
+        // hire, so the only way to staff up is to poach. The wage is bounded only by the firm's
+        // affordability: post more than you earn and your cash drains until the cash-thin branch
+        // below eases you back. That affordability ceiling is exactly what INITIATIVE-01 is here
+        // to observe, so we let it bind naturally rather than pre-empting the bid.
+        const scarce = o.unemployedCount === 0;
+        action.setWage = Math.min(wageCap, o.wagePerTick * (scarce ? 1.25 : 1.1));
+        notes.push(
+          scarce ? "labour scarce — bidding the wage up to compete" : "short-handed, raising the wage",
+        );
+      } else {
+        action.setWage = Math.min(wageCap, o.wagePerTick * 1.1);
+        notes.push("short-handed, raising the wage to attract staff");
+      }
     } else if (!o.understaffed && o.cash < BUSINESS_RESERVE && o.wagePerTick > base) {
       action.setWage = Math.max(base, o.wagePerTick * 0.95);
       notes.push("fully staffed but cash-thin, easing wages back toward base");

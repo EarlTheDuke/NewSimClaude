@@ -184,6 +184,15 @@ export const VEHICLE_RESALE = 500; // goods store -> resident when selling back
 export const RAISE_FRACTION = 0.08; // a granted raise lifts wage by this fraction
 export const MAX_WAGE_MULT = 2; // wage may not exceed this multiple of the job's base wage
 /**
+ * Free-market wage cap (Initiative #1, S1) — the multiple of a role's base wage a firm may
+ * post via `setWage`. Defaults to {@link MAX_WAGE_MULT} (2), so a city built without an
+ * override is **byte-identical** to today. Raise it (e.g. createCity({ wageCapMult: 8 })) to
+ * "free the wage": short-staffed firms then bid above the old 2× ceiling to win scarce labour,
+ * and the labour-vs-capital split floats instead of pinning. Real-world: lifting an
+ * administrative pay ceiling so a tight labour market can actually move wages.
+ */
+export const WAGE_CAP_MULT = MAX_WAGE_MULT;
+/**
  * Phase 18-pre (sustain the engine) — minimum base wage a B2B *producer* (farm, mine,
  * bakery, factory) is seeded paying. Producers seed cheap (mine 0.05) and, against the
  * storefronts' 0.17-0.20, can't hold a crew once demand growth (Phase 17 brand) makes the
