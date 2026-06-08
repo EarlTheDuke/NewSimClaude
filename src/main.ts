@@ -103,7 +103,7 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>CityWithLifeClaude — Phase 8 (hardening, persistence &amp; cost)</h1>
+  <h1>NewSimClaude — Free-Market Economy <span class="hint">· free wage + welfare floor (port 5174)</span></h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
