@@ -350,6 +350,25 @@ export const PROFIT_DISTRIBUTION_CAP = 900;
  */
 export const OWNER_DIVIDEND_SHARE = 0.1;
 /**
+ * Welfare floor (Initiative #1 S2) — the single deliberate control in the free-market
+ * experiment. Each day every non-earning resident (`jobId === ""` — the unemployed plus
+ * dependents who can't work) receives a transfer targeting this fraction of the *average
+ * worker's daily income*, funded by a levy on businesses' above-reserve cash. Default 0 ⇒
+ * the {@link WelfareSystem} is inert ⇒ byte-identical. Engaged at ~0.5 (the user's target:
+ * the unemployed earn about half an average worker).
+ *
+ * Why a levy on **capital** (not on wages): welfare is funded from the economy's surplus, so a
+ * worker's take-home wage — and thus the labour-share metric — stays clean, and the safety net
+ * survives the later weaning of the even dividend (S3). It is also a *market-respecting* wage
+ * floor: no one takes a job paying less than welfare, so firms must beat welfare to hire — a
+ * floor set by the safety net competing for labour, not a price control imposed on firms.
+ * Real-world: a profits-funded unemployment benefit pegged to prevailing wages.
+ */
+export const WELFARE_RATIO = 0;
+/** Absolute daily subsistence floor per non-worker (Initiative #1 S2), used when welfare is engaged
+ *  and average worker income is low. Default 0 ⇒ inert. */
+export const WELFARE_SUBSISTENCE_MIN = 0;
+/**
  * Phase 13c — the invest lever fires only when a capacity-bound business has at
  * least this much profit sitting above its reserve at review time. After the 13c
  * reorder the agent reviews *before* the daily dividend, so cash-above-reserve is

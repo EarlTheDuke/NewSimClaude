@@ -7,6 +7,7 @@ import { MovementSystem } from "./systems/MovementSystem";
 import { EconomySystem } from "./systems/EconomySystem";
 import { MarketSystem } from "./systems/MarketSystem";
 import { DistributionSystem } from "./systems/DistributionSystem";
+import { WelfareSystem } from "./systems/WelfareSystem";
 import { EventSystem, type EventSystemOptions } from "./systems/EventSystem";
 import { GodMode } from "./systems/GodMode";
 import { NeedsSystem } from "./systems/NeedsSystem";
@@ -88,6 +89,15 @@ export interface CitySimOptions extends CityOptions {
    */
   wageCapMult?: number;
   /**
+   * Welfare floor (Initiative #1 S2) — fraction of the average worker's daily income paid to each
+   * non-earning resident, funded by a levy on business surplus. Defaults to the live
+   * {@link WELFARE_RATIO} (0 ⇒ no welfare ⇒ byte-identical). Engage at ~0.5 for "the unemployed
+   * earn about half an average worker." The single deliberate control in the free-market run.
+   */
+  welfareRatio?: number;
+  /** Absolute daily subsistence floor per non-worker (Initiative #1 S2). Defaults to {@link WELFARE_SUBSISTENCE_MIN} (0). */
+  welfareSubsistence?: number;
+  /**
    * Toggle business birth (Phase 15 D). Defaults to the live `BUSINESS_ENTRY`;
    * lifecycle/bankruptcy tests pass `false` to isolate a death from the entry
    * system that would otherwise refill the niche it opens.
@@ -123,6 +133,7 @@ export function createCity(options: CitySimOptions = {}): {
   events?: EventSystem;
   entry: BusinessEntrySystem;
   population: PopulationSystem;
+  welfare: WelfareSystem;
   god: GodMode;
 } {
   const seed = options.seed ?? 1;
@@ -184,6 +195,10 @@ export function createCity(options: CitySimOptions = {}): {
   // sits right where distribution always ran (just after the market), so the
   // brain-off baseline is byte-identical.
   sim.addSystem(new DistributionSystem(world, options.ownerDividendShare));
+  // Welfare floor (Initiative #1 S2) runs right after distribution, on the day's settled cash —
+  // the one deliberate control. Inert at the default ratio 0 ⇒ byte-identical.
+  const welfare = new WelfareSystem(world, options.welfareRatio, options.welfareSubsistence);
+  sim.addSystem(welfare);
 
   let residentAgent: ResidentAgentSystem | undefined;
   const residentBrain = options.residentBrain ?? "off";
@@ -228,5 +243,5 @@ export function createCity(options: CitySimOptions = {}): {
   // sim clock to stamp interventions and mirrors forced disasters into `events`.
   const god = new GodMode(world, market, sim.time, seed, events);
 
-  return { sim, world, market, macro, agent, residentAgent, events, entry, population, god };
+  return { sim, world, market, macro, agent, residentAgent, events, entry, population, welfare, god };
 }
