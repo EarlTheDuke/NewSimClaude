@@ -154,3 +154,44 @@ The bones are strong: a person is born, lives a needs-driven daily life, ages, n
 a real housing market, and dies leaving an inheritance — all conserved and deterministic.
 The gaps are about **life-stage realism** (childhood) and **a life having a story arc**
 (career + wealth), not about correctness.
+
+---
+
+## The emergent citizen's dividend (a UBI)
+
+Ivo never went broke despite a flat, low wage — because the economy quietly pays
+**everyone** a daily dividend. `DistributionSystem` splits each firm's daily surplus
+(cash above its working-capital reserve, capped) two ways: **~10% to the owner**
+(`OWNER_DIVIDEND_SHARE`), and **the rest equally to every resident** — employed,
+jobless, newborn, or elderly. That even share is a **universal basic income** by
+definition; in flavour it's a *citizen's / social dividend* (a share of the
+commonwealth's profits), not tax-funded welfare. It exists because the economy is a
+**closed money loop** — without returning firm surpluses to people, money would pool in
+a few firms and everyone else would go broke and stop spending. The UBI is the
+**demand pump** that keeps the loop alive; it was never designed in — it *emerged*.
+
+**Measured (20-resident steady state):**
+| | per day |
+|---|---|
+| Dividend pool moved to people | ~$1,102 |
+| **Dividend per resident** (even 90% ÷ 20) | **~$50 / head** |
+| Wage per worker | ~$93 |
+| Dividend as a share of a **worker's** income | ~35% |
+| Dividend as a share of a **non-worker's** income | **100%** |
+
+So ~1/3 of the town (children, jobless, elderly) lives *entirely* on the dividend, and
+even workers draw a third of their income from it. It explains the "nobody goes broke"
+floor, why population growth stayed stable (newcomers/kids are instantly solvent), the
+compressed wealth distribution, and per-capita dilution (the pool ÷ a growing N).
+
+**Could wages replace it?** To move the same ~$1,100/day to people through paychecks,
+the total wage bill would have to **roughly double** (+91%, ≈ +$85/worker/day,
+≈ +$0.21/tick — from ~$0.23 to ~$0.44/tick). Two blockers: (1) wages are capped at 2×
+base and already sit near the cap, so it's not even possible without raising the cap;
+and (2) wages reach only the ~13 workers, leaving the ~7 non-workers (kids, jobless,
+elderly) with **$0** — the same money, but it abandons exactly the third of the town the
+dividend keeps afloat. The dividend reaches people wages structurally can't.
+
+**Status:** working as intended and **kept** — a distinctive, emergent feature of the
+economy. (Tunable via `OWNER_DIVIDEND_SHARE`; could be surfaced explicitly in the UI as
+a "citizen's dividend" later if desired.)

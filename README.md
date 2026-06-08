@@ -1,13 +1,52 @@
 # CityWithLifeClaude
 
-A small, watchable city economy that runs itself. Twelve residents wake, commute,
-work, eat, and socialize; seven businesses buy inputs, produce goods, set prices,
-and hire or fire. You watch it breathe on a canvas — and, if you like, hand the
-businesses' and residents' strategic decisions to Claude and see how the economy
-diverges from the deterministic baseline.
+A small, watchable city economy that **runs, lives, and grows** by itself. It starts
+as twelve residents and seven businesses — they wake, commute, work, eat, and
+socialize; firms buy inputs, produce goods, set prices, hire, invest, and compete —
+and from there the town comes alive: **people move in, families have children,
+children grow up and take jobs, residents age and die leaving inheritances, the
+landlord builds new homes, and rents float with scarcity.** You watch it breathe on a
+WebGL canvas — and, if you like, hand the businesses' and residents' strategic
+decisions to Claude and see how the economy diverges from the deterministic baseline.
 
 It is built from scratch in TypeScript: no game engine, no UI framework, one
 seeded RNG, and a strict tick loop. Same seed in, same city out — every time.
+
+---
+
+## Current state — a living, growing city (finished for now)
+
+Since v1.0 the city stopped being a fixed tableau and became a **living, growing,
+self-sustaining economy.** What's in it now:
+
+- **A real firm economy.** Businesses pull genuine strategic levers — `setPrice`,
+  `hire`, `invest` (buy capital → more output), `setWage` (compete for staff),
+  `setPayout` (retain vs. distribute), `brand` (marketing → demand) — are *born* into
+  empty niches and go *bankrupt*, and their **owners earn their firm's dividend**.
+- **A living population** (the Housing & Population track — see
+  `PHASE-HOUSING-POPULATION.md`). The town grows over time: newcomers arrive and
+  families have children; children **come of age** and join the labour market;
+  residents age and **die**, their estates **inherited** (money conserved); the
+  **landlord builds new homes** (HP4) when the town fills; and **rent floats with
+  housing scarcity** (HP2). It grows ~12 → ~25 and self-limits at a wealth-supported
+  size. Every working-age resident is its own agent.
+- **A watchable city** (Pixi.js v8 default renderer, Canvas fallback via
+  `?renderer=canvas`): a decision ticker + thought bubbles, a live **demography HUD**
+  + population sparkline, a **"town life" feed** (births / arrivals / coming-of-age /
+  new homes / partings), **lit windows** showing home occupancy, **map toasts** that
+  pop at the home where each life event happens, and **life-stage resident dots**.
+- **An emergent citizen's dividend (a UBI).** Each day every firm's surplus above its
+  working-capital reserve is split — ~10% to the owner, the rest **equally to every
+  resident** (the closed economy's demand pump). In practice ~$50/resident/day, paid
+  to *everyone regardless of work* — ~35% of a worker's income and **100% of a
+  non-worker's** (children, the jobless, and the elderly never go broke). It wasn't
+  designed in; it **emerged** from keeping a closed-money loop circulating, and it's a
+  defining feature of the economy. Full analysis + a cradle-to-grave life trace are in
+  `LIFE-TRACE.md`.
+
+Everything stays **money-conserved to the cent and deterministic from seed + snapshot**
+across the entire living cycle (≈378 tests, multi-year soaks on seeds 1 & 7). Forward
+detail lives in the `PHASE*.md` docs + `LIFE-TRACE.md` + the git log.
 
 ---
 
@@ -67,10 +106,15 @@ MovementSystem     → walk residents along the road graph
 EconomySystem      → settle wages, rent, and sales for the day
 MarketSystem       → resource price book + B2B procurement + production
 BusinessAgentSystem→ (optional) once-a-day business strategy via a provider
+DistributionSystem → split each firm's daily surplus: owner dividend + the even
+                     citizen's dividend (the "UBI") to every resident
 ResidentAgentSystem→ (optional) once-a-day resident life decisions via a provider
-LifecycleSystem    → bankruptcy + safe eviction / re-home, on the settled day
+LifecycleSystem    → bankruptcy + capacity-aware eviction / re-home, on the settled day
+BusinessEntrySystem→ found a new firm in any empty niche (creative destruction)
 NeedsSystem        → decay hunger / energy / social
 MacroSystem        → record GDP, payroll, rent, unemployment, prices (read-only)
+PopulationSystem   → growth: in-migration, births, coming-of-age, mortality +
+                     inheritance, housing construction, dynamic rent
 ```
 
 `GodMode` (`src/systems/GodMode.ts`) is deliberately **not** a system: it never
@@ -87,7 +131,8 @@ src/
   systems/     all the tick-loop systems (above) + disasters + GodMode + constants
   ai/          the decision seam: provider contracts, clamps, rule/mock/Claude
                providers (business + resident), and LLM cost accounting
-  render/      CanvasRenderer + day/night palette
+  render/      PixiRenderer (WebGL, default) + CanvasRenderer fallback behind a
+               CityRenderer seam · camera (pan/zoom/follow) · day/night palette
   experiment/  headless A/B experiment harness
   createCity.ts  assembles everything
   main.ts        the browser UI (canvas, HUD, panels) — the only DOM code
@@ -101,9 +146,11 @@ Every strategic decision flows through one small seam, so the core never knows
 whether a rule set, a mock, or Claude produced the action:
 
 - **Business**: `DecisionProvider` (`src/ai/types.ts`). Sees a flat snapshot of
-  the business's day; may propose `setPrice`, `hire`/fire, `produce`.
+  the business's day; may propose `setPrice`, `hire`/fire, `invest`, `setWage`,
+  `setPayout`, and `brand`.
 - **Resident**: `ResidentDecisionProvider` (`src/ai/residentTypes.ts`). May
-  switch jobs, move home, buy/sell a vehicle, or negotiate a raise.
+  switch jobs, move home, buy/sell a vehicle, negotiate a raise, set a savings
+  goal, or splurge on a luxury.
 
 Three guarantees hold no matter who decides:
 
