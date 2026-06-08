@@ -6,6 +6,7 @@ import {
   BUSINESS_RESERVE,
   PROFIT_DISTRIBUTION_CAP,
   OWNER_DIVIDEND_SHARE,
+  DIVIDEND_WEAN,
 } from "./constants";
 
 /**
@@ -44,6 +45,12 @@ export class DistributionSystem implements System {
      * benchmark passes 0 so its firm-net-worth score stays a clean skill signal.
      */
     private readonly ownerDividendShare: number = OWNER_DIVIDEND_SHARE,
+    /**
+     * Even-dividend weaning factor (Initiative #1 S3). Scales the even recirculation only;
+     * defaults to the live {@link DIVIDEND_WEAN} (1.0 ⇒ byte-identical). Taper toward 0 to test
+     * whether the freed wage market + welfare can circulate the closed economy without the pump.
+     */
+    private readonly dividendWean: number = DIVIDEND_WEAN,
   ) {}
 
   update(ctx: SystemContext): void {
@@ -70,9 +77,11 @@ export class DistributionSystem implements System {
         biz.pnl.distributed += this.world.transfer(biz.id, biz.ownerId, ownerCut);
       }
 
-      // The rest recirculates evenly to all residents — the closed economy's
-      // primary demand pump, kept broad so dividends don't starve everyone else.
-      const share = (budget - ownerCut) / residents.length;
+      // The rest recirculates evenly to all residents — the closed economy's primary demand
+      // pump. Scaled by the S3 weaning factor: at 1.0 the full even dividend flows (today's
+      // behaviour); below 1.0 only that fraction recirculates and the remainder stays as firm
+      // cash, so we can watch whether wages + welfare carry circulation without the pump.
+      const share = ((budget - ownerCut) * this.dividendWean) / residents.length;
       if (share > 0) {
         for (const r of residents) {
           biz.pnl.distributed += this.world.transfer(biz.id, r.id, share);

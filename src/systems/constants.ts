@@ -369,6 +369,17 @@ export const WELFARE_RATIO = 0;
  *  and average worker income is low. Default 0 ⇒ inert. */
 export const WELFARE_SUBSISTENCE_MIN = 0;
 /**
+ * Dividend weaning (Initiative #1 S3) — a multiplier on the *even recirculation* (the artificial
+ * "UBI" demand pump in {@link DistributionSystem}). 1.0 = today's full even dividend ⇒
+ * byte-identical; taper toward 0 to wean it in notches (1.0 → 0.5 → 0.25 → 0) and watch whether
+ * competitive wages + welfare + owner spending keep the closed economy circulating, or whether it
+ * pools and stalls — the empirical trigger for the VISION money-creation fork. **Only the even
+ * split is weaned; the owner's draw ({@link OWNER_DIVIDEND_SHARE}) is untouched** (that's genuine
+ * capitalist income, not the artificial pump). The un-distributed remainder stays as firm cash.
+ * Real-world: removing a universal stimulus transfer to see if the market self-circulates.
+ */
+export const DIVIDEND_WEAN = 1;
+/**
  * Phase 13c — the invest lever fires only when a capacity-bound business has at
  * least this much profit sitting above its reserve at review time. After the 13c
  * reorder the agent reviews *before* the daily dividend, so cash-above-reserve is

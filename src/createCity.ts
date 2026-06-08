@@ -80,6 +80,12 @@ export interface CitySimOptions extends CityOptions {
    */
   ownerDividendShare?: number;
   /**
+   * Dividend weaning (Initiative #1 S3) — multiplier on the even recirculation. Defaults to the
+   * live {@link DIVIDEND_WEAN} (1.0 ⇒ byte-identical). Taper toward 0 to wean the artificial demand
+   * pump and test whether the freed wage market + welfare keep the closed economy circulating.
+   */
+  dividendWean?: number;
+  /**
    * Free-market wage cap (Initiative #1 S1) — the multiple of base wage a firm may post via
    * `setWage`. Defaults to the live {@link WAGE_CAP_MULT} (= 2 = the old fixed cap), so an
    * unset city is **byte-identical** to today. Raise it (e.g. 8) to free the wage: firms then
@@ -194,7 +200,7 @@ export function createCity(options: CitySimOptions = {}): {
   // the change that finally fires the dormant invest lever. With no agent this
   // sits right where distribution always ran (just after the market), so the
   // brain-off baseline is byte-identical.
-  sim.addSystem(new DistributionSystem(world, options.ownerDividendShare));
+  sim.addSystem(new DistributionSystem(world, options.ownerDividendShare, options.dividendWean));
   // Welfare floor (Initiative #1 S2) runs right after distribution, on the day's settled cash —
   // the one deliberate control. Inert at the default ratio 0 ⇒ byte-identical.
   const welfare = new WelfareSystem(world, options.welfareRatio, options.welfareSubsistence);
