@@ -94,11 +94,17 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
   //   • welfareRatio 0.5 — the one control: every non-earner gets ~half the average worker's daily
   //     income, funded by a levy on business surplus (capital, not wages). A 6-year A/B showed
   //     this is what actually keeps the closed economy circulating (highest velocity, lowest Gini,
-  //     least unemployment) — free wages ALONE pooled wealth and stalled. The dividend is still on
-  //     for now; weaning it (S3) is the next experiment.
+  //     least unemployment) — free wages ALONE pooled wealth and stalled.
+  //   • dividendWean 0.5 — the S3 result, engaged: the artificial UBI-like recirculation pump is
+  //     half removed, so wages + welfare carry more of the circulation. A verified 12-year/3-seed
+  //     experiment found the closed economy SELF-CIRCULATES without the pump (stable low velocity,
+  //     solvent non-workers) — money creation is NOT required — but fully removing it (wean 0)
+  //     leaves it near-frozen with money pooled in firm cash, so we keep it half-on here so the
+  //     town stays lively to watch. See INITIATIVE-01-WAGE-CIRCULATION.md "S3 Results".
   wageCapMult: 8,
   welfareRatio: 0.5,
   welfareSubsistence: 2,
+  dividendWean: 0.5,
 });
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
