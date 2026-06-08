@@ -1,8 +1,9 @@
 # INITIATIVE #1: A Free Labour Market — let wages *emerge*, only welfare is a control
 
-> First experiment of the free-market direction (`VISION.md`). **Status: designed,
-> awaiting go. Nothing built.** Conservation-safe (redistributes/relocates existing money,
-> mints nothing). This is the version that keeps it a *free market* — see the correction below.
+> First experiment of the free-market direction (`VISION.md`). **Status: S0 + S1 SHIPPED**
+> (flag-gated, default byte-identical, in the fork's local git — commits `63a4152`, `f9de674`).
+> Next: engage the free wage live + S2 welfare floor. Conservation-safe (redistributes/relocates
+> existing money, mints nothing). This is the version that keeps it a *free market* — see below.
 
 ## The correction (why the earlier "dial" was wrong)
 
@@ -72,13 +73,21 @@ free market holds or reveals the need for created money.
 
 ## The plan (sequence — small, measured increments)
 
-- **S0 — Instrument (no behaviour change).** Add the observatory metrics: **labour share**
-  (wages ÷ (wages+profit)), unemployment, average + spread of wages, profit margin, **money
-  velocity** (daily consumption ÷ `totalMoney`), **Gini** of wealth, business-cycle
-  amplitude, and a per-cohort **solvency census**. This is how we "see the economy."
-- **S1 — Free the wage.** Behind a flag, remove `MAX_WAGE_MULT` + the absolute clamp; make
-  `setWage` genuinely competitive (bid against rivals' wages + scarcity + own affordability,
-  ease back when overstaffed). Observe wages begin to move and the labour share float.
+- **S0 — Instrument (no behaviour change). ✅ DONE (`63a4152`).** Added to `MacroSystem`:
+  **labour share** (wages ÷ (wages+dividend)), **dividend** flow, **money velocity** (daily
+  consumption ÷ `totalMoney`), **Gini** of resident wealth, and **avg wage** — plus HUD vital
+  cards for Labour share / Inequality / Velocity. Pure reads, deterministic, round-trip-safe.
+  *(Still to add later as the experiment deepens: wage spread, profit margin, cycle amplitude,
+  a per-cohort solvency census — defer until S2/S3 need them.)*
+- **S1 — Free the wage. ✅ DONE (`f9de674`).** Added `WAGE_CAP_MULT` (default = `MAX_WAGE_MULT`
+  = 2 ⇒ byte-identical) threaded `createCity → BusinessAgentSystem`: `setWage` clamps to
+  `[base, base*wageCapMult]`, `observe()` surfaces `maxWage`, and the coarse absolute clamp
+  lifts in step. The rules brain bids competitively only when the cap is lifted — always ≥ the
+  capped baseline, harder when the jobless pool is empty, bounded only by affordability (the
+  cash-thin ease-back is the natural brake). Proven: a lifted cap pushes wages above the old
+  2× ceiling, conserved + deterministic, and raises the avg wage vs the capped city.
+  **The mechanism ships default-OFF; engaging it in the LIVE game is the next step — best paired
+  with S2 so the freed market has its one control (welfare) before the dividend is ever weaned.**
 - **S2 — Welfare floor (the one control).** Unemployed/dependents at ~50% of the *lagged*
   average worker income, with an absolute subsistence minimum, funded by a small levy.
   Non-worker solvency becomes a hard CI gate.
