@@ -1,9 +1,10 @@
 # INITIATIVE #1: A Free Labour Market — let wages *emerge*, only welfare is a control
 
-> First experiment of the free-market direction (`VISION.md`). **Status: S0 + S1 SHIPPED**
-> (flag-gated, default byte-identical, in the fork's local git — commits `63a4152`, `f9de674`).
-> Next: engage the free wage live + S2 welfare floor. Conservation-safe (redistributes/relocates
-> existing money, mints nothing). This is the version that keeps it a *free market* — see below.
+> First experiment of the free-market direction (`VISION.md`). **Status: S0 + S1 + S2 SHIPPED**
+> (flag-gated, default byte-identical, in the fork's local git — `63a4152`, `f9de674`, `f4af9ba`).
+> Next: engage the free wage + welfare live and observe, then S3 (wean the dividend).
+> Conservation-safe (redistributes/relocates existing money, mints nothing). This is the version
+> that keeps it a *free market* — see below.
 
 ## The correction (why the earlier "dial" was wrong)
 
@@ -88,9 +89,13 @@ free market holds or reveals the need for created money.
   2× ceiling, conserved + deterministic, and raises the avg wage vs the capped city.
   **The mechanism ships default-OFF; engaging it in the LIVE game is the next step — best paired
   with S2 so the freed market has its one control (welfare) before the dividend is ever weaned.**
-- **S2 — Welfare floor (the one control).** Unemployed/dependents at ~50% of the *lagged*
-  average worker income, with an absolute subsistence minimum, funded by a small levy.
-  Non-worker solvency becomes a hard CI gate.
+- **S2 — Welfare floor (the one control). ✅ DONE (`f4af9ba`).** New `WelfareSystem` pays each
+  non-earner (`jobId === ""`) `WELFARE_RATIO` × the average worker's daily income (floored at
+  `WELFARE_SUBSISTENCE_MIN`), funded by a **levy on business above-reserve cash** — capital funds
+  the net, so wages/labour-share stay clean and the floor survives the dividend-weaning to come.
+  Conserved + deterministic; the levy never drives a firm below reserve; `paidTotal()` exposes
+  disbursement. Default ratio 0 ⇒ inert ⇒ byte-identical. *(Refinements deferred: lag the average
+  a day to damp oscillation; a per-cohort solvency CI gate once welfare runs live.)*
 - **S3 — Wean the dividend.** Taper the even-dividend share in notches (1.0 → 0.5 → 0 of
   today's level), each gated on: demand/GDP within a band, solvency intact, bounded cycle
   amplitude. **Watch whether competitive wages + owner spending replace it.** If it stalls,
