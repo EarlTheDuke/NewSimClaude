@@ -660,6 +660,11 @@ function renderMacro(): void {
       vitalCard("Avg price", money2(latest.avgResourcePrice), history.map((s) => s.avgResourcePrice), "#e15bc8"),
       vitalCard("Total money", money(latest.totalMoney), history.map((s) => s.totalMoney), "#9aa0a6"),
       vitalCard("Unemployed", String(latest.unemployed), history.map((s) => s.unemployed), "#e1a35b"),
+      // Observatory metrics (free-market study): the emergent labour/capital split,
+      // inequality, and whether money is actually circulating.
+      vitalCard("Labour share", `${Math.round(latest.labourShare * 100)}%`, history.map((s) => s.labourShare), "#f778ba"),
+      vitalCard("Inequality (Gini)", latest.gini.toFixed(2), history.map((s) => s.gini), "#db6d28"),
+      vitalCard("Velocity", latest.velocity.toFixed(2), history.map((s) => s.velocity), "#3fb950"),
     ].join("");
   }
 
