@@ -1,9 +1,12 @@
 # INITIATIVE #1: A Free Labour Market — let wages *emerge*, only welfare is a control
 
-> First experiment of the free-market direction (`VISION.md`). **Status: S0 + S1 + S2 SHIPPED and
-> ENGAGED LIVE** (`63a4152`, `f9de674`, `f4af9ba`, `ca24266`). The live browser game now runs as a
-> free labour market with a welfare floor (cap 8 + welfare 0.5); `createCity` defaults stay OFF so
-> the 387-test suite is byte-identical. **Next: S3 — wean the dividend** (the crux).
+> First experiment of the free-market direction (`VISION.md`). **Status: S0–S3 SHIPPED + the crux
+> experiment RUN and VERIFIED.** Free labour market + welfare floor + dividend-weaning knob, all
+> flag-gated (390-test suite byte-identical at defaults); engaged live on :5174 (cap 8 + welfare 0.5,
+> dividend still on). **S3 result: the money-creation fork is NOT forced** — a closed economy
+> self-circulates without the dividend, just quieter and more unequal (money pools in firm cash).
+> **Next is a fork (your call): (a) accept it, (b) fix organic recirculation within conservation, or
+> (c) the money-creation fork — recommend (b) first.** See *S3 Results*.
 > Conservation-safe so far (redistributes/relocates existing money, mints nothing).
 >
 > **Key result (6-yr A/B, seeds 1 & 7):** freeing wages *alone* made circulation WORSE — velocity
@@ -102,14 +105,51 @@ free market holds or reveals the need for created money.
   Conserved + deterministic; the levy never drives a firm below reserve; `paidTotal()` exposes
   disbursement. Default ratio 0 ⇒ inert ⇒ byte-identical. *(Refinements deferred: lag the average
   a day to damp oscillation; a per-cohort solvency CI gate once welfare runs live.)*
-- **S3 — Wean the dividend.** Taper the even-dividend share in notches (1.0 → 0.5 → 0 of
-  today's level), each gated on: demand/GDP within a band, solvency intact, bounded cycle
-  amplitude. **Watch whether competitive wages + owner spending replace it.** If it stalls,
-  **stop and record it** — that's the money-creation fork's trigger, a result, not a failure.
+- **S3 — Wean the dividend. ✅ DONE + EXPERIMENT RUN (`d0fe35c` knob, `f749c27` spiral fix).**
+  Added `DIVIDEND_WEAN` (multiplier on the even recirculation; default 1.0 ⇒ byte-identical) and
+  ran the notch experiment. **Findings below.** The money-creation fork is **NOT forced** by the
+  data — but the closed economy pays a real circulation cost without the pump. See *S3 Results*.
 - **S4 — Relax reserves**; **(later)** remove `PRODUCER_WAGE_FLOOR` once the labour market
   can hold producer wages up organically.
 - **(The fork — later, deliberate)** money creation, *if* the experiment shows a closed free
   market can't self-sustain.
+
+## S3 Results — the crux experiment (verified by a 4-lens adversarial panel)
+
+**Setup.** Free wage + welfare 0.5 engaged; taper `DIVIDEND_WEAN` 1.0 → 0; measure velocity
+(consumption ÷ money), inequality, solvency, and where money pools. 12-year horizon, multiple
+seeds, money conserved in every run.
+
+**A bug found & fixed first (`f749c27`).** At the high cap, weaning the dividend triggered a runaway
+**wage spiral** (avgWage → ~1.0, the 8× ceiling) that drained firms and collapsed circulation. Root
+cause: the S1 free-wage bid had **no affordability gate**, and the ease-back only fired when
+`!understaffed`, so an understaffed-and-broke firm ratcheted forever. Fixed: bid up only while
+cash > reserve; ease back when cash-thin even if understaffed. avgWage now stays ~0.27–0.29.
+
+**The verified findings (post-fix, 12 yr, seeds 1/3/7):**
+1. **The money-creation fork is NOT forced.** A closed, conserved economy *does* self-circulate
+   without the dividend: velocity settles to a **stable low equilibrium** (~0.03–0.04 at the
+   original cap; it oscillates, it does **not** slide to zero — y9→y12 slopes were +20%/+29%/−5%).
+   Non-workers stay solvent. This **refutes** "a closed market cannot self-circulate."
+2. **But weaning costs ~50–75% of circulation**, and the lost money **pools in firm cash**
+   (business share of all money rose to **60–95%**), with inequality climbing (Gini 0.49→0.85). The
+   dividend was doing real recirculation work; remove it and firms hoard the surplus.
+3. **Surprise: the *free* wage circulates WORSE than the capped wage here.** Affordability-disciplined
+   firms (cap 8) hoard cash (biz-share 89–95%, velocity ~0.01), while the "dumb" always-pay-the-cap
+   firms (cap 2) push more money to workers (biz-share ~80%, velocity ~0.035). Discipline → hoarding.
+
+**Interpretation (the honest read).** The closed economy *works* without the pump — just quieter and
+more unequal. The missing recirculation channel is **firms/owners spending their accumulated cash**
+(capex, higher draws that get *spent*, credit) — exactly the channels a real economy has and ours
+under-models. So the next question is a genuine **fork (the user's call):**
+- **(a) Accept** the lower-circulation closed equilibrium (wean the dividend, live with quieter/unequal).
+- **(b) Fix organic recirculation *within conservation*** — make owner draws / firm investment empty
+  the hoarded firm cash back into the economy. Test whether that restores vibrancy without minting.
+- **(c) The money-creation fork** (credit / growth / "accounted not conserved" money) — the VISION
+  endgame, only if (b) can't carry it.
+
+Recommendation: **try (b) before (c).** The data says money creation isn't *required* yet; the
+bottleneck is hoarded firm cash, which an organic spending channel might recirculate.
 
 ## What we deliberately do NOT do (per your direction)
 
