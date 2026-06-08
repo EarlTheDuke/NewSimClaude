@@ -29,16 +29,14 @@ describe("free wage market (S1)", () => {
     expect(b.world.serialize()).toEqual(a.world.serialize());
   });
 
-  it("a lifted cap lets competition push wages above the old 2× ceiling — conserved & deterministic", () => {
+  it("a freed wage market is conserved, deterministic, and bounded — no firm pinned at the high cap", () => {
     const free = scarce({ wageCapMult: 8 });
     const start = free.world.totalMoney();
     free.sim.run(TICKS_PER_DAY * 365);
+    const firms = free.world.businesses.filter((b) => b.active && !!b.baseWagePerTick);
 
-    // Some firm now pays above 2× its base — impossible under the old fixed cap.
-    const overOldCap = free.world.businesses.filter(
-      (b) => b.active && !!b.baseWagePerTick && b.wagePerTick > b.baseWagePerTick * 2 + 1e-9,
-    );
-    expect(overOldCap.length).toBeGreaterThan(0);
+    // Anti-spiral (S3 fix): affordability keeps every firm's posted wage off the 8× ceiling.
+    expect(firms.every((b) => b.wagePerTick < b.baseWagePerTick! * 8 - 1e-9)).toBe(true);
 
     // Conservation holds to the cent.
     expect(free.world.totalMoney()).toBeCloseTo(start, 2);
@@ -49,11 +47,15 @@ describe("free wage market (S1)", () => {
     expect(free2.world.serialize()).toEqual(free.world.serialize());
   });
 
-  it("freeing the wage lifts the average wage vs the same city with the cap on", () => {
-    const capped = scarce(); // wageCapMult defaults to 2
+  it("the freed market lifts wages above base (competes) but the affordability gate prevents a spiral", () => {
+    // Before the S3 fix, a freed cap let understaffed-but-broke firms ratchet wages toward the 8×
+    // ceiling, driving the average toward ~1.0 and collapsing circulation once the dividend was
+    // weaned. With the affordability gate + understaffed-cash-thin ease-back, the average lands in a
+    // sane band: above the seeded bases (≤ 0.20 — wages did compete up) yet far below the spiral.
     const free = scarce({ wageCapMult: 8 });
-    capped.sim.run(TICKS_PER_DAY * 365);
     free.sim.run(TICKS_PER_DAY * 365);
-    expect(free.macro.latest()!.avgWage).toBeGreaterThan(capped.macro.latest()!.avgWage);
+    const w = free.macro.latest()!.avgWage;
+    expect(w).toBeGreaterThan(0.2); // competition lifted pay above the highest seeded base
+    expect(w).toBeLessThan(0.5); // but no runaway toward the cap (the bug drove this to ~1.0)
   });
 });
