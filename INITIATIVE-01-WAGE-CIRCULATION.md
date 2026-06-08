@@ -1,10 +1,16 @@
 # INITIATIVE #1: A Free Labour Market — let wages *emerge*, only welfare is a control
 
-> First experiment of the free-market direction (`VISION.md`). **Status: S0 + S1 + S2 SHIPPED**
-> (flag-gated, default byte-identical, in the fork's local git — `63a4152`, `f9de674`, `f4af9ba`).
-> Next: engage the free wage + welfare live and observe, then S3 (wean the dividend).
-> Conservation-safe (redistributes/relocates existing money, mints nothing). This is the version
-> that keeps it a *free market* — see below.
+> First experiment of the free-market direction (`VISION.md`). **Status: S0 + S1 + S2 SHIPPED and
+> ENGAGED LIVE** (`63a4152`, `f9de674`, `f4af9ba`, `ca24266`). The live browser game now runs as a
+> free labour market with a welfare floor (cap 8 + welfare 0.5); `createCity` defaults stay OFF so
+> the 387-test suite is byte-identical. **Next: S3 — wean the dividend** (the crux).
+> Conservation-safe so far (redistributes/relocates existing money, mints nothing).
+>
+> **Key result (6-yr A/B, seeds 1 & 7):** freeing wages *alone* made circulation WORSE — velocity
+> halved, Gini → ~0.92, the unemployed got poorer (money pooled in the few employed insiders). The
+> **welfare floor** is what carries circulation (highest velocity, Gini → 0.09–0.33, lowest
+> unemployment). Strong evidence for crux outcome #2: a closed free market pools/stalls → wages
+> can't circulate it on their own → points at the VISION money-creation fork. See below.
 
 ## The correction (why the earlier "dial" was wrong)
 
