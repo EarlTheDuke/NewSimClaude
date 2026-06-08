@@ -425,6 +425,7 @@ function renderInspector(): void {
     const util = market.capacityUtilizationFor(b.id);
     const utilStr = util !== undefined ? `${(util * 100).toFixed(0)}%` : "—";
     const net = b.pnl.revenue + b.pnl.rentCollected - b.pnl.wagesPaid - b.pnl.distributed;
+    const ownerName = world.getResident(b.ownerId)?.name ?? "—";
     const decB = latestDecisionFor(b.id, agent?.decisions() ?? [], residentAgent?.decisions() ?? []);
     const whyNowBiz =
       decB && "businessId" in decB
@@ -439,10 +440,11 @@ function renderInspector(): void {
       <p>cash: ${money(b.cash)} · inventory: ${b.inventory} · price: ${money(b.price)}</p>
       <p>chain: ${chain}</p>
       <p>resources: ${stock}</p>
+      <p>owner: ${ownerName}</p>
       <p>employees: ${b.employeeIds.length} · wage ${b.wagePerTick.toFixed(2)}/tick</p>
       <p>capital: ${(b.capital ?? CAPITAL_BASELINE).toFixed(0)} · utilization: ${utilStr}</p>
       ${insolvent > 0 ? `<p class="warn">insolvent ${insolvent}d</p>` : ""}
-      <p class="pnl">revenue ${money(b.pnl.revenue)} · wages ${money(b.pnl.wagesPaid)} · rent ${money(b.pnl.rentCollected)} · dist ${money(b.pnl.distributed)} · net ${money(net)}</p>
+      <p class="pnl">lifetime · revenue ${money(b.pnl.revenue)} · wages ${money(b.pnl.wagesPaid)} · rent ${money(b.pnl.rentCollected)} · dist ${money(b.pnl.distributed)} · net ${money(net)}</p>
       ${whyNowBiz}
     `;
   }
