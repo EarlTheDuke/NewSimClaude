@@ -55,7 +55,7 @@ const agenticResidentIds = "all" as const;
 // is the watchable AI city economy the project is for; the decision traces narrate
 // every move. (Set agenticBusinessIds back to just the storefronts for the calmer,
 // pre-Phase-15 view.)
-const { sim, world, market, macro, agent, residentAgent, events, god, population } = createCity({
+const { sim, world, market, macro, agent, residentAgent, events, god, population, welfare } = createCity({
   seed: 1,
   brain,
   residentBrain,
@@ -86,6 +86,19 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
   // housing scarcity (HP2): they climb as the town fills and ease as the landlord
   // builds — a real housing market that gives the landlord meaning.
   populationOptions: { births: true, mortality: true, construction: true, dynamicRent: true },
+  // Free-market experiment (INITIATIVE-01) — ENGAGED here so the town runs as a free labour
+  // market with a single control. Both default-OFF in createCity (tests/bench byte-identical);
+  // turned on only in this live view.
+  //   • wageCapMult 8 — "free the wage": short-staffed firms may bid well past the old 2× cap to
+  //     win scarce labour, so the wage/profit split EMERGES from competition instead of a decree.
+  //   • welfareRatio 0.5 — the one control: every non-earner gets ~half the average worker's daily
+  //     income, funded by a levy on business surplus (capital, not wages). A 6-year A/B showed
+  //     this is what actually keeps the closed economy circulating (highest velocity, lowest Gini,
+  //     least unemployment) — free wages ALONE pooled wealth and stalled. The dividend is still on
+  //     for now; weaning it (S3) is the next experiment.
+  wageCapMult: 8,
+  welfareRatio: 0.5,
+  welfareSubsistence: 2,
 });
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -158,6 +171,9 @@ const townLifeEl = el<HTMLDivElement>("#townLife");
 // Sampled once per sim-day in renderFrame; the feed narrates demographic events as
 // the cumulative counts tick up, the sparkline traces the town's growth curve.
 const popHistory: number[] = [];
+// Welfare disbursed per sampled day (Initiative #1 S2) — charted as its own vital.
+const welfareHistory: number[] = [];
+let lastWelfarePaid = 0;
 const townLife: string[] = [];
 let lastDemoDay = -1;
 let lastDemoCounts = { born: 0, died: 0, migrated: 0, grewUp: 0 };
@@ -575,6 +591,13 @@ function sampleDemography(day: number): void {
   popHistory.push(world.residents.length);
   if (popHistory.length > 400) popHistory.shift();
 
+  // Welfare flow since the last sample (cumulative-total delta — a multi-day frame jump folds
+  // the missed days into one bar, so no money is dropped from the chart).
+  const wp = welfare.paidTotal();
+  welfareHistory.push(wp - lastWelfarePaid);
+  lastWelfarePaid = wp;
+  if (welfareHistory.length > 400) welfareHistory.shift();
+
   const d = population.demography();
   const homes = world.locations.filter((l) => l.type === "home").length;
   const add = (text: string): void => {
@@ -665,6 +688,7 @@ function renderMacro(): void {
       vitalCard("Labour share", `${Math.round(latest.labourShare * 100)}%`, history.map((s) => s.labourShare), "#f778ba"),
       vitalCard("Inequality (Gini)", latest.gini.toFixed(2), history.map((s) => s.gini), "#db6d28"),
       vitalCard("Velocity", latest.velocity.toFixed(2), history.map((s) => s.velocity), "#3fb950"),
+      vitalCard("Welfare / day", money(welfareHistory[welfareHistory.length - 1] ?? 0), welfareHistory, "#ffa657"),
     ].join("");
   }
 
