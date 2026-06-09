@@ -27,6 +27,13 @@ export const BUSINESS_RGB = Object.fromEntries(
   Object.entries(BUSINESS_HEX).map(([k, v]) => [k, hexToRgb(v)]),
 ) as Record<BusinessKind, Rgb>;
 
+/**
+ * Fallback colour for a business kind with no entry in the palette — i.e. a data-driven
+ * **new industry** registered at build time (Initiative #2 slice 4d). A distinct teal so a
+ * newly-registered industry stands out on the map; the seeded seven keep their own colours.
+ */
+export const BUSINESS_RGB_DEFAULT: Rgb = hexToRgb("#2a9d8f");
+
 // Shared rendering palette/geometry — exported so the Pixi renderer (R2) reproduces
 // the exact same colours and sizes for parity. The canvas renderer is their origin.
 export const HOME_RGB = hexToRgb("#3a3320");
@@ -399,7 +406,7 @@ export class CanvasRenderer implements CityRenderer {
       return;
     }
 
-    const base: Rgb = biz ? BUSINESS_RGB[biz.kind] : HOME_RGB;
+    const base: Rgb = biz ? BUSINESS_RGB[biz.kind] ?? BUSINESS_RGB_DEFAULT : HOME_RGB;
     ctx.fillStyle = dim(base, a);
     ctx.fillRect(x, y, BUILDING, BUILDING);
 

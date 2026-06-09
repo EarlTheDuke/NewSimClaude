@@ -13,7 +13,7 @@ import {
   summarizeResidentAction,
 } from "./render/DecisionNarration";
 import { ARCHETYPES } from "./world/archetypes";
-import type { ResourceKind } from "./world/types";
+import type { BusinessKind, ResourceKind } from "./world/types";
 import type { DisasterKind } from "./systems/disasters";
 import { CAPITAL_BASELINE, GRANT_AMOUNT, MOVE_SPEED, VEHICLE_SPEED_MULT } from "./systems/constants";
 import { compareExperiments, formatComparison } from "./experiment/harness";
@@ -105,11 +105,27 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
   welfareRatio: 0.5,
   welfareSubsistence: 2,
   dividendWean: 0.5,
+  // Business creation & industries (INITIATIVE-02 / "Initiative A") — ENGAGED here so the economy
+  // SELF-EXPANDS before your eyes. Both default-OFF in createCity (tests/bench byte-identical);
+  // turned on only in this live view.
+  //   • opportunityEntry — a storefront or producer that runs flat-out AND stays solvent draws a
+  //     RIVAL: a second firm of its kind is founded (storefronts open across town, producers
+  //     co-locate), funded by a resident-entrepreneur out of savings (no money minted) and crewed
+  //     from the jobless pool. Watch the town-life feed + the map for a new firm born into a busy
+  //     niche as population growth lifts demand against capacity.
+  //   • extraIndustries — a genuinely NEW, data-driven industry registered at build time: an
+  //     "orchard" producing grain, which the bakery buys alongside the farm via the multi-producer
+  //     chain. It appears on the map in TEAL — the fallback colour for a kind the palette doesn't
+  //     know, i.e. a brand-new industry. (Its kind is outside the seeded union, hence the one cast.)
+  opportunityEntry: true,
+  extraIndustries: [
+    { kind: "orchard" as BusinessKind, produces: "grain", sellsToResidents: false, target: 50, maxPerDay: 36 },
+  ],
 });
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>NewSimClaude — Free-Market Economy <span class="hint">· free wage + welfare floor (port 5174)</span></h1>
+  <h1>NewSimClaude — Free-Market Economy <span class="hint">· free wage + welfare + business entry + new industry (port 5174)</span></h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>

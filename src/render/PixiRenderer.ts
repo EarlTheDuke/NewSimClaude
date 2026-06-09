@@ -13,6 +13,7 @@ import {
   LABEL_RGB,
   HOME_RGB,
   BUSINESS_RGB,
+  BUSINESS_RGB_DEFAULT,
   BUILDING,
   COLOCATE_DX,
   ACTIVITY_COLOR,
@@ -556,7 +557,7 @@ export class PixiRenderer implements CityRenderer {
       v.planks.visible = true;
       v.windows.visible = false;
     } else {
-      const baseRgb = biz ? BUSINESS_RGB[biz.kind] : HOME_RGB;
+      const baseRgb = biz ? BUSINESS_RGB[biz.kind] ?? BUSINESS_RGB_DEFAULT : HOME_RGB;
       v.base.tint = dimInt(baseRgb, a);
       v.planks.visible = false;
       const lit = glow * (0.12 + 0.88 * Math.max(0, Math.min(1, litFraction)));
