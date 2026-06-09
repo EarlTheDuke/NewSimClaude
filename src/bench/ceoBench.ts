@@ -28,6 +28,7 @@ import {
   BENCH_WEALTH_ELASTICITY,
   BENCH_OWNER_DIVIDEND_SHARE,
   BENCH_CREDIT_ENABLED,
+  BENCH_TRADE_ENABLED,
   BENCH_BRAND_DEMAND_ELASTICITY,
   BENCH_GROWTH_START_CAPITAL,
   BENCH_GROWTH_BRAND_ELASTICITY,
@@ -166,6 +167,10 @@ function setupScenario(config: CeoBenchConfig): {
     // moves the historical scorecards, and the bench world has exactly seven businesses.
     creditEnabled: BENCH_CREDIT_ENABLED,
     includeBank: false,
+    // Freeze trade OFF (C4 slice a6): no port, no outside demand — a skill score must measure the
+    // CEO, never a demand battery, and a live TRADE_ENABLED flip must not move history.
+    tradeEnabled: BENCH_TRADE_ENABLED,
+    includePort: false,
     residentBrain: config.residentBrain ?? "off",
     agenticResidentIds: config.agenticResidentIds,
   });

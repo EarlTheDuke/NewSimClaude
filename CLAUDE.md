@@ -10,9 +10,12 @@ This file auto-loads every session in this repo. It is the operating manual; the
 > (free labour market, done) → **[INITIATIVE-02-BUSINESS-CREATION.md](INITIATIVE-02-BUSINESS-CREATION.md)**
 > (creation & industries, done) → **[INITIATIVE-03-COMPETITION.md](INITIATIVE-03-COMPETITION.md)**
 > (competition, done) → **[INITIATIVE-04-GDP-GROWTH.md](INITIATIVE-04-GDP-GROWTH.md)** (GDP growth:
-> credit C1 done, C2 verified — *GDP plateaus*). The open decision is the **money fork** —
-> **[INITIATIVE-04-C4-MONEY-FORK.md](INITIATIVE-04-C4-MONEY-FORK.md)** (3 paths planned; build conserving
-> trade first). Everything is flag-gated + byte-identical at default; ~461 tests.
+> C1 credit done; C2 verified — *GDP plateaus*; **C4 path (a) conserving trade BUILT & VERIFIED**
+> — the port lifts GDP within conservation and the lift *outlives* its finite battery). Decision
+> record + the (a) result: **[INITIATIVE-04-C4-MONEY-FORK.md](INITIATIVE-04-C4-MONEY-FORK.md)**;
+> **path (b) bounded money creation is in flight** (user-greenlit 2026-06-09 — the audited
+> mint/burn relaxation; default + bench stay strictly conserved). Everything flag-gated +
+> byte-identical at default; ~492 tests.
 
 1. **[NORTH-STAR.md](NORTH-STAR.md)** — the post-v1 compass. Re-read at every phase
    boundary and check proposed work against the three moves (wants-grow-with-wealth →

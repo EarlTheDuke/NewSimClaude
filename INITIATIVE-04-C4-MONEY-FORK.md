@@ -4,6 +4,16 @@
 > [INITIATIVE-04-GDP-GROWTH.md](INITIATIVE-04-GDP-GROWTH.md), [NORTH-STAR.md](NORTH-STAR.md), and
 > the sacred invariants in [CLAUDE.md](CLAUDE.md).
 
+> **DECISION (2026-06-09): the user chose (a) → (b).** Path (a) is **BUILT & VERIFIED** (slices
+> a1–a6 shipped, flag-gated, bench-frozen). **THE (a) RESULT:** outside demand lifts GDP +25–45%
+> while the port's finite reserve funds it — and the lift **outlives the battery**: the export boom
+> finances a ~2× town (in-migration/births/construction) whose own demand holds GDP above the C2
+> plateau after the foreign money is fully spent (`tradeGrowthSoak.test.ts`, seeds 1 & 7,
+> conservation to the cent throughout). The bound is real too: the battery exhausts in ~1 year and
+> is never refilled — *unbounded* growth needs money creation. **Path (b) is now in flight as the
+> user's explicit, deliberate decision to relax the conservation invariant** the audited way
+> (mint/burn logged, bounded, measured; default + bench stay strictly conserved).
+
 ## The question, with evidence
 
 Initiative #1 (S3) suspected, and **C2 now proves over a 4-year full-stack soak**: a closed, conserved

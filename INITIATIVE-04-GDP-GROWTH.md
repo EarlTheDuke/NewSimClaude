@@ -64,15 +64,18 @@ A **Treasury** holder: taxes (sales/income/corporate) as transfers in, public sp
 out (welfare already prototypes this). A real fiscal lever and a new benchmark scenario; frozen OFF
 in the firm-CEO bench. Conserving (every tax/transfer routes through the treasury). Draft `PHASE20-*`.
 
-### C4 — The money fork · **PLANNED (all three paths)** — see [INITIATIVE-04-C4-MONEY-FORK.md](INITIATIVE-04-C4-MONEY-FORK.md)
-The C2 plateau (GDP doesn't compound within conservation) forces the decision. Three paths are fully
-planned in the fork doc: **(a) external trade** — a *conserving* port that injects outside demand,
-lifting the ceiling **inside** the sacred invariant (recommended first); **(b) bounded money creation**
-— a monetary authority with an audited `mint`/`burn`, which **deliberately relaxes** the sacred
-conservation invariant (your explicit call, the deliberate escalation if (a)'s bounded growth isn't
-enough); **(c) accept the plateau** — bank the closed-economy result and pivot to the benchmark +
-visualization tracks. **Recommendation: build (a), measure its lift, then revisit (b) vs (c) with
-evidence.** Awaiting your direction.
+### C4 — The money fork · **(a) BUILT & VERIFIED; (b) IN FLIGHT** — see [INITIATIVE-04-C4-MONEY-FORK.md](INITIATIVE-04-C4-MONEY-FORK.md)
+The C2 plateau forced the decision; the user chose **(a) → (b)** (2026-06-09). **(a) external
+trade is COMPLETE** (slices a1–a6): a conserving Port (`includePort` + `tradeEnabled`, default
+byte-identical, bench-frozen) buys producer surplus at frozen world prices (the GDP exports term),
+sells imports to genuinely-starved firms with the local market holding right of first refusal
+(the −M term), and gives CEOs the `setExportShare` serve-the-better-market lever. **THE (a)
+FINDING (`tradeGrowthSoak.test.ts`):** outside demand lifts GDP +25–45% while the battery funds
+it, and the lift **outlives the battery** — the export boom finances a ~2× town whose own demand
+holds GDP above the plateau after the foreign money is spent. Bounded (the battery dies in ~1
+year, never refilled), conserved to the cent. **(b) bounded money creation is now in flight** as
+the explicit user decision — audited `mint`/`burn`, bounded supply rule, default + bench strictly
+conserved.
 
 ### C5 — GDP growth measurement + the explicit money decision
 A clear **real-GDP-growth** metric over a long soak across the whole program, and the deliberate,

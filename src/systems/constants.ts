@@ -340,6 +340,12 @@ export const TRADE_IMPORT_PRICE_MULT = 1.5;
  * replacement supply chain.
  */
 export const TRADE_IMPORT_MAX_PER_DAY = 8;
+/**
+ * The CEO benchmark freezes trade OFF (slice a6, mirroring {@link BENCH_CREDIT_ENABLED}): no port,
+ * no exports, no imports — so a live TRADE_ENABLED flip never moves the historical scorecards, the
+ * bench world keeps exactly seven businesses, and skill scores never ride outside demand.
+ */
+export const BENCH_TRADE_ENABLED = false;
 
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;

@@ -6,7 +6,7 @@ import {
   formatCeoScorecard,
   ablationStudy,
 } from "./ceoBench";
-import { BENCH_START_CAPITAL, BENCH_TURNS } from "../systems/constants";
+import { BENCH_START_CAPITAL, BENCH_TURNS, BENCH_TRADE_ENABLED } from "../systems/constants";
 
 const SEED = 9;
 
@@ -73,6 +73,15 @@ describe("CEO benchmark (Phase 10d)", () => {
       const a = runCeoBenchmark({ seed: SEED, brain: "rules" });
       const b = runCeoBenchmark({ seed: SEED, brain: "rules" });
       expect(a).toEqual(b);
+    });
+  });
+
+  describe("trade freeze (C4 slice a6)", () => {
+    it("the bench is pinned trade-off, so a skill score can never ride the port's demand battery", () => {
+      // The structural pin lives in ceoBench.ts (includePort: false, tradeEnabled:
+      // BENCH_TRADE_ENABLED); this tripwire keeps the frozen constant from ever drifting on —
+      // flipping the live TRADE_ENABLED must never move a historical scorecard.
+      expect(BENCH_TRADE_ENABLED).toBe(false);
     });
   });
 
