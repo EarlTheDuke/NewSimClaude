@@ -28,6 +28,12 @@ export interface MacroSample {
    * trade-off city, so gdp reads exactly as before there.
    */
   exports: number;
+  /**
+   * Imports that day (C4a slice a3): inputs firms bought from the port when the local chain left
+   * them short. Subtracts from GDP (the standard −M: imported content isn't city output, and it
+   * later appears inside C). 0 in a portless or trade-off city.
+   */
+  imports: number;
   /** Cash paid to residents as WAGES that day (dividends are tracked separately in {@link dividend}). */
   payroll: number;
   /** Rent collected that day. */
@@ -70,6 +76,7 @@ interface Cumulative {
   investment: number;
   distributed: number;
   exports: number;
+  imports: number;
 }
 
 /**
@@ -85,7 +92,7 @@ interface Cumulative {
 export class MacroSystem implements System {
   readonly id = "macro";
   private samples: MacroSample[] = [];
-  private prev: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0 };
+  private prev: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0, imports: 0 };
 
   constructor(
     private readonly world: World,
@@ -95,7 +102,7 @@ export class MacroSystem implements System {
   update(ctx: SystemContext): void {
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
 
-    const cum: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0 };
+    const cum: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0, imports: 0 };
     let totalCapital = 0;
     for (const b of this.world.businesses) {
       cum.payroll += b.pnl.wagesPaid;
@@ -103,18 +110,22 @@ export class MacroSystem implements System {
       cum.investment += b.capitalInvested ?? 0;
       cum.distributed += b.pnl.distributed;
       cum.exports += b.pnl.exportRevenue ?? 0;
+      cum.imports += b.pnl.importSpend ?? 0;
       if (ARCHETYPES[b.kind].sellsToResidents) cum.consumption += b.pnl.revenue;
       totalCapital += b.capital ?? CAPITAL_BASELINE;
     }
 
-    // Day-over-day flows. GDP by expenditure = consumption + investment + exports;
-    // in the seeded city investment and exports are 0, so gdp == consumption and
+    // Day-over-day flows. GDP by expenditure = C + I + X − M; in the seeded city
+    // X and M are 0 and I is 0 until someone invests, so gdp == consumption and
     // the metric stays byte-identical to its pre-12d (consumption-only) self.
     // (Exports never double-count into consumption: only non-storefront producers
-    // sell to the port, and their revenue isn't in the consumption sum.)
+    // sell to the port, and their revenue isn't in the consumption sum. Imports
+    // subtract because the landed content isn't city output, yet shows up later
+    // inside C when the processed good retails.)
     const consumption = cum.consumption - this.prev.consumption;
     const investment = cum.investment - this.prev.investment;
     const exported = cum.exports - this.prev.exports;
+    const imported = cum.imports - this.prev.imports;
     const wages = cum.payroll - this.prev.payroll;
     const dividend = cum.distributed - this.prev.distributed;
     const totalMoney = this.world.totalMoney();
@@ -123,10 +134,11 @@ export class MacroSystem implements System {
     const sample: MacroSample = {
       day: ctx.totalTicks / TICKS_PER_DAY,
       totalMoney,
-      gdp: consumption + investment + exported,
+      gdp: consumption + investment + exported - imported,
       consumption,
       investment,
       exports: exported,
+      imports: imported,
       payroll: wages,
       rent: cum.rent - this.prev.rent,
       unemployed: this.world.residents.filter((r) => r.jobId === "").length,
@@ -171,8 +183,9 @@ export class MacroSystem implements System {
           investment: s.prev.investment ?? 0, // pre-12d saves carry no investment baseline
           distributed: s.prev.distributed ?? 0, // pre-observatory saves carry no dividend baseline
           exports: s.prev.exports ?? 0, // pre-C4a saves carry no exports baseline
+          imports: s.prev.imports ?? 0, // pre-a3 saves carry no imports baseline
         }
-      : { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0 };
+      : { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0, imports: 0 };
   }
 }
 

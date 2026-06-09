@@ -196,6 +196,15 @@ export interface ProfitAndLoss {
    * never exported), byte-identical. NEVER seeded.
    */
   exportRevenue?: number;
+  /**
+   * Cumulative cash this firm paid the port for IMPORTED inputs (Initiative C / C4a slice a3) —
+   * the other leg of the current account: goods landed from abroad when the local chain left the
+   * firm short. {@link MacroSystem} differences it into GDP's −M term (imported content isn't city
+   * output, so it nets out of the C it later appears in). Records cash that already moved via
+   * World.transfer (`firm→port` — conservation untouched). Absent ⇒ 0 (no port / never imported),
+   * byte-identical. NEVER seeded.
+   */
+  importSpend?: number;
 }
 
 /**

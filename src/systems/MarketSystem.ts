@@ -113,6 +113,24 @@ export class MarketSystem implements System {
   }
 
   /**
+   * A business's labour-/capital-bent daily production ceiling (Phase 12b), read-only — exposed
+   * for the TradeSystem's import-gap math (C4 slice a3), mirroring {@link costFloorFor}. The gap a
+   * firm may fill from abroad is reckoned with exactly the arithmetic {@link procure} uses, so an
+   * import order can never exceed what the firm could actually process.
+   */
+  effectiveCapacityOf(biz: Business): number {
+    return this.effectiveCapacity(biz);
+  }
+
+  /**
+   * A business's desired output stock (Phase 14 capital-scaled target), read-only — the other half
+   * of the import-gap math (C4 slice a3).
+   */
+  effectiveTargetOf(biz: Business): number {
+    return this.effectiveTarget(biz);
+  }
+
+  /**
    * Phase 6 hook — slam a resource's price to `base * multiplier`, clamped to
    * the usual [MIN, MAX] band so a supply-shock can't break the price model.
    * Touches no cash (the spike is felt later, as dearer B2B procurement, which

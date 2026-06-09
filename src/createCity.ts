@@ -254,9 +254,9 @@ export function createCity(options: CitySimOptions = {}): {
 
   // External trade (Initiative C / C4a) runs right after the B2B market: stock is freshly
   // produced, and export revenue books before the CEO reviews the day, before profit distribution,
-  // and before Macro samples it. Inert at the default (TRADE_ENABLED off ⇒ no-op) ⇒ byte-identical.
-  // Slice a1: a stub.
-  sim.addSystem(new TradeSystem(world, options.tradeEnabled));
+  // and before Macro samples it. The market reference feeds the import-gap arithmetic (a3).
+  // Inert at the default (TRADE_ENABLED off ⇒ no-op) ⇒ byte-identical.
+  sim.addSystem(new TradeSystem(world, market, options.tradeEnabled));
 
   let agent: BusinessAgentSystem | undefined;
   const brain = options.brain ?? "off";

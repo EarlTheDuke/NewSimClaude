@@ -7,6 +7,8 @@ import {
   TRADE_WORLD_PRICE_MULT,
   TRADE_EXPORT_MAX_PER_DAY,
   TRADE_EXPORT_STOCK_FLOOR,
+  TRADE_IMPORT_PRICE_MULT,
+  TRADE_IMPORT_MAX_PER_DAY,
 } from "./constants";
 import { ARCHETYPES } from "../world/archetypes";
 import { RESOURCE_KINDS, BASE_RESOURCE_PRICE } from "../world/industries";
@@ -220,5 +222,84 @@ describe("TradeSystem — export demand (C4 slice a2)", () => {
     loaded.sim.run(TICKS_PER_DAY * 10);
     expect(loaded.world.serialize()).toEqual(original.world.serialize());
     expect(loaded.macro.latest()).toEqual(original.macro.latest());
+  });
+});
+
+/**
+ * Slice a3 — imports / the current account's other leg. A firm the LOCAL chain left short buys its
+ * standing input gap from the port at the dearer landed price (`firm → port`), so money flows back
+ * into the demand battery and only NET exports drain it. In a healthy chain the gap is zero —
+ * imports are the relief valve, not a replacement supply chain.
+ */
+describe("TradeSystem — imports / current account (C4 slice a3)", () => {
+  /** An engaged trade city whose bakery is dead (and never refilled), starving the diner of food. */
+  const starved = (seed: number) => {
+    const city = createCity({ seed, includePort: true, tradeEnabled: true, businessEntry: false });
+    const bakery = city.world.getBusiness("biz_bakery")!;
+    bakery.active = false; // the local food source is gone — only the dock can supply now
+    bakery.resources = {};
+    return city;
+  };
+
+  it("a healthy local chain imports nothing — the valve stays shut", () => {
+    const { sim, world, macro } = createCity({ seed: 1, includePort: true, tradeEnabled: true });
+    sim.run(TICKS_PER_DAY * 30);
+    for (const b of world.businesses) expect(b.pnl.importSpend ?? 0).toBe(0);
+    expect(macro.latest()!.imports).toBe(0);
+  });
+
+  it("a starved consumer imports its input gap at the landed price, bounded by the boat", () => {
+    const { sim, world } = starved(1);
+    sim.run(TICKS_PER_DAY); // one day: local procurement fails, the evening boat lands the gap
+    const diner = world.getBusiness("biz_diner")!;
+    const landedPrice = BASE_RESOURCE_PRICE.food * TRADE_IMPORT_PRICE_MULT;
+    const spend = diner.pnl.importSpend ?? 0;
+    expect(spend).toBeGreaterThan(0);
+    // Units landed match cash paid exactly, and never exceed the boat's daily cargo.
+    const unitsLanded = spend / landedPrice;
+    expect(diner.resources.food).toBeCloseTo(unitsLanded, 9);
+    expect(unitsLanded).toBeLessThanOrEqual(TRADE_IMPORT_MAX_PER_DAY + 1e-9);
+  });
+
+  it("imports keep a starved storefront trading — the relief valve works", () => {
+    const { sim, world } = starved(1);
+    sim.run(TICKS_PER_DAY * 30);
+    const diner = world.getBusiness("biz_diner")!;
+    expect(diner.active).toBe(true);
+    expect(diner.pnl.importSpend ?? 0).toBeGreaterThan(0);
+    // Imported food was processed into meals and sold on — the diner still has stock to sell.
+    expect(diner.inventory).toBeGreaterThan(0);
+  });
+
+  it("the current account nets to the cent: port cash = seed − exports + imports", () => {
+    const { sim, world } = starved(1);
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 45);
+    const port = world.getBusiness("biz_port")!;
+    const exportsTotal = world.businesses.reduce((s, b) => s + (b.pnl.exportRevenue ?? 0), 0);
+    const importsTotal = world.businesses.reduce((s, b) => s + (b.pnl.importSpend ?? 0), 0);
+    expect(importsTotal).toBeGreaterThan(0);
+    expect(port.cash).toBeCloseTo(PORT_SEED_CASH - exportsTotal + importsTotal, 6);
+    expect(world.totalMoney()).toBeCloseTo(start, 6); // conserved through the two-way account
+  });
+
+  it("MacroSystem reports the −M term: gdp = C + I + X − M", () => {
+    const { sim, macro } = starved(1);
+    sim.run(TICKS_PER_DAY * 10);
+    const sample = macro.latest()!;
+    expect(sample.imports).toBeGreaterThan(0);
+    expect(sample.gdp).toBeCloseTo(
+      sample.consumption + sample.investment + sample.exports - sample.imports,
+      6,
+    );
+  });
+
+  it("the starved import scenario is deterministic: same seed twice → identical world", () => {
+    const run = () => {
+      const c = starved(7);
+      c.sim.run(TICKS_PER_DAY * 20);
+      return c.world.serialize();
+    };
+    expect(run()).toEqual(run());
   });
 });

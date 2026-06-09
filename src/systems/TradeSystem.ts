@@ -4,11 +4,14 @@ import type { World } from "../world/World";
 import type { Business, ResourceKind } from "../world/types";
 import { ARCHETYPES } from "../world/archetypes";
 import { RESOURCE_KINDS, BASE_RESOURCE_PRICE } from "../world/industries";
+import type { MarketSystem } from "./MarketSystem";
 import {
   TRADE_ENABLED,
   TRADE_WORLD_PRICE_MULT,
   TRADE_EXPORT_MAX_PER_DAY,
   TRADE_EXPORT_STOCK_FLOOR,
+  TRADE_IMPORT_PRICE_MULT,
+  TRADE_IMPORT_MAX_PER_DAY,
 } from "./constants";
 
 /**
@@ -40,6 +43,8 @@ export class TradeSystem implements System {
 
   constructor(
     private readonly world: World,
+    /** Read-only access to the market's capacity/target arithmetic for the import-gap math (a3). */
+    private readonly market: MarketSystem,
     /** Whether trade is live; defaults to {@link TRADE_ENABLED} (off ⇒ this system is inert). */
     private readonly enabled: boolean = TRADE_ENABLED,
   ) {}
@@ -49,7 +54,7 @@ export class TradeSystem implements System {
     const port = this.world.getBusiness("biz_port");
     if (!port || !port.active) return; // trade needs a seeded port (strictly opt-in, like the bank)
     this.buyExports(port);
-    // Slice a3 sells imports here.
+    this.sellImports(port);
   }
 
   /**
@@ -90,6 +95,57 @@ export class TradeSystem implements System {
   }
 
   /**
+   * Slice a3 — the rest of the world sells the city what its own chain couldn't supply,
+   * `firm → port`, at the frozen landed price (base × {@link TRADE_IMPORT_PRICE_MULT} — dearer
+   * than the export price; the spread is the world's shipping margin). For each resource (chain
+   * order), each active consumer's **standing input gap at end of market day** — the same
+   * deficit arithmetic {@link MarketSystem.procure} uses, minus input already on hand — is filled
+   * up to the boat's bounded daily cargo ({@link TRADE_IMPORT_MAX_PER_DAY}), capped by the firm's
+   * own cash. **The local market keeps right of first refusal:** each consumer's gap is first
+   * netted against the standing stock local producers still hold (claimed in the same id order
+   * tomorrow's procurement will run), and the boat sells only the remainder — so a healthy chain
+   * imports nothing, and the dock can never undercut a supplier who has the goods sitting ready.
+   * The evening order lands tonight so TOMORROW's production can run: imports are the relief
+   * valve when fire, bankruptcy, or export pull leaves the local market genuinely short. Money
+   * flows city → port, refilling the demand battery: the current account nets, and only NET
+   * exports drain the reserve. Imported units enter the world (non-cash, like production). Spend
+   * books into `pnl.importSpend` — Macro's −M term, since imported content isn't city output.
+   * Deterministic: fixed resource order, id-sorted firms, integer units, frozen prices, no RNG.
+   */
+  private sellImports(port: Business): void {
+    for (const res of RESOURCE_KINDS) {
+      const landedPrice = BASE_RESOURCE_PRICE[res] * TRADE_IMPORT_PRICE_MULT;
+      let cargo = TRADE_IMPORT_MAX_PER_DAY; // the boat's daily hold for this good
+      // What local producers still hold of this good (post-export) — tomorrow morning's local
+      // supply, which outranks the boat. Consumers claim it in id order as they're considered.
+      let localStock = this.producersOf(res).reduce((s, p) => s + (p.resources[res] ?? 0), 0);
+      for (const firm of this.consumersOf(res)) {
+        if (cargo <= 0) break;
+        const a = ARCHETYPES[firm.kind];
+        const outStock = a.sellsToResidents ? firm.inventory : firm.resources[a.produces!] ?? 0;
+        const deficit = Math.min(
+          this.market.effectiveCapacityOf(firm),
+          Math.max(0, this.market.effectiveTargetOf(firm) - outStock),
+        );
+        const want = Math.max(0, deficit - (firm.resources[res] ?? 0));
+        // Right of first refusal: the gap the local market can still fill is reserved for it.
+        const localClaim = Math.min(want, localStock);
+        localStock -= localClaim;
+        const shortfall = want - localClaim;
+        // Integer units the firm can actually pay for — the transfer settles in full, so cash
+        // moved matches units landed exactly.
+        const units = Math.min(shortfall, cargo, Math.floor(firm.cash / landedPrice));
+        if (units <= 0) continue;
+        const paid = this.world.transfer(firm.id, port.id, units * landedPrice); // firm → port; conserved
+        if (paid <= 0) continue;
+        firm.resources[res] = (firm.resources[res] ?? 0) + units; // landed from abroad (non-cash)
+        firm.pnl.importSpend = (firm.pnl.importSpend ?? 0) + paid;
+        cargo -= units;
+      }
+    }
+  }
+
+  /**
    * Every active producer of a resource, id-sorted — the same deterministic pool
    * {@link MarketSystem.producersOf} uses, so a respawned or second producer joins the export
    * channel exactly as it joins the local one.
@@ -97,6 +153,16 @@ export class TradeSystem implements System {
   private producersOf(resource: ResourceKind): Business[] {
     return this.world.businesses
       .filter((b) => b.active && ARCHETYPES[b.kind].produces === resource)
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  }
+
+  /**
+   * Every active consumer of a resource (storefronts + processors that buy it as input),
+   * id-sorted — the import counterpart of {@link producersOf}.
+   */
+  private consumersOf(resource: ResourceKind): Business[] {
+    return this.world.businesses
+      .filter((b) => b.active && ARCHETYPES[b.kind].consumes === resource)
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
 }

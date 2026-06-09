@@ -326,6 +326,20 @@ export const TRADE_EXPORT_MAX_PER_DAY = 8;
  * first; only the surplus is offered for export.
  */
 export const TRADE_EXPORT_STOCK_FLOOR = 0.5;
+/**
+ * Import price per resource = its base B2B price × this multiplier (slice a3) — frozen, like the
+ * world price. Sits ABOVE the export price ({@link TRADE_WORLD_PRICE_MULT} — the spread is the
+ * world's shipping margin) and just under the local band ceiling ({@link PRICE_MAX_MULT}), so
+ * imports are the *expensive fallback*: a firm structurally prefers local supply and only pays the
+ * dock when the local chain leaves it short. Real-world: landed cost — world price plus freight.
+ */
+export const TRADE_IMPORT_PRICE_MULT = 1.5;
+/**
+ * Max units of EACH resource the port sells to the city per day (slice a3) — the boat's bounded
+ * daily cargo, mirroring {@link TRADE_EXPORT_MAX_PER_DAY}. Keeps imports a relief valve, not a
+ * replacement supply chain.
+ */
+export const TRADE_IMPORT_MAX_PER_DAY = 8;
 
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;
