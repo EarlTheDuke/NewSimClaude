@@ -5,10 +5,11 @@ import type {
   Road,
   Location,
   Business,
+  BusinessKind,
   Resident,
   WorkSchedule,
 } from "./types";
-import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE, PRODUCER_WAGE_FLOOR, HOME_CAPACITY_MAX, HOME_CAPACITY_MIN } from "../systems/constants";
+import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE, PRODUCER_WAGE_FLOOR, HOME_CAPACITY_MAX, HOME_CAPACITY_MIN, BANK_SEED_CASH } from "../systems/constants";
 import { ARCHETYPES } from "./archetypes";
 import type { IndustryDef } from "./industries";
 
@@ -86,6 +87,13 @@ export interface CityOptions {
    * round-robin. Off by default (empty) ⇒ the seeded city is byte-identical.
    */
   extraIndustries?: readonly IndustryDef[];
+  /**
+   * Seed a Bank (Initiative C / Phase 18b) — a conserving financial holder. Pushes `biz_bank` +
+   * `loc_bank`, **carving its seed cash from the landlord** so the genesis total is unchanged.
+   * Strictly opt-in (never implied by `creditEnabled`); off by default ⇒ the seven-business city is
+   * byte-identical. The bank's archetype is registered by `createCity` before the build.
+   */
+  includeBank?: boolean;
   /**
    * Opt in to a second, rival diner (Phase 11b). Adds `biz_diner_2` — a faithful
    * twin of the original diner under a different owner — at the bottom-right
@@ -187,6 +195,33 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
       capital: CAPITAL_BASELINE,
     });
   });
+
+  // Initiative C / Phase 18b — seed the Bank when asked: a conserving financial holder, capitalised
+  // by CARVING its seed cash from the landlord so the genesis total is unchanged. Non-producing
+  // (maxPerDay 0 ⇒ the staffing round-robin below skips it) and carries no plant capital. Co-located
+  // with the landlord's node. Off by default ⇒ no bank, activeBusinesses stays 7.
+  if (options.includeBank) {
+    const bankLoc: Location = { id: "loc_bank", name: "First Bank", type: "workplace", nodeId: nodeId(3, 1) };
+    locations.push(bankLoc);
+    const landlord = businesses.find((b) => b.kind === "landlord");
+    if (landlord) landlord.cash -= BANK_SEED_CASH; // carve, so the genesis total is unchanged
+    businesses.push({
+      id: "biz_bank",
+      name: bankLoc.name,
+      kind: "bank" as BusinessKind,
+      ownerId: ownerOf(2), // a resident owner; the bank holds < its reserve so it pays no dividend
+      locationId: bankLoc.id,
+      cash: BANK_SEED_CASH,
+      inventory: 0,
+      price: 0,
+      employeeIds: [],
+      wagePerTick: 0,
+      pnl: pnl(),
+      resources: {},
+      active: true,
+      capital: 0, // no plant capital — keeps the bank out of MacroSystem.totalCapital
+    });
+  }
 
   // --- Homes on the left/middle columns (c = 0,1) ---
   const homeNodes: string[] = [];

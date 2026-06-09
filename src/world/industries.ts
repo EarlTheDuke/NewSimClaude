@@ -45,6 +45,12 @@ export interface IndustryDef {
    * reckons against. Set only on storefronts; absent ⇒ not resident-facing.
    */
   retailPrice?: number;
+  /**
+   * The Bank role (Initiative C / Phase 18) — a conserving financial holder: it lends, accrues
+   * interest, holds a larger reserve, and is never bankrupted. Set only on the bank archetype,
+   * which is registered solely when a city is built with `includeBank`.
+   */
+  bank?: boolean;
 }
 
 /** The economic identity a system reads by kind — the IndustryDef minus its `kind` tag. */
@@ -56,6 +62,7 @@ export interface Archetype {
   maxPerDay: number;
   collectsRent?: boolean;
   capitalGoodsVendor?: boolean;
+  bank?: boolean;
 }
 
 /** A tradeable intermediate good and its starting B2B price ($/unit). */
@@ -79,6 +86,20 @@ export const SEEDED_INDUSTRIES: readonly IndustryDef[] = [
   { kind: "goods", consumes: "wares", sellsToResidents: true, target: 24, maxPerDay: 21, retailPrice: 34 },
   { kind: "landlord", sellsToResidents: false, target: 0, maxPerDay: 0, collectsRent: true },
 ];
+
+/**
+ * The Bank archetype (Initiative C / Phase 18) — a non-producing financial holder, registered into
+ * the live registry ONLY when a city is built with `includeBank` (never seeded by default, so the
+ * default seven-business city is untouched). Its `kind` is outside the seeded union, so it reaches
+ * the registry through one contained cast — exactly like a data-driven extra industry (slice 4d).
+ */
+export const BANK_INDUSTRY: IndustryDef = {
+  kind: "bank" as BusinessKind,
+  sellsToResidents: false,
+  target: 0,
+  maxPerDay: 0, // produces nothing ⇒ never staffed (desiredHeadcount 0), no capacity
+  bank: true,
+};
 
 /** The seeded four, in chain order (grain/materials are primary; food/wares are processed). */
 export const SEEDED_RESOURCES: readonly ResourceDef[] = [
@@ -118,6 +139,7 @@ function rebuild(): void {
       maxPerDay: d.maxPerDay,
       collectsRent: d.collectsRent,
       capitalGoodsVendor: d.capitalGoodsVendor,
+      bank: d.bank,
     };
   }
 

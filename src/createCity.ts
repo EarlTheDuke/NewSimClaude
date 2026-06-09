@@ -1,7 +1,7 @@
 import { Simulation } from "./core/Simulation";
 import { World } from "./world/World";
 import { buildCity, type CityOptions } from "./world/cityGen";
-import { resetIndustries, type ResourceDef } from "./world/industries";
+import { resetIndustries, BANK_INDUSTRY, type ResourceDef } from "./world/industries";
 import { WorldSystem } from "./systems/WorldSystem";
 import { BrainSystem } from "./systems/BrainSystem";
 import { MovementSystem } from "./systems/MovementSystem";
@@ -184,7 +184,14 @@ export function createCity(options: CitySimOptions = {}): {
   // Initiative #2 slice 4d — register this city's industries (seeded + any extras) before building,
   // so ARCHETYPES/resources/prices reflect them. With no extras this restores the seeded economy
   // verbatim ⇒ byte-identical. Per-build reset keeps determinism + test isolation (see industries.ts).
-  resetIndustries(options.extraIndustries, options.extraResources);
+  // Initiative C / Phase 18b — when includeBank, register the Bank archetype too (so ARCHETYPES.bank
+  // exists for the lookups), STRICTLY opt-in (never implied by creditEnabled). cityGen seeds the bank
+  // firm itself (carved from the landlord), so it is NOT added to the cityGen extra-industry list.
+  const includeBank = options.includeBank ?? false;
+  const registryIndustries = includeBank
+    ? [...(options.extraIndustries ?? []), BANK_INDUSTRY]
+    : options.extraIndustries;
+  resetIndustries(registryIndustries, options.extraResources);
   const world = buildCity(sim.rng, options);
 
   // Constructed up front so the EventSystem can hold a market reference; it is

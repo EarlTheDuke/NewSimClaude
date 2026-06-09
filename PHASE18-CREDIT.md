@@ -78,7 +78,7 @@ The adversarial pass forced these. They are non-negotiable and baked into the sl
 | Slice | One line |
 |---|---|
 | **✅ 18a** | Inert seam — SHIPPED (re-grounded): `Business.debt?` / `pnl.debtService?` types + all `CREDIT_*`/`BANK_*`/`BENCH_CREDIT_ENABLED` constants (inert) + no-op `CreditSystem` stub (registered between Distribution and Lifecycle) + `creditEnabled?` option. **NO union/record change** (4d/4b made it unnecessary). `credit.test.ts`: no debt booked, conserved, round-trips, deterministic, `creditEnabled:true` still a no-op. 428 tests green, byte-identical. |
-| **18b** | Seed the Bank as a conserving holder behind `includeBank` (cash carved from landlord) + `BANK_RESERVE` distribution branch + bank-is-special guard in `LifecycleSystem`. Still no lending. |
+| **✅ 18b** | Seed the Bank — SHIPPED (re-grounded): a `BANK_INDUSTRY` registry entry with a **`bank` role flag** (registered only under `includeBank`); `cityGen` seeds `biz_bank` co-located with the landlord, **cash carved from the landlord** (genesis total unchanged), non-producing (never staffed), `capital:0`. `BANK_RESERVE` branch in `DistributionSystem` (keyed on the flag) + bank-never-bankrupts guard in `LifecycleSystem`. Strictly opt-in ⇒ default city has no bank and `activeBusinesses===7`. 432 tests green. Still no lending. |
 | **18c** | Borrow lever: `bank → firm` transfer booking `debt.principal` (flag-gated, rules brain silent). |
 | **18d** | Interest accrual: `CreditSystem.update()` goes live as a `firm → bank` daily transfer (rate defaults 0 ⇒ no-op). |
 | **18e** | Repay lever: `firm → bank`, interest-then-principal waterfall; emptied debt deleted to restore byte-identical shape. |

@@ -5,6 +5,7 @@ import { ARCHETYPES } from "../world/archetypes";
 import {
   LANDLORD_RESERVE,
   BUSINESS_RESERVE,
+  BANK_RESERVE,
   PROFIT_DISTRIBUTION_CAP,
   OWNER_DIVIDEND_SHARE,
   DIVIDEND_WEAN,
@@ -60,7 +61,11 @@ export class DistributionSystem implements System {
     if (residents.length === 0) return;
     for (const biz of this.world.businesses) {
       if (!biz.active) continue;
-      const reserve = ARCHETYPES[biz.kind].collectsRent ? LANDLORD_RESERVE : BUSINESS_RESERVE;
+      const reserve = ARCHETYPES[biz.kind].bank
+        ? BANK_RESERVE // the bank keeps its lending float — not swept to the ordinary reserve
+        : ARCHETYPES[biz.kind].collectsRent
+          ? LANDLORD_RESERVE
+          : BUSINESS_RESERVE;
       // Phase 16 — the firm pays out only `payoutRate` of its capped surplus; the
       // rest is retained as cash to reinvest. Default 1.0 ⇒ full distribution,
       // byte-identical to pre-Phase-16.

@@ -9,6 +9,7 @@ import {
   RECYCLE_BANKRUPT_ASSETS,
 } from "./constants";
 import { cheapestVacantHome } from "../world/housing";
+import { ARCHETYPES } from "../world/archetypes";
 
 /**
  * Business and resident lifecycle (Phase 4c). Runs once per sim-day, after the
@@ -39,6 +40,10 @@ export class LifecycleSystem implements System {
 
   private reviewSolvency(biz: Business): void {
     if (!biz.active) return;
+    // The Bank is never bankrupted (Initiative C / Phase 18b) — a central financial holder doesn't
+    // liquidate to its owner and silently kill the credit subsystem. Its solvency is managed by its
+    // reserve + (later) interest income, not the ordinary cash-floor streak.
+    if (ARCHETYPES[biz.kind].bank) return;
     const days = biz.cash < BANKRUPT_CASH_FLOOR ? (biz.insolventDays ?? 0) + 1 : 0;
     biz.insolventDays = days;
     if (days < BANKRUPT_GRACE_DAYS) return;
