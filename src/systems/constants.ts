@@ -287,6 +287,26 @@ export const BANK_SEED_CASH = 1500;
 /** The CEO benchmark freezes credit OFF (mirrors the other BENCH_* freezes) so historical scorecards never move. */
 export const BENCH_CREDIT_ENABLED = false;
 
+// --- External trade (Initiative C / C4 path a) — all INERT here (slice a1). The Port is a
+//     CONSERVING holder: its reserve is counted in totalMoney() and every trade flow is a
+//     World.transfer, so the sacred invariant holds across ticks — the genesis total is simply
+//     higher (city + port reserve). Frozen OFF in the CEO bench (slice a6).
+//     See INITIATIVE-04-C4-MONEY-FORK.md. ---
+/**
+ * Master switch for external trade (C4a). OFF here ⇒ the {@link TradeSystem} is a no-op even when
+ * a port is seeded ⇒ the default city is byte-identical. Real-world: whether the town's port
+ * actually has shipping traffic calling at it.
+ */
+export const TRADE_ENABLED = false;
+/**
+ * Cash the Port is seeded with under `includePort` — the rest of the world's money standing ready
+ * to buy the city's exports (a finite **demand battery**). It enters at genesis like any holder's
+ * seed (deliberately NOT carved from a city holder — the city didn't fund the world), so the
+ * genesis total is higher by exactly this amount and conservation-across-ticks is untouched. When
+ * it runs dry, foreign demand is exhausted — refilling it mid-run would be money creation (path b).
+ */
+export const PORT_SEED_CASH = 20000;
+
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;
 /**

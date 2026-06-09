@@ -9,7 +9,7 @@ import type {
   Resident,
   WorkSchedule,
 } from "./types";
-import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE, PRODUCER_WAGE_FLOOR, HOME_CAPACITY_MAX, HOME_CAPACITY_MIN, BANK_SEED_CASH } from "../systems/constants";
+import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE, PRODUCER_WAGE_FLOOR, HOME_CAPACITY_MAX, HOME_CAPACITY_MIN, BANK_SEED_CASH, PORT_SEED_CASH } from "../systems/constants";
 import { ARCHETYPES } from "./archetypes";
 import type { IndustryDef } from "./industries";
 
@@ -94,6 +94,15 @@ export interface CityOptions {
    * byte-identical. The bank's archetype is registered by `createCity` before the build.
    */
   includeBank?: boolean;
+  /**
+   * Seed a Port (Initiative C / C4a external trade) — the city's conserving window to the rest of
+   * the world. Pushes `biz_port` + `loc_port`, seeded with {@link PORT_SEED_CASH} of **new genesis
+   * money** (the foreign buyers' reserve — deliberately NOT carved from a city holder, since the
+   * city didn't fund the world). The genesis total is higher by exactly the seed; conservation
+   * across ticks still holds to the cent. Strictly opt-in (never implied by `tradeEnabled`); off
+   * by default ⇒ the city is byte-identical. The port's archetype is registered by `createCity`.
+   */
+  includePort?: boolean;
   /**
    * Opt in to a second, rival diner (Phase 11b). Adds `biz_diner_2` — a faithful
    * twin of the original diner under a different owner — at the bottom-right
@@ -220,6 +229,33 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
       resources: {},
       active: true,
       capital: 0, // no plant capital — keeps the bank out of MacroSystem.totalCapital
+    });
+  }
+
+  // Initiative C / C4a — seed the Port when asked: the rest of the world as a conserving holder.
+  // Its cash is the FOREIGN buyers' money — new genesis money, not carved, because the city didn't
+  // fund the world — so totalMoney() is higher by exactly the seed and stays conserved from there.
+  // Non-producing (maxPerDay 0 ⇒ never staffed), no plant capital (out of MacroSystem.totalCapital),
+  // and every cash sweep skips the `port` role flag (distribution, welfare levy, bank savings,
+  // bankruptcy). Sits at the top-right edge — the road out of town. Off by default ⇒ byte-identical.
+  if (options.includePort) {
+    const portLoc: Location = { id: "loc_port", name: "Harbor Port", type: "workplace", nodeId: nodeId(3, 0) };
+    locations.push(portLoc);
+    businesses.push({
+      id: "biz_port",
+      name: portLoc.name,
+      kind: "port" as BusinessKind,
+      ownerId: ownerOf(0), // nominal owner (render/typing); the port never distributes a cent
+      locationId: portLoc.id,
+      cash: PORT_SEED_CASH,
+      inventory: 0,
+      price: 0,
+      employeeIds: [],
+      wagePerTick: 0,
+      pnl: pnl(),
+      resources: {},
+      active: true,
+      capital: 0, // no plant capital — keeps the port out of MacroSystem.totalCapital
     });
   }
 

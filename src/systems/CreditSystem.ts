@@ -76,7 +76,9 @@ export class CreditSystem implements System {
     const bank = this.world.getBusiness("biz_bank");
     if (!bank) return;
     for (const biz of this.world.businesses) {
-      if (!biz.active || biz.id === bank.id) continue;
+      // The Port (C4a) is not a city saver — its reserve is the rest of the world's money, and
+      // paying it yield would drain the bank's lending float out of the city economy.
+      if (!biz.active || biz.id === bank.id || ARCHETYPES[biz.kind].port) continue;
       const reserve = ARCHETYPES[biz.kind].collectsRent ? LANDLORD_RESERVE : BUSINESS_RESERVE;
       const idle = Math.max(0, biz.cash - reserve); // cash above the firm's own working reserve
       if (idle <= 0) continue;

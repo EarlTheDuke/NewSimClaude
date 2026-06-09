@@ -1,7 +1,7 @@
 import { Simulation } from "./core/Simulation";
 import { World } from "./world/World";
 import { buildCity, type CityOptions } from "./world/cityGen";
-import { resetIndustries, BANK_INDUSTRY, type ResourceDef } from "./world/industries";
+import { resetIndustries, BANK_INDUSTRY, PORT_INDUSTRY, type ResourceDef } from "./world/industries";
 import { WorldSystem } from "./systems/WorldSystem";
 import { BrainSystem } from "./systems/BrainSystem";
 import { MovementSystem } from "./systems/MovementSystem";
@@ -14,6 +14,7 @@ import { GodMode } from "./systems/GodMode";
 import { NeedsSystem } from "./systems/NeedsSystem";
 import { LifecycleSystem } from "./systems/LifecycleSystem";
 import { CreditSystem } from "./systems/CreditSystem";
+import { TradeSystem } from "./systems/TradeSystem";
 import { BusinessEntrySystem } from "./systems/BusinessEntrySystem";
 import { MacroSystem } from "./systems/MacroSystem";
 import { PopulationSystem, type PopulationOptions } from "./systems/PopulationSystem";
@@ -173,6 +174,14 @@ export interface CitySimOptions extends CityOptions {
    * the bank's margin.
    */
   creditSavingsRate?: number;
+  /**
+   * External trade (Initiative C / C4a). When true, the {@link TradeSystem} runs the port's daily
+   * current account — export purchases (`port→firm`, outside demand) and import sales
+   * (`firm→port`) — all conserving transfers. Defaults to the live {@link TRADE_ENABLED} (off ⇒
+   * the system is a no-op ⇒ byte-identical). Strictly opt-in, and needs `includePort` to actually
+   * trade — exactly like `creditEnabled` vs `includeBank`.
+   */
+  tradeEnabled?: boolean;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -206,10 +215,15 @@ export function createCity(options: CitySimOptions = {}): {
   // Initiative C / Phase 18b — when includeBank, register the Bank archetype too (so ARCHETYPES.bank
   // exists for the lookups), STRICTLY opt-in (never implied by creditEnabled). cityGen seeds the bank
   // firm itself (carved from the landlord), so it is NOT added to the cityGen extra-industry list.
+  // Initiative C / C4a — likewise the Port under includePort (never implied by tradeEnabled);
+  // cityGen seeds the port firm itself, as new genesis money (the foreign buyers' reserve).
   const includeBank = options.includeBank ?? false;
-  const registryIndustries = includeBank
-    ? [...(options.extraIndustries ?? []), BANK_INDUSTRY]
-    : options.extraIndustries;
+  const includePort = options.includePort ?? false;
+  const registryIndustries = [
+    ...(options.extraIndustries ?? []),
+    ...(includeBank ? [BANK_INDUSTRY] : []),
+    ...(includePort ? [PORT_INDUSTRY] : []),
+  ];
   resetIndustries(registryIndustries, options.extraResources);
   const world = buildCity(sim.rng, options);
 
@@ -237,6 +251,12 @@ export function createCity(options: CitySimOptions = {}): {
   sim.addSystem(new MovementSystem(world));
   sim.addSystem(new EconomySystem(world, options.wealthElasticity, options.brandElasticity));
   sim.addSystem(market);
+
+  // External trade (Initiative C / C4a) runs right after the B2B market: stock is freshly
+  // produced, and export revenue books before the CEO reviews the day, before profit distribution,
+  // and before Macro samples it. Inert at the default (TRADE_ENABLED off ⇒ no-op) ⇒ byte-identical.
+  // Slice a1: a stub.
+  sim.addSystem(new TradeSystem(world, options.tradeEnabled));
 
   let agent: BusinessAgentSystem | undefined;
   const brain = options.brain ?? "off";

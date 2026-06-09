@@ -51,6 +51,15 @@ export interface IndustryDef {
    * which is registered solely when a city is built with `includeBank`.
    */
   bank?: boolean;
+  /**
+   * The Port role (Initiative C / C4 path a — external trade) — the city's conserving window to
+   * the rest of the world. Its cash is the *foreign buyers'* money (counted in `totalMoney()`, so
+   * conservation holds to the cent), never city profit: it pays no dividend, is exempt from the
+   * welfare levy and bank savings yield, and is never bankrupted (an empty port = foreign demand
+   * exhausted, not a business failure). Set only on the port archetype, registered solely when a
+   * city is built with `includePort`.
+   */
+  port?: boolean;
 }
 
 /** The economic identity a system reads by kind — the IndustryDef minus its `kind` tag. */
@@ -63,6 +72,7 @@ export interface Archetype {
   collectsRent?: boolean;
   capitalGoodsVendor?: boolean;
   bank?: boolean;
+  port?: boolean;
 }
 
 /** A tradeable intermediate good and its starting B2B price ($/unit). */
@@ -99,6 +109,21 @@ export const BANK_INDUSTRY: IndustryDef = {
   target: 0,
   maxPerDay: 0, // produces nothing ⇒ never staffed (desiredHeadcount 0), no capacity
   bank: true,
+};
+
+/**
+ * The Port archetype (Initiative C / C4 path a — external trade) — a non-producing trade
+ * counterparty, registered into the live registry ONLY when a city is built with `includePort`
+ * (never seeded by default, so the default city is untouched). Same contained-cast pattern as the
+ * Bank. Real-world: the dock and customs house where the rest of the world buys the town's surplus
+ * output — and sells it what it can't make enough of.
+ */
+export const PORT_INDUSTRY: IndustryDef = {
+  kind: "port" as BusinessKind,
+  sellsToResidents: false,
+  target: 0,
+  maxPerDay: 0, // produces nothing ⇒ never staffed (desiredHeadcount 0), no capacity
+  port: true,
 };
 
 /** The seeded four, in chain order (grain/materials are primary; food/wares are processed). */
@@ -140,6 +165,7 @@ function rebuild(): void {
       collectsRent: d.collectsRent,
       capitalGoodsVendor: d.capitalGoodsVendor,
       bank: d.bank,
+      port: d.port,
     };
   }
 

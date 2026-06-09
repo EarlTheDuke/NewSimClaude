@@ -48,7 +48,10 @@ export class LifecycleSystem implements System {
     // The Bank is never bankrupted (Initiative C / Phase 18b) — a central financial holder doesn't
     // liquidate to its owner and silently kill the credit subsystem. Its solvency is managed by its
     // reserve + (later) interest income, not the ordinary cash-floor streak.
-    if (ARCHETYPES[biz.kind].bank) return;
+    // Nor is the Port (C4a): an empty port means FOREIGN DEMAND IS EXHAUSTED (exports pause until
+    // imports refill it) — not a business failure to liquidate to a resident owner, which would
+    // hand the rest of the world's remaining money to the city and kill imports for good.
+    if (ARCHETYPES[biz.kind].bank || ARCHETYPES[biz.kind].port) return;
     const days = biz.cash < BANKRUPT_CASH_FLOOR ? (biz.insolventDays ?? 0) + 1 : 0;
     biz.insolventDays = days;
     if (days < BANKRUPT_GRACE_DAYS) return;

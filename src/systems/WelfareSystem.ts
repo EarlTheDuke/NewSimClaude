@@ -67,8 +67,10 @@ export class WelfareSystem implements System {
     // Levy on businesses' above-reserve cash — capital funds the net. Two passes: sum the
     // headroom, then collect pro-rata, so no firm is driven below its reserve and we raise no
     // more than is needed. levy_i = levyTotal·(headroom_i / totalHeadroom) ≤ headroom_i.
+    // The Port (C4a) is exempt: its cash is the rest of the world's money, not city surplus —
+    // taxing it would smuggle foreign money into the city outside the trade channel.
     const contributors = this.world.businesses
-      .filter((b) => b.active)
+      .filter((b) => b.active && !ARCHETYPES[b.kind].port)
       .map((b) => ({
         b,
         headroom: Math.max(0, b.cash - (ARCHETYPES[b.kind].collectsRent ? LANDLORD_RESERVE : BUSINESS_RESERVE)),
