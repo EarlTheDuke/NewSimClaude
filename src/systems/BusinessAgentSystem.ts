@@ -169,6 +169,9 @@ export class BusinessAgentSystem implements System {
     if (clamped.borrow !== undefined && clamped.borrow > 0) {
       clamped.borrow = this.applyBorrow(biz, clamped.borrow, day);
     }
+    if (clamped.repay !== undefined && clamped.repay > 0) {
+      clamped.repay = this.applyRepay(biz, clamped.repay);
+    }
     if (clamped.brand !== undefined && clamped.brand > 0) {
       clamped.brand = this.applyBrand(biz, clamped.brand); // Phase 17 — brand takes its slice first
     }
@@ -265,6 +268,29 @@ export class BusinessAgentSystem implements System {
     debt.principal += moved;
     debt.borrowed = (debt.borrowed ?? 0) + moved;
     biz.debt = debt;
+    return moved;
+  }
+
+  /**
+   * Phase 18e — repay the Bank a fraction of what's owed. A `firm→bank` {@link World.transfer}
+   * (capped at the firm's cash, so it can't repay more than it holds — real deleveraging, no reserve
+   * floor), applied as a waterfall: **accrued interest first, then principal**. An emptied loan is
+   * **deleted** so a debt-free firm's snapshot shape is byte-identical again. Money only moves via the
+   * transfer (the debt write-down is non-cash), so `totalMoney()` is conserved. Returns cash repaid.
+   */
+  private applyRepay(biz: Business, fraction: number): number {
+    if (!this.creditEnabled || !biz.debt) return 0;
+    const bank = this.world.getBusiness("biz_bank");
+    if (!bank || bank.id === biz.id) return 0;
+    const owed = biz.debt.principal + biz.debt.accruedInterest;
+    const moved = this.world.transfer(biz.id, bank.id, owed * fraction); // firm → bank; conserved, cash-capped
+    if (moved <= 0) return 0;
+    biz.pnl.debtService = (biz.pnl.debtService ?? 0) + moved;
+    // Waterfall: clear accrued interest first, then principal.
+    const interestPaid = Math.min(moved, biz.debt.accruedInterest);
+    biz.debt.accruedInterest -= interestPaid;
+    biz.debt.principal -= moved - interestPaid;
+    if (biz.debt.principal <= 1e-9 && biz.debt.accruedInterest <= 1e-9) delete biz.debt; // loan cleared
     return moved;
   }
 

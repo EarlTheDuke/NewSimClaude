@@ -193,6 +193,12 @@ export interface BusinessAction {
    * engaged AND a Bank is seeded; the debt is non-cash bookkeeping, so conservation is untouched.
    */
   borrow?: number;
+  /**
+   * Fraction (0..1) of total debt owed (principal + accrued interest) to **repay** the Bank this
+   * review (Initiative C / Phase 18). A `firm→bank` transfer, capped at the firm's cash, applied
+   * interest-first then principal; an emptied loan is deleted. Clamped to `[0,1]`. Conserving.
+   */
+  repay?: number;
 }
 
 /**

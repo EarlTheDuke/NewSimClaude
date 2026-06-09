@@ -14,6 +14,26 @@ class BorrowProvider implements DecisionProvider {
   }
 }
 
+/** A test mind that repays a fixed fraction of its debt every review. */
+class RepayProvider implements DecisionProvider {
+  readonly id = "repay-test";
+  constructor(private readonly fraction: number) {}
+  decide(): BusinessDecision {
+    return { action: { repay: this.fraction }, reason: "repay test" };
+  }
+}
+
+/** Conservingly originate a loan on a business: move cash bank→firm and book the debt. */
+function lendTo(
+  world: ReturnType<typeof createCity>["world"],
+  firmId: string,
+  principal: number,
+  accruedInterest = 0,
+): void {
+  world.transfer("biz_bank", firmId, principal); // bank → firm (conserved)
+  world.getBusiness(firmId)!.debt = { principal, accruedInterest, originDay: 0, borrowed: principal };
+}
+
 /**
  * Initiative C / Phase 18a — the inert credit seam. The CreditSystem is registered (between
  * distribution and lifecycle) but does nothing: no Bank is seeded, no debt is booked, no money
@@ -238,5 +258,70 @@ describe("CreditSystem — interest accrual (Phase 18d)", () => {
     original.sim.run(TICKS_PER_DAY * 10);
     loaded.sim.run(TICKS_PER_DAY * 10);
     expect(loaded.world.serialize()).toEqual(original.world.serialize());
+  });
+});
+
+/**
+ * Phase 18e — the repay lever. A firm pays the Bank a fraction of what it owes (`firm→bank`,
+ * cash-capped), interest-first then principal; an emptied loan is deleted to restore the
+ * byte-identical debt-free shape. Conserving (the write-down is non-cash).
+ */
+describe("CreditSystem — repay lever (Phase 18e)", () => {
+  const credit = (brain: DecisionProvider) =>
+    createCity({ seed: 1, includeBank: true, creditEnabled: true, brain, agenticBusinessIds: ["biz_diner"] });
+
+  it("full repay clears interest + principal and deletes the debt; money conserved", () => {
+    const { sim, world } = credit(new RepayProvider(1));
+    lendTo(world, "biz_diner", 1000, 50); // 1000 principal + 50 accrued interest
+    const start = world.totalMoney();
+    const bankBefore = world.getBusiness("biz_bank")!.cash;
+
+    sim.run(TICKS_PER_DAY); // one review → full repay
+
+    expect(world.getBusiness("biz_diner")!.debt).toBeUndefined(); // loan cleared, shape restored
+    expect(world.getBusiness("biz_bank")!.cash).toBeCloseTo(bankBefore + 1050, 6); // principal + interest recouped
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("partial repay follows the waterfall — interest first, then principal", () => {
+    const { sim, world } = credit(new RepayProvider(0.5));
+    lendTo(world, "biz_diner", 1000, 100); // owed 1100 ⇒ repay half = 550
+    const start = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY);
+
+    const debt = world.getBusiness("biz_diner")!.debt!;
+    expect(debt.accruedInterest).toBeCloseTo(0, 6); // the 100 interest cleared first
+    expect(debt.principal).toBeCloseTo(550, 6); // then 450 off the 1000 principal
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("books no repayment when credit is disabled", () => {
+    const { sim, world } = createCity({
+      seed: 1,
+      includeBank: true,
+      creditEnabled: false,
+      brain: new RepayProvider(1),
+      agenticBusinessIds: ["biz_diner"],
+    });
+    lendTo(world, "biz_diner", 1000, 0);
+    sim.run(TICKS_PER_DAY * 3);
+    expect(world.getBusiness("biz_diner")!.debt?.principal).toBe(1000); // untouched (repay off)
+  });
+
+  it("is deterministic with repayment: same seed twice → identical world", () => {
+    const run = () => {
+      const c = createCity({
+        seed: 7,
+        includeBank: true,
+        creditEnabled: true,
+        brain: new RepayProvider(0.3),
+        agenticBusinessIds: ["biz_diner"],
+      });
+      lendTo(c.world, "biz_diner", 1200, 80);
+      c.sim.run(TICKS_PER_DAY * 8);
+      return c.world.serialize();
+    };
+    expect(run()).toEqual(run());
   });
 });

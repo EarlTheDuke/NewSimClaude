@@ -77,6 +77,12 @@ export function clampAction(
     out.borrow = clamp(action.borrow, 0, limits.maxBorrowPerReview);
   }
 
+  if (action.repay !== undefined && Number.isFinite(action.repay)) {
+    // Phase 18 — fraction of total owed to repay; the cash cap + interest-first waterfall are applied
+    // in BusinessAgentSystem.applyRepay().
+    out.repay = clamp(action.repay, 0, 1);
+  }
+
   return out;
 }
 
