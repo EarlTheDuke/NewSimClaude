@@ -87,12 +87,67 @@ cross-town vs co-located placement.
 - *Observed:* under heavy demand the rival appears on whichever producer slams first (mine, then
   farm in the seed-1 fixture) — the bottleneck, wherever it is, is what attracts entry.
 
-### Slice 4 — Data-driven industries (the big one)
+### Slice 4 — Data-driven industries (the big one) · PLANNED (2026-06-08)
 Make `BusinessKind` / `ResourceKind` / `ARCHETYPES` / `PRODUCER_OF` **data-driven** so genuinely
 **new kinds and new industries** can exist (and, later, be *founded* into demand): a new service
-sector, a deeper processing chain, product variety. Large refactor — sequenced last, behind the
-cheaper multiplication wins, and gated so the default seven-business city is byte-identical.
-Connects to the `ROADMAP.md` **texture track** (goods/services variety).
+sector, a deeper processing chain, product variety. Large refactor — broken into byte-identical
+steps behind the 399-test suite, the same discipline as the rest of the program. Connects to the
+`ROADMAP.md` **texture track** (goods/services variety).
+
+#### What's actually coupled to the static types (code audit, 2026-06-08)
+The seven `BusinessKind`s and four `ResourceKind`s are baked in two distinct ways — the refactor
+must dismantle **both**:
+
+1. **Lookup tables the compiler forces exhaustive over the union** — one source of truth each,
+   hand-maintained: `ARCHETYPES` and `PRODUCER_OF` (`archetypes.ts`), `BASE_RESOURCE_PRICE` +
+   `RETAIL_REFERENCE_PRICE` (`constants.ts`), `MarketSystem`'s `RESOURCES` array + `prices`/`sold`
+   literals, `CanvasRenderer.BUSINESS_HEX`. New industries means these are **derived from a
+   registry**, not enumerated by hand.
+2. **Behavioral special-cases by identity** — `kind === X` checks that actually encode a **role**:
+   - `kind === "landlord"` (rentier: collects rent, no production, higher cash reserve, fire-immune)
+     — `DistributionSystem`, `WelfareSystem`, `EconomySystem.collectRent`, `disasters`, `GodMode`.
+   - `kind === "diner" || "goods"` (storefront: sells to residents, pays business rent) —
+     `EconomySystem`. **Already** expressible via the existing `Archetype.sellsToResidents` flag.
+   - `kind === "factory"` (capital-goods / construction-materials vendor: receives invest spend and
+     home-build payments) — `BusinessAgentSystem.applyInvest`, `PopulationSystem.construct`.
+   The fix: replace identity checks with **capability flags on the archetype** (a role the data
+   declares), so logic keys off *what a firm does*, not *what it's named*.
+
+#### Sub-slices (each flag-gated / byte-identical until 4d turns capability on)
+- **4a — Registry as the single source (pure refactor, zero behavior change).** Introduce
+  `INDUSTRY_REGISTRY` holding exactly today's 7 kinds + 4 resources, and *derive* `ARCHETYPES` /
+  `PRODUCER_OF` / `BASE_RESOURCE_PRICE` / `RETAIL_REFERENCE_PRICE` from it. Keep the union types
+  (as `keyof typeof INDUSTRY_REGISTRY`). Guard: the 399-test suite stays byte-identical.
+- **4b — Capability flags replace identity special-cases (pure refactor).** Add role flags to
+  `Archetype` (`collectsRent`/rentier, `capitalGoodsVendor`; reuse `sellsToResidents`). Rewrite the
+  `kind === "landlord"|"diner"|"goods"|"factory"` sites to read the flag. Byte-identical.
+- **4c — Dynamic resource maps in `MarketSystem`.** Replace the hardcoded `RESOURCES` array and
+  `prices`/`sold` literals with registry-derived maps over *all* registered resources (stable array
+  order — no object-key iteration). Byte-identical for the seeded four.
+- **4d — Widen the types + runtime registration (the capability, flag-gated).** Change
+  `BusinessKind`/`ResourceKind` to a branded `string` (keep `SEEDED_KINDS`/`SEEDED_RESOURCES`
+  unions for seeds + tests + the frozen bench), and add a deterministic API to register a new
+  industry. Off by default ⇒ the seeded city is unchanged; on, a new kind/resource/chain can exist
+  — and (a follow-on) be *founded* into demand via the slice-1/3 entry machinery.
+
+#### Invariants to hold (call-outs for the build)
+- **Determinism:** the registry is a **stable array**, iterated in order — never object-key/Map
+  order (the sacred no-iteration-surprise rule). Runtime-registered industries get deterministic
+  ids + ordering.
+- **Serialization:** `Business.kind` is already a string in snapshots, so widening round-trips; but
+  a restored snapshot referencing a runtime-added kind needs that kind's archetype **registered
+  before restore** — seeded industries always are; persist/replay runtime registrations
+  deterministically (design in 4d).
+- **Benchmark:** the CEO bench freezes to the **seeded** registry only, so new industries never
+  perturb the skill signal (the NORTH-STAR realism-vs-benchmark tension).
+- **Closed economy / rendering-reads:** untouched — the registry is data; no new money paths,
+  no view mutation.
+
+#### Why this order
+4a→4b→4c are no-op refactors that dismantle the static coupling safely, each caught by the
+byte-identity suite; only **4d** adds new capability, behind a flag. The high-risk refactor the
+working agreement flags for a checkpoint is thus delivered as a sequence of byte-identical steps —
+exactly the 12a/13a/15/16/INIT1 pattern.
 
 ## Then: Initiative B (Competition) and C (GDP growth)
 
