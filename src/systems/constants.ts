@@ -256,6 +256,15 @@ export const PRODUCER_COST_PLUS_MARGIN = 0.15;
  * ones lose the business. Keeps the single market price (per-producer pricing is a later step).
  */
 export const PRODUCER_COMPETITION = 0;
+/**
+ * Labour competition (Initiative B, slice 2) — OFF by default. When on, a firm's review sees the
+ * strongest same-kind rival's wage (`rivalWage`) and can **poach** (bid up to at least the rival's
+ * wage to pull staff) or **match-to-retain** (a rival pays more → match it, *don't exceed* — the
+ * truce, so wages converge at a shared competitive level instead of spiralling to the cap). Only
+ * sharpens the freed-wage market (Initiative #1 S1); the capped default city already ignores rivals.
+ * Off ⇒ `rivalWage` is omitted from the observation ⇒ the wage logic is byte-identical.
+ */
+export const LABOUR_COMPETITION = false;
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;
 /**

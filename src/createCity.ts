@@ -140,6 +140,13 @@ export interface CitySimOptions extends CityOptions {
    * an efficient producer wins more share, out-grows a laggard, and the supply side truly competes.
    */
   producerCompetition?: number;
+  /**
+   * Labour competition (Initiative B, slice 2) — when true, a firm's review sees the strongest
+   * same-kind rival's wage and can poach / match-to-retain (a wage war with a truce). Defaults to
+   * the live {@link LABOUR_COMPETITION} (off ⇒ `rivalWage` omitted ⇒ wage logic byte-identical).
+   * Only bites in a freed-wage city (`wageCapMult` raised); the capped default already ignores rivals.
+   */
+  labourCompetition?: boolean;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -219,6 +226,7 @@ export function createCity(options: CitySimOptions = {}): {
       market,
       options.brandElasticity,
       wageCapMult,
+      options.labourCompetition,
     );
     sim.addSystem(agent);
   }

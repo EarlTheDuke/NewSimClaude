@@ -150,12 +150,30 @@ export class RuleBasedProvider implements DecisionProvider {
       // S3 weaning experiment + an adversarial review of RuleBasedProvider). Affordability, not a
       // fixed ceiling, sets the wage.
       const canAfford = o.cash > BUSINESS_RESERVE;
+      // Initiative B slice 2 — the strongest same-kind rival wage. Undefined when labour
+      // competition is off or there's no rival, in which case every branch below collapses to
+      // the pre-B2 logic (byte-identical).
+      const rival = o.rivalWage;
       if (o.understaffed && o.wagePerTick < wageCap && canAfford) {
         const scarce = o.unemployedCount === 0;
-        action.setWage = Math.min(wageCap, o.wagePerTick * (scarce ? 1.25 : 1.1));
+        let bid = o.wagePerTick * (scarce ? 1.25 : 1.1);
+        // Poach (B2): to pull staff from a higher-paying rival, bid up to AT LEAST its wage.
+        const poaching = rival !== undefined && rival > bid;
+        if (poaching) bid = rival!;
+        action.setWage = Math.min(wageCap, bid);
         notes.push(
-          scarce ? "labour scarce — bidding the wage up to compete" : "short-handed, raising the wage",
+          poaching
+            ? "short-handed — bidding to a rival's wage to poach staff"
+            : scarce
+              ? "labour scarce — bidding the wage up to compete"
+              : "short-handed, raising the wage",
         );
+      } else if (rival !== undefined && rival > o.wagePerTick && o.wagePerTick < wageCap && canAfford) {
+        // Match-to-retain (B2): a rival pays more and could poach my crew — match it, but DON'T
+        // exceed (the truce), so wages converge at a shared competitive level instead of my staff
+        // walking or both firms ratcheting to the cap.
+        action.setWage = Math.min(wageCap, rival);
+        notes.push("a rival pays more — matching its wage to keep my crew");
       } else if (o.cash < BUSINESS_RESERVE && o.wagePerTick > base) {
         action.setWage = Math.max(base, o.wagePerTick * 0.95);
         notes.push("cash-thin — easing wages back toward base to stay solvent");

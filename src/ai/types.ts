@@ -72,6 +72,15 @@ export interface BusinessObservation {
    * labour rather than silently starve.
    */
   understaffed: boolean;
+  /**
+   * The strongest wage a same-kind active **rival** posts (Initiative B slice 2) — the best
+   * competing offer this firm's crew could be poached by, and the level it must reach to poach in
+   * turn. Present only when labour competition is engaged AND a rival exists; **undefined**
+   * otherwise, so the lone-firm / feature-off wage logic is byte-identical. A mind uses it to
+   * *match-to-retain* (a rival pays more → match it, don't exceed — the truce) or to *poach* (bid
+   * up to at least the rival's wage to pull staff), instead of bidding blind off its own wage.
+   */
+  rivalWage?: number;
   /** Revenue booked during the day that just ended. */
   dayRevenue: number;
   /** Wages paid to staff during the day that just ended — labour cost only; the profit payout is {@link dayDistributed}. */

@@ -12,7 +12,7 @@ import type {
 } from "../ai/types";
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
-import { BUSINESS_RESERVE, CAPITAL_BASELINE, WAGE_CAP_MULT, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY } from "./constants";
+import { BUSINESS_RESERVE, CAPITAL_BASELINE, WAGE_CAP_MULT, LABOUR_COMPETITION, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY } from "./constants";
 import { ARCHETYPES, desiredHeadcount } from "../world/archetypes";
 import type { MarketSystem } from "./MarketSystem";
 
@@ -75,6 +75,12 @@ export class BusinessAgentSystem implements System {
      * byte-identical; raise it to let firms bid above the old 2× ceiling for scarce labour.
      */
     private readonly wageCapMult: number = WAGE_CAP_MULT,
+    /**
+     * Labour competition (Initiative B slice 2) — when true, the observation carries `rivalWage`
+     * (the strongest same-kind rival's wage), so a firm can poach / match-to-retain. Defaults to
+     * {@link LABOUR_COMPETITION} (off ⇒ `rivalWage` omitted ⇒ wage logic byte-identical).
+     */
+    private readonly labourCompetition: boolean = LABOUR_COMPETITION,
   ) {
     this.limits = limits;
   }
@@ -295,6 +301,12 @@ export class BusinessAgentSystem implements System {
     );
     const rivalPrice =
       rivals.length > 0 ? rivals.reduce((s, b) => s + b.price, 0) / rivals.length : undefined;
+    // Initiative B slice 2 — the strongest same-kind rival wage (the best poaching offer). Gated on
+    // labour competition AND a rival existing; otherwise undefined, so the wage logic is unchanged.
+    const rivalWage =
+      this.labourCompetition && rivals.length > 0
+        ? rivals.reduce((m, b) => Math.max(m, b.wagePerTick), 0)
+        : undefined;
 
     // The wholesale price of the one input this kind turns 1:1 into a sellable
     // unit — its marginal cost, and the floor below which a sale loses money.
@@ -317,6 +329,7 @@ export class BusinessAgentSystem implements System {
       baseWagePerTick: biz.baseWagePerTick ?? biz.wagePerTick,
       maxWage: (biz.baseWagePerTick ?? biz.wagePerTick) * this.wageCapMult, // S1 — the effective wage ceiling (base × cap)
       understaffed: biz.employeeIds.length < desiredHeadcount(biz.kind),
+      rivalWage, // Initiative B slice 2 — the strongest rival wage (undefined ⇒ feature off / no rival)
       dayRevenue,
       dayWages,
       dayRent,

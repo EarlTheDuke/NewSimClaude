@@ -57,12 +57,22 @@ exponent; **0 ⇒ proportional-to-stock ⇒ byte-identical**; engage ~1–2). 41
 - *Deferred (noted):* a hard share floor / truce (today a laggard's share decays smoothly toward
   zero as cost diverges, then it exits → entry refills — which is the intended B3 churn).
 
-### B2 — Rival-aware wages (the wage war + a truce)
-Surface a `rivalWage` signal (what same-kind rivals pay) in the observation, and let a firm **bid to
-match/beat** a rival that's poaching its crew (retain) or to **poach** when it wants to grow —
-affordability-gated, with a **truce** (converge, don't ratchet to the cap), mirroring the storefront
-price truce. Optionally let a worker be pulled by a clearly-higher rival even at full staff (a
-posted opening). Flag-gated. Makes labour competition strategic + visible.
+### ✅ B2 — Rival-aware wages (the wage war + a truce) · SHIPPED
+The observation now carries `rivalWage` (the strongest same-kind rival's posted wage), and the firm
+brain uses it two ways in the freed-wage market:
+- **Match-to-retain** — a fully-staffed firm whose rival pays more **matches** that wage (capped at
+  its own ceiling, affordability-gated) but **does not exceed** it — the truce, so two rivals'
+  wages **converge** at a shared level instead of either firm's crew walking or both ratcheting to
+  the cap.
+- **Poach** — a short-handed firm bids up to **at least** the rival's wage (not just +10/25% off its
+  own), so it can actually pull staff from a higher payer.
+- Flag-gated via `labourCompetition` (`LABOUR_COMPETITION` default **false** ⇒ `rivalWage` omitted ⇒
+  the S1 wage logic is byte-identical). 421 tests green.
+- `labourCompetition.test.ts`: unit-tests the match/poach/no-chase/can't-afford/byte-identical cases,
+  plus an integration test where two rival diners' wages **converge** (conserved + deterministic).
+- *Note:* worker *movement* still needs the resident brain on (workers chase the best **hiring**
+  offer); B2 is the firm-side wage war that sets up that movement. Pulling a worker even at full
+  staff (a posted opening) is deferred — the convergence dynamic is the core win.
 
 ### B3 — Competitive exit + churn (tie A ↔ B)
 Demonstrate (and sharpen if needed) that a firm which persistently **loses** share/customers/workers
