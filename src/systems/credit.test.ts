@@ -504,3 +504,69 @@ describe("CreditSystem — observation + financing netting (Phase 18g)", () => {
     expect(Math.abs(make(true) - make(false))).toBeLessThan(500); // not ~1000 (the borrow)
   });
 });
+
+/**
+ * Phase 18h — credit engaged with the rules brain. The conservative borrow/repay heuristic + debt-
+ * service-before-dividends, run across the whole free-market stack. The provable bar (per the design,
+ * since this demand-driven economy may not *compound* on credit) is the weaker one: credit is
+ * **available, conserving, and harmless** — the economy stays alive and conserved while firms borrow,
+ * service, repay, and (some) default. The live `CREDIT_ENABLED` flag stays OFF; this is the opt-in path.
+ */
+describe("CreditSystem — engaged with the rules brain (Phase 18h)", () => {
+  const creditCity = (seed: number) =>
+    createCity({
+      seed,
+      brain: "rules",
+      residentBrain: "rules",
+      agenticBusinessIds: ["biz_diner", "biz_goods", "biz_farm", "biz_factory", "biz_mine", "biz_bakery"],
+      agenticResidentIds: "all",
+      secondDiner: true,
+      includeBank: true,
+      creditEnabled: true,
+      creditDailyRate: 0.003, // a modest daily rate
+      creditMaxPrincipal: 4000, // a real per-firm ceiling
+      wageCapMult: 8,
+      welfareRatio: 0.5,
+      welfareSubsistence: 2,
+      dividendWean: 0.5,
+      populationGrowth: true,
+      populationOptions: { births: true, mortality: true, construction: true, dynamicRent: true },
+    });
+
+  it("is available, conserving, and harmless over a 2-year soak (seeds 1 & 7)", () => {
+    for (const seed of [1, 7]) {
+      const { sim, world } = creditCity(seed);
+      const start = world.totalMoney();
+      sim.run(TICKS_PER_DAY * 365 * 2);
+
+      expect(world.totalMoney()).toBeCloseTo(start, 2); // conserved through borrow/interest/repay/default
+      for (const r of world.residents) {
+        expect(Number.isFinite(r.money)).toBe(true);
+        expect(r.money).toBeGreaterThanOrEqual(0);
+      }
+      for (const b of world.businesses) {
+        expect(Number.isFinite(b.cash)).toBe(true);
+        expect(b.cash).toBeGreaterThanOrEqual(0);
+      }
+      const activeKinds = new Set(world.businesses.filter((b) => b.active).map((b) => b.kind));
+      expect(activeKinds.size).toBeGreaterThanOrEqual(4); // still a living, varied economy
+      expect(world.getBusiness("biz_bank")!.active).toBe(true); // the bank never dies
+      // Credit was actually exercised — some firm serviced debt at some point.
+      expect(world.businesses.some((b) => (b.pnl.debtService ?? 0) > 0)).toBe(true);
+    }
+  }, 120_000);
+
+  it("is deterministic + round-trips mid-run with credit engaged", () => {
+    const original = creditCity(1);
+    original.sim.run(TICKS_PER_DAY * 200);
+    const json = snapshotToJSON(original.sim.serialize());
+
+    const loaded = creditCity(99);
+    loaded.sim.restore(snapshotFromJSON(json));
+    expect(loaded.world.serialize()).toEqual(original.world.serialize());
+
+    original.sim.run(TICKS_PER_DAY * 40);
+    loaded.sim.run(TICKS_PER_DAY * 40);
+    expect(loaded.world.serialize()).toEqual(original.world.serialize());
+  }, 120_000);
+});

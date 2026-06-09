@@ -6,6 +6,8 @@ import {
   LANDLORD_RESERVE,
   BUSINESS_RESERVE,
   BANK_RESERVE,
+  CREDIT_ENABLED,
+  CREDIT_DAILY_INTEREST_RATE,
   PROFIT_DISTRIBUTION_CAP,
   OWNER_DIVIDEND_SHARE,
   DIVIDEND_WEAN,
@@ -53,6 +55,10 @@ export class DistributionSystem implements System {
      * whether the freed wage market + welfare can circulate the closed economy without the pump.
      */
     private readonly dividendWean: number = DIVIDEND_WEAN,
+    /** Whether debt-service-before-dividends is live (Phase 18h); defaults to {@link CREDIT_ENABLED} (off ⇒ byte-identical). */
+    private readonly creditEnabled: boolean = CREDIT_ENABLED,
+    /** Daily interest rate, to reserve tomorrow's interest before paying dividends (Phase 18h). Defaults to {@link CREDIT_DAILY_INTEREST_RATE}. */
+    private readonly creditRate: number = CREDIT_DAILY_INTEREST_RATE,
   ) {}
 
   update(ctx: SystemContext): void {
@@ -70,7 +76,13 @@ export class DistributionSystem implements System {
       // rest is retained as cash to reinvest. Default 1.0 ⇒ full distribution,
       // byte-identical to pre-Phase-16.
       const payoutRate = biz.payoutRate ?? 1;
-      const budget = Math.min(biz.cash - reserve, PROFIT_DISTRIBUTION_CAP) * payoutRate;
+      // Phase 18h — debt service before dividends: a firm with a loan holds back tomorrow's interest
+      // (principal × rate) from its distributable surplus, so it doesn't pay the surplus out and then
+      // default on the bank. No debt / credit off ⇒ 0 reserved ⇒ byte-identical.
+      const interestDue =
+        this.creditEnabled && (biz.debt?.principal ?? 0) > 0 ? biz.debt!.principal * this.creditRate : 0;
+      const surplus = Math.max(0, biz.cash - reserve - interestDue);
+      const budget = Math.min(surplus, PROFIT_DISTRIBUTION_CAP) * payoutRate;
       if (budget <= 0) continue;
 
       // Owner's dividend first (Phase 15 C): a share λ of the day's profit goes to

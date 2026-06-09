@@ -188,6 +188,31 @@ export class RuleBasedProvider implements DecisionProvider {
       notes.push("fully staffed but cash-thin, easing wages back toward base");
     }
 
+    // Credit (Phase 18h) — a conservative borrow/repay policy, gated on credit being engaged
+    // (`o.creditRate` is present only then; absent ⇒ this whole block is skipped ⇒ byte-identical).
+    // Borrow to fund growth ONLY when capacity-bound + profitable (the same gate as invest, so the
+    // loan funds capacity that can actually pay the interest); repay when flush and NOT
+    // capacity-bound (idle cash is better off deleveraging than carrying interest). The borrow ask is
+    // clamped per-review and bounded by the principal ceiling downstream, so it can request freely.
+    if (o.creditRate !== undefined && o.capacityUtilization !== undefined) {
+      const debt = o.debtPrincipal ?? 0;
+      if (
+        o.capacityUtilization > INVEST_UTILIZATION_THRESHOLD &&
+        o.dayProfit > 0 &&
+        o.cash > BUSINESS_RESERVE
+      ) {
+        action.borrow = INVEST_MIN_SURPLUS * 2; // a modest draw; clamps + the ceiling bound it
+        notes.push("capacity-bound + profitable — borrowing to expand faster");
+      } else if (
+        debt > 0 &&
+        o.cash > BUSINESS_RESERVE + INVEST_MIN_SURPLUS &&
+        o.capacityUtilization <= INVEST_UTILIZATION_THRESHOLD
+      ) {
+        action.repay = 0.5; // flush and slack — pay down half the debt
+        notes.push("flush + slack — paying down debt");
+      }
+    }
+
     return {
       action,
       reason: notes.length > 0 ? notes.join("; ") : "steady state, no change",

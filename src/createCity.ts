@@ -266,7 +266,15 @@ export function createCity(options: CitySimOptions = {}): {
   // the change that finally fires the dormant invest lever. With no agent this
   // sits right where distribution always ran (just after the market), so the
   // brain-off baseline is byte-identical.
-  sim.addSystem(new DistributionSystem(world, options.ownerDividendShare, options.dividendWean));
+  sim.addSystem(
+    new DistributionSystem(
+      world,
+      options.ownerDividendShare,
+      options.dividendWean,
+      options.creditEnabled,
+      options.creditDailyRate,
+    ),
+  );
   // Welfare floor (Initiative #1 S2) runs right after distribution, on the day's settled cash —
   // the one deliberate control. Inert at the default ratio 0 ⇒ byte-identical.
   const welfare = new WelfareSystem(world, options.welfareRatio, options.welfareSubsistence);
