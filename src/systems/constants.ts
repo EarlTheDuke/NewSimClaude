@@ -265,6 +265,28 @@ export const PRODUCER_COMPETITION = 0;
  * Off ⇒ `rivalWage` is omitted from the observation ⇒ the wage logic is byte-identical.
  */
 export const LABOUR_COMPETITION = false;
+
+// --- Credit & finance (Initiative C / Phase 18) — all INERT here (slice 18a). Engaged later via
+//     a tuning sweep; the whole subsystem is frozen OFF in the CEO bench. See PHASE18-CREDIT.md. ---
+/**
+ * Master switch for credit/banking (Initiative C, C1). OFF here ⇒ no lending, no interest, the
+ * {@link CreditSystem} is a no-op, and `createCity` seeds no Bank ⇒ the default city is byte-identical.
+ * Real-world: whether the town has a working bank that firms can borrow from to fund growth.
+ */
+export const CREDIT_ENABLED = false;
+/** Flat daily interest a borrower pays the Bank, as a fraction of principal (`firm→bank` transfer). 0 ⇒ free credit / no-op. */
+export const CREDIT_DAILY_INTEREST_RATE = 0;
+/** Hard ceiling on a single firm's outstanding principal — its borrowing limit. 0 ⇒ no firm may borrow. */
+export const CREDIT_MAX_PRINCIPAL_PER_FIRM = 0;
+/** Daily yield the Bank pays on a firm's idle cash (`bank→saver` transfer), so hoarding isn't free. 0 ⇒ no savings interest. */
+export const CREDIT_SAVINGS_DAILY_RATE = 0;
+/** Working-capital reserve the Bank keeps (its lending float) — kept above {@link BUSINESS_RESERVE} so the nightly distribution sweep doesn't drain its capacity. */
+export const BANK_RESERVE = 4500;
+/** Seed cash the Bank is capitalised with when `includeBank` — carved from the landlord's seeded cash so the genesis total is unchanged. */
+export const BANK_SEED_CASH = 1500;
+/** The CEO benchmark freezes credit OFF (mirrors the other BENCH_* freezes) so historical scorecards never move. */
+export const BENCH_CREDIT_ENABLED = false;
+
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;
 /**

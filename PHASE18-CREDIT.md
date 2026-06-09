@@ -1,11 +1,16 @@
 # Phase 18 — Credit & Finance (banking)
 
-> **STATUS: SHELVED 2026-06-06 — fully designed, NOT built.** Greenlit direction, parked
-> while the project moves to a different area. Resume from here when credit/finance is picked
-> up. Designed via a multi-agent workflow (3 independent designs — minimal-first,
-> conservation-first, CEO-lever-first — each adversarially stress-tested for money-leaks and
-> determinism breaks, then synthesized). Grounded in the codebase as of HEAD `3d1c4a1`;
-> re-verify file/line references against current code before building.
+> **STATUS: RESUMED as Initiative C / leg C1 (2026-06-08). 18a SHIPPED.** This is the detailed,
+> adversarially-verified design for the credit leg of [INITIATIVE-04-GDP-GROWTH.md](INITIATIVE-04-GDP-GROWTH.md).
+> Designed via a multi-agent workflow (3 independent designs — minimal-first, conservation-first,
+> CEO-lever-first — each stress-tested for money-leaks and determinism breaks, then synthesized).
+>
+> **Re-grounding (the design predates Initiative A slice 4d).** The data-driven `INDUSTRY_REGISTRY`
+> (4d) + capability flags (4b) + the renderer's `BUSINESS_RGB_DEFAULT` fallback **simplify the seam**:
+> **18a needs NO `BusinessKind` union / `ARCHETYPES` / `BUSINESS_HEX` change** (those "must move in 18a
+> or typecheck fails" call-outs no longer apply). The bank arrives in **18b** as a registry entry with
+> a **`bank` role flag** (the 4b pattern), seeded only under `includeBank`. Re-verify every file/line
+> below against current code before building each remaining slice.
 >
 > House doc in the PHASE15/PHASE17 style. Every slice ships byte-identical to the brain-off
 > baseline until a flag/constant is deliberately engaged; the whole subsystem is frozen OFF in
@@ -72,7 +77,7 @@ The adversarial pass forced these. They are non-negotiable and baked into the sl
 
 | Slice | One line |
 |---|---|
-| **18a** | Inert seam: `"bank"` union + `ARCHETYPES.bank` + `BUSINESS_HEX.bank` + `debt?`/`debtService?` types + all `CREDIT_*` constants (inert) + no-op `CreditSystem` stub. **Byte-identical.** |
+| **✅ 18a** | Inert seam — SHIPPED (re-grounded): `Business.debt?` / `pnl.debtService?` types + all `CREDIT_*`/`BANK_*`/`BENCH_CREDIT_ENABLED` constants (inert) + no-op `CreditSystem` stub (registered between Distribution and Lifecycle) + `creditEnabled?` option. **NO union/record change** (4d/4b made it unnecessary). `credit.test.ts`: no debt booked, conserved, round-trips, deterministic, `creditEnabled:true` still a no-op. 428 tests green, byte-identical. |
 | **18b** | Seed the Bank as a conserving holder behind `includeBank` (cash carved from landlord) + `BANK_RESERVE` distribution branch + bank-is-special guard in `LifecycleSystem`. Still no lending. |
 | **18c** | Borrow lever: `bank → firm` transfer booking `debt.principal` (flag-gated, rules brain silent). |
 | **18d** | Interest accrual: `CreditSystem.update()` goes live as a `firm → bank` daily transfer (rate defaults 0 ⇒ no-op). |

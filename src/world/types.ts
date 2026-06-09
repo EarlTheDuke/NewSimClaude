@@ -155,6 +155,16 @@ export interface Business {
    * NEVER seeded.
    */
   brandSpent?: number;
+  /**
+   * Outstanding debt to the Bank (Initiative C / Phase 18 credit) — **non-cash bookkeeping**, never
+   * money. `principal` is what was borrowed and not yet repaid; `accruedInterest` is interest the
+   * firm owed but couldn't pay in cash (a claim, not minted money); `originDay` is informational
+   * (interest is flat `principal × rate`, time-independent); `borrowed` is the cumulative draw, for
+   * observation. Money only ever moves via `World.transfer` (borrow `bank→firm`, interest/repay
+   * `firm→bank`), so `totalMoney()` is untouched. Absent ⇒ debt-free; an emptied loan is deleted to
+   * restore the byte-identical shape. NEVER seeded — the default city carries no debt.
+   */
+  debt?: { principal: number; accruedInterest: number; originDay: number; borrowed?: number };
 }
 
 export interface ProfitAndLoss {
@@ -170,6 +180,13 @@ export interface ProfitAndLoss {
    * records cash that already moved via World.transfer (conservation untouched).
    */
   distributed: number;
+  /**
+   * Interest + principal paid to the Bank during the day (Initiative C / Phase 18 credit) — a true
+   * cash outflow (a `firm→bank` transfer), tracked separately so the observation can net financing
+   * out of `dayProfit`/`dayRent`. Records cash that already moved via World.transfer (conservation
+   * untouched). Absent ⇒ 0 (debt-free / pre-credit), byte-identical.
+   */
+  debtService?: number;
 }
 
 /**

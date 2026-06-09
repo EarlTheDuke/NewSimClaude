@@ -13,6 +13,7 @@ import { EventSystem, type EventSystemOptions } from "./systems/EventSystem";
 import { GodMode } from "./systems/GodMode";
 import { NeedsSystem } from "./systems/NeedsSystem";
 import { LifecycleSystem } from "./systems/LifecycleSystem";
+import { CreditSystem } from "./systems/CreditSystem";
 import { BusinessEntrySystem } from "./systems/BusinessEntrySystem";
 import { MacroSystem } from "./systems/MacroSystem";
 import { PopulationSystem, type PopulationOptions } from "./systems/PopulationSystem";
@@ -147,6 +148,12 @@ export interface CitySimOptions extends CityOptions {
    * Only bites in a freed-wage city (`wageCapMult` raised); the capped default already ignores rivals.
    */
   labourCompetition?: boolean;
+  /**
+   * Credit & finance (Initiative C / Phase 18). When true, the {@link CreditSystem} services loans
+   * and (later slices) firms may borrow from a seeded Bank. Defaults to the live {@link CREDIT_ENABLED}
+   * (off ⇒ the system is a no-op ⇒ byte-identical). Strictly opt-in — never implied by other knobs.
+   */
+  creditEnabled?: boolean;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -256,6 +263,11 @@ export function createCity(options: CitySimOptions = {}): {
     );
     sim.addSystem(residentAgent);
   }
+
+  // Credit/finance (Initiative C / Phase 18) runs between distribution and lifecycle, so a firm's
+  // debt service is taken after its dividend is set but before solvency is judged. Inert at the
+  // default (CREDIT_ENABLED off ⇒ no-op) ⇒ byte-identical. Slice 18a: a no-op stub.
+  sim.addSystem(new CreditSystem(world, options.creditEnabled));
 
   // Lifecycle runs after the economy, market, and any agents so it judges each
   // holder on the fully-settled day: bankruptcy off true end-of-day cash, and
