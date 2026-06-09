@@ -187,6 +187,15 @@ export interface ProfitAndLoss {
    * untouched). Absent ⇒ 0 (debt-free / pre-credit), byte-identical.
    */
   debtService?: number;
+  /**
+   * Cumulative revenue from EXPORT sales to the port (Initiative C / C4a) — cash the rest of the
+   * world paid this firm for goods shipped abroad. A subset of {@link revenue} (export sales book
+   * into both), broken out so {@link MacroSystem} can count the exports term of GDP without
+   * polluting consumption, and so a mind can see its export income (slice a4). Records cash that
+   * already moved via World.transfer (`port→firm` — conservation untouched). Absent ⇒ 0 (no port /
+   * never exported), byte-identical. NEVER seeded.
+   */
+  exportRevenue?: number;
 }
 
 /**

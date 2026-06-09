@@ -306,6 +306,26 @@ export const TRADE_ENABLED = false;
  * it runs dry, foreign demand is exhausted — refilling it mid-run would be money creation (path b).
  */
 export const PORT_SEED_CASH = 20000;
+/**
+ * World price per resource = its base B2B price × this multiplier (slice a2) — a **frozen table**,
+ * never moved by local supply/demand (the city is a price-taker on the world market; its little
+ * book doesn't move the world). Above 1 so exporting pays better than the local base — the pull
+ * that makes producers serve the dock. Real-world: the commodity's international price.
+ */
+export const TRADE_WORLD_PRICE_MULT = 1.25;
+/**
+ * Max units of EACH resource the port buys per day (slice a2) — the rest of the world's bounded
+ * daily appetite for the town's goods. Caps the export channel so outside demand lifts the city
+ * rather than strip-mining it. Real-world: the standing order size foreign buyers place.
+ */
+export const TRADE_EXPORT_MAX_PER_DAY = 8;
+/**
+ * The port only buys a producer's stock ABOVE this fraction of its archetype `target` (slice a2) —
+ * the keep-floor that guarantees the local chain is never starved by the dock: the morning's B2B
+ * procurement always finds at least this buffer. Real-world: domestic supply commitments come
+ * first; only the surplus is offered for export.
+ */
+export const TRADE_EXPORT_STOCK_FLOOR = 0.5;
 
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;

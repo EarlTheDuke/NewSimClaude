@@ -13,14 +13,21 @@ export interface MacroSample {
   totalMoney: number;
   /**
    * Output that day by the expenditure approach: consumption + investment
-   * (Phase 12d). Before the invest lever this was consumption alone; in a city
-   * where nobody invests the two are identical, so the number is unchanged there.
+   * (Phase 12d) + exports (C4a). Before the invest lever this was consumption
+   * alone; in a city where nobody invests or exports the terms are 0, so the
+   * number is unchanged there.
    */
   gdp: number;
   /** Final consumption that day: resident spend at storefronts. */
   consumption: number;
   /** Investment that day: business spend on capital goods via the invest lever. */
   investment: number;
+  /**
+   * Exports that day (C4a): city output sold to the rest of the world via the port — the
+   * outside-demand term that can lift GDP past the closed-economy ceiling. 0 in a portless or
+   * trade-off city, so gdp reads exactly as before there.
+   */
+  exports: number;
   /** Cash paid to residents as WAGES that day (dividends are tracked separately in {@link dividend}). */
   payroll: number;
   /** Rent collected that day. */
@@ -62,6 +69,7 @@ interface Cumulative {
   rent: number;
   investment: number;
   distributed: number;
+  exports: number;
 }
 
 /**
@@ -77,7 +85,7 @@ interface Cumulative {
 export class MacroSystem implements System {
   readonly id = "macro";
   private samples: MacroSample[] = [];
-  private prev: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0 };
+  private prev: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0 };
 
   constructor(
     private readonly world: World,
@@ -87,22 +95,26 @@ export class MacroSystem implements System {
   update(ctx: SystemContext): void {
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
 
-    const cum: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0 };
+    const cum: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0 };
     let totalCapital = 0;
     for (const b of this.world.businesses) {
       cum.payroll += b.pnl.wagesPaid;
       cum.rent += b.pnl.rentCollected;
       cum.investment += b.capitalInvested ?? 0;
       cum.distributed += b.pnl.distributed;
+      cum.exports += b.pnl.exportRevenue ?? 0;
       if (ARCHETYPES[b.kind].sellsToResidents) cum.consumption += b.pnl.revenue;
       totalCapital += b.capital ?? CAPITAL_BASELINE;
     }
 
-    // Day-over-day flows. GDP by expenditure = consumption + investment; in the
-    // seeded city investment is 0, so gdp == consumption and the metric stays
-    // byte-identical to its pre-12d (consumption-only) self.
+    // Day-over-day flows. GDP by expenditure = consumption + investment + exports;
+    // in the seeded city investment and exports are 0, so gdp == consumption and
+    // the metric stays byte-identical to its pre-12d (consumption-only) self.
+    // (Exports never double-count into consumption: only non-storefront producers
+    // sell to the port, and their revenue isn't in the consumption sum.)
     const consumption = cum.consumption - this.prev.consumption;
     const investment = cum.investment - this.prev.investment;
+    const exported = cum.exports - this.prev.exports;
     const wages = cum.payroll - this.prev.payroll;
     const dividend = cum.distributed - this.prev.distributed;
     const totalMoney = this.world.totalMoney();
@@ -111,9 +123,10 @@ export class MacroSystem implements System {
     const sample: MacroSample = {
       day: ctx.totalTicks / TICKS_PER_DAY,
       totalMoney,
-      gdp: consumption + investment,
+      gdp: consumption + investment + exported,
       consumption,
       investment,
+      exports: exported,
       payroll: wages,
       rent: cum.rent - this.prev.rent,
       unemployed: this.world.residents.filter((r) => r.jobId === "").length,
@@ -157,8 +170,9 @@ export class MacroSystem implements System {
           rent: s.prev.rent,
           investment: s.prev.investment ?? 0, // pre-12d saves carry no investment baseline
           distributed: s.prev.distributed ?? 0, // pre-observatory saves carry no dividend baseline
+          exports: s.prev.exports ?? 0, // pre-C4a saves carry no exports baseline
         }
-      : { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0 };
+      : { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0 };
   }
 }
 
