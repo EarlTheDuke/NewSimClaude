@@ -110,6 +110,14 @@ export interface CitySimOptions extends CityOptions {
    */
   businessEntry?: boolean;
   /**
+   * Toggle opportunity-driven entry (Initiative #2, slice 1). Defaults to the live
+   * {@link OPPORTUNITY_ENTRY} (off ⇒ byte-identical). On, a storefront kind that runs
+   * capacity-bound and solvent attracts a **second** firm across town — creative
+   * destruction's birth half generalized from "refill the dead" to "challenge the
+   * overstretched." Reads utilization from the market, so it needs no new state.
+   */
+  opportunityEntry?: boolean;
+  /**
    * Toggle population growth (HP3). Defaults to the live {@link POPULATION_GROWTH}
    * (false); pass true to admit new $0 residents into spare housing over time so
    * firms gain real customers and the labour pool can staff every firm.
@@ -228,7 +236,7 @@ export function createCity(options: CitySimOptions = {}): {
   // bankruptcies settled, then refills any niche they emptied — before Macro reads
   // the day's vitals. Inert until a kind goes extinct, so the seeded city is
   // unchanged.
-  const entry = new BusinessEntrySystem(world, options.businessEntry);
+  const entry = new BusinessEntrySystem(world, options.businessEntry, options.opportunityEntry, market);
   sim.addSystem(entry);
   sim.addSystem(new NeedsSystem(world));
 

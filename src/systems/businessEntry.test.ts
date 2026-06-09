@@ -93,6 +93,71 @@ describe("BusinessEntrySystem — business birth", () => {
     expect(loaded.world.serialize()).toEqual(original.world.serialize());
   });
 
+  /**
+   * Initiative #2, slice 1 — *opportunity* entry. Where heal refills an extinct kind,
+   * opportunity founds a SECOND storefront when the incumbent runs flat-out (capacity-
+   * bound) and solvent: a busy, profitable niche attracts a rival, who opens across
+   * town so the price+distance demand split actually hands it customers. Off by default
+   * (byte-identical); a slammed diner is the standing test fixture.
+   */
+  describe("opportunity entry — a slammed storefront draws a rival", () => {
+    /** A rich town eats voraciously (steep wealth elasticity), pinning the lone diner flat-out. */
+    function slammedTown(over: Parameters<typeof createCity>[0] = {}) {
+      const c = createCity({
+        seed: 1,
+        businessEntry: false, // isolate: only opportunity entry may add a firm
+        wealthElasticity: 2, // wants grow steeply with wealth → demand >> diner capacity
+        unemployed: 3, // slack labour the rival can hire (poaching is a later initiative)
+        ...over,
+      });
+      for (const r of c.world.residents) r.money = 20_000; // slam demand + guarantee funded founders
+      return c;
+    }
+
+    it("founds a rival diner across town when the incumbent is capacity-bound and solvent", () => {
+      const { sim, world } = slammedTown({ opportunityEntry: true });
+      const startMoney = world.totalMoney();
+
+      sim.run(TICKS_PER_DAY * 20); // past the entry cooldown; the diner runs hot for days
+
+      const diners = world.businesses.filter((b) => b.kind === "diner" && b.active);
+      expect(diners.length).toBe(2); // a second diner was born into the unmet demand
+      const rival = diners.find((b) => b.id !== "biz_diner")!;
+      // It opened at its OWN location, not on top of the incumbent — a real geographic split.
+      expect(rival.locationId).not.toBe(world.getBusiness("biz_diner")!.locationId);
+      expect(rival.employeeIds.length).toBeGreaterThan(0); // staffed from the labour pool
+      expect(world.residents.some((r) => r.id === rival.ownerId)).toBe(true); // a resident founded + owns it
+      // Birth mints no money — the founder bought the firm out of pocket; the loop holds.
+      expect(world.totalMoney()).toBeCloseTo(startMoney, 4);
+    });
+
+    it("is inert when the flag is off — the same slammed town spawns no rival", () => {
+      const { sim, world } = slammedTown(); // opportunityEntry defaults OFF
+      sim.run(TICKS_PER_DAY * 20);
+      expect(world.businesses.filter((b) => b.kind === "diner" && b.active)).toHaveLength(1);
+      expect(world.businesses.some((b) => b.id.startsWith("biz_diner_gen"))).toBe(false);
+    });
+
+    it("respects the per-kind cap — never founds a third diner", () => {
+      // Start with two diners already; the kind is at the cap, so no rival may be added.
+      const { sim, world } = slammedTown({ opportunityEntry: true, secondDiner: true });
+      sim.run(TICKS_PER_DAY * 30);
+      expect(
+        world.businesses.filter((b) => b.kind === "diner" && b.active).length,
+      ).toBeLessThanOrEqual(2);
+      expect(world.businesses.some((b) => b.id.startsWith("biz_diner_gen"))).toBe(false);
+    });
+
+    it("is deterministic: the same slammed town births the identical rival", () => {
+      const build = () => {
+        const c = slammedTown({ opportunityEntry: true });
+        c.sim.run(TICKS_PER_DAY * 20);
+        return c.world.serialize();
+      };
+      expect(build()).toEqual(build());
+    });
+  });
+
   it("self-heals: forced exits across the chain are refilled over a churning run (D4)", () => {
     const { sim, world } = createCity({
       seed: 1,

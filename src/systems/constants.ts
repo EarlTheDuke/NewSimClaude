@@ -324,6 +324,30 @@ export const NEW_FIRM_CAPITAL = 500;
 /** Min days between business births — hysteresis so a wave of deaths heals gradually, not in a thrash. */
 export const ENTRY_COOLDOWN_DAYS = 10;
 /**
+ * Opportunity-driven entry (Initiative #2, slice 1) — OFF by default, so the seeded
+ * city is byte-identical. Where {@link BUSINESS_ENTRY} only *heals* (refills a kind
+ * once it has gone fully extinct), this lets a kind that is alive but *overstretched*
+ * attract a **second** firm. Real-world: when the corner diner is slammed every lunch
+ * and still turning a profit, an entrepreneur opens a rival across town. Scoped to
+ * **storefronts** (diner, goods) — the only kinds the demand side already splits across
+ * multiple firms (by price + distance); a second *producer* would sit unreached behind
+ * {@link MarketSystem}'s first-match `producerOf`, so new producers/industries are a
+ * later slice. Conserving + deterministic, exactly like the heal path.
+ */
+export const OPPORTUNITY_ENTRY = false;
+/**
+ * The yesterday-utilization (`make / capacity`, Phase 12c) at or above which a storefront
+ * counts as **capacity-bound** — running flat-out, a signal of unmet demand worth a rival.
+ * High by design: only a firm that made nearly every unit it could is a true opportunity.
+ */
+export const OPPORTUNITY_UTIL = 0.97;
+/**
+ * The most active firms one storefront kind may hold via opportunity entry — a hard cap so
+ * a hot niche attracts *a* rival, not an unbounded swarm (the demand-split + lifecycle then
+ * decide whether the newcomer survives). 2 = the incumbent plus one challenger.
+ */
+export const MAX_FIRMS_PER_KIND = 2;
+/**
  * Profit distribution keeps the closed economy alive. In a closed loop, resident
  * shop-spending must equal total business wages, so any per-business surplus
  * would otherwise pool forever in one holder (a rent-collecting landlord, a
