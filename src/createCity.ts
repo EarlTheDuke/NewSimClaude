@@ -283,6 +283,7 @@ export function createCity(options: CitySimOptions = {}): {
       options.creditEnabled,
       options.creditMaxPrincipal,
       options.creditDailyRate,
+      options.tradeEnabled,
     );
     sim.addSystem(agent);
   }

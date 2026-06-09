@@ -151,6 +151,30 @@ export interface BusinessObservation {
    * interest. Absent ⇒ no credit (the lever is dead, like brand at elasticity 0).
    */
   creditRate?: number;
+  /**
+   * The frozen world price the port pays for this firm's produce (Initiative C / C4 slice a4) —
+   * present **only when trade is live** (engaged + an active port) AND this kind produces an
+   * exportable good; absent ⇒ the export lever is dead (the creditRate gating pattern). Compared
+   * against {@link localPrice} it answers the real CEO question: which market pays better today?
+   */
+  exportPrice?: number;
+  /**
+   * What this firm's produce currently trades at in the LOCAL B2B market (C4 slice a4) — the live
+   * price book's quote, floating with local supply/demand while {@link exportPrice} stays frozen.
+   * Present only alongside exportPrice, so trade-off observations are byte-identical.
+   */
+  localPrice?: number;
+  /**
+   * The firm's current export stance (C4 slice a4): the fraction (0..1) of its above-floor surplus
+   * offered to the dock each evening. Read back so a mind sees its stance before changing it (the
+   * payoutRate pattern). Present only when the lever is live; 1 = full participation (the default).
+   */
+  exportShare?: number;
+  /**
+   * Cash the port paid this firm for exports during the day just ended (C4 slice a4) — the lever's
+   * feedback signal. Present only when the lever is live; 0 = nothing shipped.
+   */
+  dayExportRevenue?: number;
 }
 
 /**
@@ -213,6 +237,14 @@ export interface BusinessAction {
    * interest-first then principal; an emptied loan is deleted. Clamped to `[0,1]`. Conserving.
    */
   repay?: number;
+  /**
+   * Proposed fraction (0..1) of the firm's above-floor surplus to offer the port each evening
+   * (Initiative C / C4 slice a4) — the export-vs-local lever: 1 ships every spare unit at the
+   * frozen world price, 0 holds everything home (e.g. when a local shortage pays better). Clamped
+   * to `[0,1]`; ignored (and logged as nothing) when trade isn't live. Moves no cash itself —
+   * export payments still flow `port→firm` through World.transfer — so conservation is untouched.
+   */
+  setExportShare?: number;
 }
 
 /**

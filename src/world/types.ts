@@ -165,6 +165,14 @@ export interface Business {
    * restore the byte-identical shape. NEVER seeded — the default city carries no debt.
    */
   debt?: { principal: number; accruedInterest: number; originDay: number; borrowed?: number };
+  /**
+   * Fraction (0..1) of this firm's above-floor surplus offered to the port each evening
+   * (Initiative C / C4 slice a4) — the CEO's export-vs-local lever, set via `setExportShare`.
+   * The keep-floor ({@link TRADE_EXPORT_STOCK_FLOOR}) always protects the local buffer first;
+   * this scales what's offered beyond it. Absent ⇒ 1 (offer the whole surplus — the a2/a3
+   * passive-port behaviour, byte-identical). Never money. NEVER seeded.
+   */
+  exportShare?: number;
 }
 
 export interface ProfitAndLoss {

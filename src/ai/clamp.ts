@@ -83,6 +83,12 @@ export function clampAction(
     out.repay = clamp(action.repay, 0, 1);
   }
 
+  if (action.setExportShare !== undefined && Number.isFinite(action.setExportShare)) {
+    // C4 a4 — fraction of above-floor surplus offered to the port; the trade-live gate is applied
+    // in BusinessAgentSystem.apply(), where the city's trade state is known.
+    out.setExportShare = clamp(action.setExportShare, 0, 1);
+  }
+
   return out;
 }
 

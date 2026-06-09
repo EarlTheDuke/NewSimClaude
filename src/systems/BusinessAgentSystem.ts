@@ -12,8 +12,9 @@ import type {
 } from "../ai/types";
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
-import { BUSINESS_RESERVE, CAPITAL_BASELINE, WAGE_CAP_MULT, LABOUR_COMPETITION, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY, CREDIT_ENABLED, CREDIT_MAX_PRINCIPAL_PER_FIRM, CREDIT_DAILY_INTEREST_RATE } from "./constants";
+import { BUSINESS_RESERVE, CAPITAL_BASELINE, WAGE_CAP_MULT, LABOUR_COMPETITION, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY, CREDIT_ENABLED, CREDIT_MAX_PRINCIPAL_PER_FIRM, CREDIT_DAILY_INTEREST_RATE, TRADE_ENABLED, TRADE_WORLD_PRICE_MULT } from "./constants";
 import { ARCHETYPES, desiredHeadcount } from "../world/archetypes";
+import { BASE_RESOURCE_PRICE } from "../world/industries";
 import type { MarketSystem } from "./MarketSystem";
 
 /** Cumulative readings captured at the previous review, to diff into day deltas. */
@@ -92,6 +93,13 @@ export class BusinessAgentSystem implements System {
     private readonly creditMaxPrincipal: number = CREDIT_MAX_PRINCIPAL_PER_FIRM,
     /** Daily interest rate, surfaced in the observation (Phase 18g) so a mind can judge borrowing. Defaults to {@link CREDIT_DAILY_INTEREST_RATE}. */
     private readonly creditRate: number = CREDIT_DAILY_INTEREST_RATE,
+    /**
+     * External trade (Initiative C / C4 slice a4). When true (and an active port exists), a
+     * producing firm's observation carries the export signals (`exportPrice`/`localPrice`/
+     * `exportShare`/`dayExportRevenue`) and the `setExportShare` lever is live. Defaults to
+     * {@link TRADE_ENABLED} (off ⇒ fields omitted, lever dead ⇒ byte-identical).
+     */
+    private readonly tradeEnabled: boolean = TRADE_ENABLED,
   ) {
     this.limits = limits;
   }
@@ -184,6 +192,12 @@ export class BusinessAgentSystem implements System {
     }
     if (clamped.setWage !== undefined) this.applySetWage(biz, clamped.setWage);
     if (clamped.setPayout !== undefined) biz.payoutRate = clamped.setPayout; // Phase 16
+    if (clamped.setExportShare !== undefined) {
+      // C4 a4 — live only when trade is engaged; a dead lever writes nothing and logs nothing,
+      // so a trade-off world's snapshot never grows a stray exportShare field.
+      if (this.tradeEnabled) biz.exportShare = clamped.setExportShare;
+      else delete clamped.setExportShare;
+    }
 
     this.log.push({
       day,
@@ -386,6 +400,13 @@ export class BusinessAgentSystem implements System {
     const consumes = ARCHETYPES[biz.kind].consumes;
     const unitCost = consumes ? this.market?.priceBook()[consumes] : undefined;
 
+    // C4 a4 — the export lever's signals, present ONLY when trade is live (engaged + an active
+    // port) and this kind produces an exportable good — the creditRate gating pattern, so a
+    // trade-off observation is byte-identical and a mind knows the lever is live by their presence.
+    const produces = ARCHETYPES[biz.kind].produces;
+    const tradeLive =
+      this.tradeEnabled && produces !== undefined && !!this.world.getBusiness("biz_port")?.active;
+
     return {
       businessId: biz.id,
       name: biz.name,
@@ -428,6 +449,14 @@ export class BusinessAgentSystem implements System {
       borrowed: biz.debt?.borrowed,
       debtServicePaid: biz.debt ? dayDebtService : undefined,
       creditRate: this.creditEnabled ? this.creditRate : undefined,
+      // C4 a4 — the export decision's inputs: the frozen world price vs the floating local quote
+      // (which market pays better today?), the firm's current stance, and yesterday's export cash.
+      exportPrice: tradeLive ? BASE_RESOURCE_PRICE[produces!] * TRADE_WORLD_PRICE_MULT : undefined,
+      localPrice: tradeLive ? this.market?.priceBook()[produces!] : undefined,
+      exportShare: tradeLive ? biz.exportShare ?? 1 : undefined,
+      dayExportRevenue: tradeLive
+        ? (biz.pnl.exportRevenue ?? 0) - (prevPnl.exportRevenue ?? 0)
+        : undefined,
     };
   }
 

@@ -80,9 +80,12 @@ export class TradeSystem implements System {
         const stock = firm.resources[res] ?? 0;
         const keep = Math.ceil(ARCHETYPES[firm.kind].target * TRADE_EXPORT_STOCK_FLOOR);
         const surplus = Math.max(0, stock - keep);
+        // The CEO's export lever (a4): the firm offers only `exportShare` of its surplus to the
+        // dock (floored to integer units). Absent ⇒ 1 ⇒ the whole surplus — byte-identical.
+        const offered = Math.floor(surplus * (firm.exportShare ?? 1));
         // Integer units, affordable within the port's remaining reserve — so the transfer below
         // always settles in full and cash moved matches units shipped exactly.
-        const units = Math.min(surplus, remaining, Math.floor(port.cash / worldPrice));
+        const units = Math.min(offered, remaining, Math.floor(port.cash / worldPrice));
         if (units <= 0) continue;
         const paid = this.world.transfer(port.id, firm.id, units * worldPrice); // port → firm; conserved
         if (paid <= 0) continue;

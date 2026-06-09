@@ -213,6 +213,24 @@ export class RuleBasedProvider implements DecisionProvider {
       }
     }
 
+    // External trade (C4 slice a4) — serve the better market. Gated on the dock being live for
+    // this firm (`exportPrice` present only then; absent ⇒ skipped ⇒ byte-identical). The world
+    // price is frozen while the local quote floats: normally the world pays more (offer the whole
+    // surplus), but when a local shortage spikes the home price past the world's, hold the goods
+    // home — an export pause during scarcity, which also keeps the town fed. Real-world: a trader
+    // shipping to whichever buyer bids higher today.
+    if (o.exportPrice !== undefined && o.localPrice !== undefined) {
+      const share = o.exportPrice >= o.localPrice ? 1 : 0;
+      if (share !== (o.exportShare ?? 1)) {
+        action.setExportShare = share;
+        notes.push(
+          share === 1
+            ? "world price beats local — offering the surplus for export"
+            : "local price beats the world's — holding stock for the home market",
+        );
+      }
+    }
+
     return {
       action,
       reason: notes.length > 0 ? notes.join("; ") : "steady state, no change",

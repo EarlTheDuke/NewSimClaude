@@ -2,6 +2,13 @@ import { describe, it, expect } from "vitest";
 import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "../utils/serialization";
+import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
+import type {
+  BusinessDecision,
+  BusinessObservation,
+  DecisionProvider,
+  DecisionRequest,
+} from "../ai/types";
 import {
   PORT_SEED_CASH,
   TRADE_WORLD_PRICE_MULT,
@@ -298,6 +305,141 @@ describe("TradeSystem — imports / current account (C4 slice a3)", () => {
     const run = () => {
       const c = starved(7);
       c.sim.run(TICKS_PER_DAY * 20);
+      return c.world.serialize();
+    };
+    expect(run()).toEqual(run());
+  });
+});
+
+/** A test mind that sets a fixed export share once, then leaves everything alone. */
+class ShareProvider implements DecisionProvider {
+  readonly id = "share-test";
+  constructor(private readonly share: number) {}
+  decide(): BusinessDecision {
+    return { action: { setExportShare: this.share }, reason: "share test" };
+  }
+}
+
+/** Records the last observation it saw, so a test can assert what the mind was shown. */
+class CaptureProvider implements DecisionProvider {
+  readonly id = "capture";
+  last: BusinessObservation | undefined;
+  decide(req: DecisionRequest): BusinessDecision {
+    this.last = req.observation;
+    return { action: {}, reason: "capture" };
+  }
+}
+
+/**
+ * Slice a4 — the CEO export lever. A producing firm decides what fraction of its above-floor
+ * surplus to offer the dock (`setExportShare`, clamped [0,1]); its observation gains the decision's
+ * inputs (frozen world price vs floating local quote, current stance, yesterday's export cash) —
+ * present ONLY when the dock is live for it, the creditRate gating pattern.
+ */
+describe("TradeSystem — the CEO export lever (C4 slice a4)", () => {
+  it("setExportShare 0 stops a firm's exports; the rest of the chain keeps shipping", () => {
+    const { sim, world } = createCity({
+      seed: 1,
+      includePort: true,
+      tradeEnabled: true,
+      brain: new ShareProvider(0),
+      agenticBusinessIds: ["biz_farm"],
+    });
+    sim.run(TICKS_PER_DAY * 10);
+    const farm = world.getBusiness("biz_farm")!;
+    const mine = world.getBusiness("biz_mine")!;
+    // Day 1's export lands before the first review applies (trade runs before the agent on the
+    // boundary tick); from day 2 the farm withholds — its tally freezes at the one day.
+    const worldGrainPrice = BASE_RESOURCE_PRICE.grain * TRADE_WORLD_PRICE_MULT;
+    expect(farm.pnl.exportRevenue ?? 0).toBeLessThanOrEqual(
+      TRADE_EXPORT_MAX_PER_DAY * worldGrainPrice + 1e-9,
+    );
+    expect(farm.exportShare).toBe(0);
+    expect(mine.pnl.exportRevenue ?? 0).toBeGreaterThan(farm.pnl.exportRevenue ?? 0); // others unaffected
+  });
+
+  it("a partial share scales the offer: 0.2 of the farm's surplus = 5 units, not the 8-unit cap", () => {
+    const run = (share?: number) => {
+      const city = createCity({ seed: 1, includePort: true, tradeEnabled: true });
+      if (share !== undefined) city.world.getBusiness("biz_farm")!.exportShare = share;
+      city.sim.run(TICKS_PER_DAY);
+      return city.world.getBusiness("biz_farm")!.pnl.exportRevenue ?? 0;
+    };
+    const worldGrainPrice = BASE_RESOURCE_PRICE.grain * TRADE_WORLD_PRICE_MULT;
+    // Day 1 the farm sits at its target 50; keep-floor 25 ⇒ surplus 25. Full participation hits
+    // the 8-unit daily cap; share 0.2 offers floor(25 × 0.2) = 5 — the share binds, not the cap.
+    expect(run()).toBeCloseTo(TRADE_EXPORT_MAX_PER_DAY * worldGrainPrice, 6);
+    expect(run(0.2)).toBeCloseTo(5 * worldGrainPrice, 6);
+  });
+
+  it("shows a producing mind the export signals when the dock is live — and omits them when not", () => {
+    const live = new CaptureProvider();
+    const ported = createCity({
+      seed: 1,
+      includePort: true,
+      tradeEnabled: true,
+      brain: live,
+      agenticBusinessIds: ["biz_farm"],
+    });
+    ported.sim.run(TICKS_PER_DAY);
+    expect(live.last!.exportPrice).toBeCloseTo(BASE_RESOURCE_PRICE.grain * TRADE_WORLD_PRICE_MULT, 9);
+    expect(live.last!.localPrice).toBeGreaterThan(0); // the floating local quote, for comparison
+    expect(live.last!.exportShare).toBe(1); // default stance — full participation
+    // Day 1's exports landed before the review: the mind sees the cash in its feedback signal.
+    expect(live.last!.dayExportRevenue).toBeGreaterThan(0);
+
+    const dark = new CaptureProvider();
+    const plain = createCity({ seed: 1, brain: dark, agenticBusinessIds: ["biz_farm"] });
+    plain.sim.run(TICKS_PER_DAY);
+    // Undefined-valued keys vanish at the JSON boundary every networked provider crosses — the
+    // same "omitted when off" contract the credit fields keep.
+    expect(dark.last!.exportPrice).toBeUndefined();
+    expect(dark.last!.localPrice).toBeUndefined();
+    expect(dark.last!.exportShare).toBeUndefined();
+    expect(dark.last!.dayExportRevenue).toBeUndefined();
+  });
+
+  it("a storefront mind never sees the lever — meals don't ship abroad", () => {
+    const capture = new CaptureProvider();
+    const { sim } = createCity({
+      seed: 1,
+      includePort: true,
+      tradeEnabled: true,
+      brain: capture,
+      agenticBusinessIds: ["biz_diner"],
+    });
+    sim.run(TICKS_PER_DAY);
+    expect(capture.last!.exportPrice).toBeUndefined();
+    expect(capture.last!.exportShare).toBeUndefined();
+  });
+
+  it("the dead lever writes nothing: with trade off, setExportShare never reaches the world", () => {
+    const { sim, world } = createCity({
+      seed: 1,
+      brain: new ShareProvider(0.5),
+      agenticBusinessIds: ["biz_farm"],
+    });
+    sim.run(TICKS_PER_DAY * 5);
+    expect("exportShare" in world.getBusiness("biz_farm")!).toBe(false);
+  });
+
+  it("clamps setExportShare into [0,1] and drops non-finite proposals", () => {
+    expect(clampAction({ setExportShare: 5 }, 10, DEFAULT_LIMITS).setExportShare).toBe(1);
+    expect(clampAction({ setExportShare: -0.5 }, 10, DEFAULT_LIMITS).setExportShare).toBe(0);
+    expect(clampAction({ setExportShare: 0.4 }, 10, DEFAULT_LIMITS).setExportShare).toBe(0.4);
+    expect(clampAction({ setExportShare: NaN }, 10, DEFAULT_LIMITS).setExportShare).toBeUndefined();
+  });
+
+  it("the rules brain trades through the lever deterministically (same seed → identical world)", () => {
+    const run = () => {
+      const c = createCity({
+        seed: 7,
+        includePort: true,
+        tradeEnabled: true,
+        brain: "rules",
+        agenticBusinessIds: ["biz_farm", "biz_bakery", "biz_diner", "biz_goods"],
+      });
+      c.sim.run(TICKS_PER_DAY * 30);
       return c.world.serialize();
     };
     expect(run()).toEqual(run());
