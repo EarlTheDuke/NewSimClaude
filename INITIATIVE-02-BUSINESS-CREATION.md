@@ -62,12 +62,17 @@ A storefront kind that is **alive but overstretched** attracts a *second* firm.
 - **Real-world:** when the corner diner is slammed every lunch and still turning a profit, an
   entrepreneur opens a rival across town.
 
-### Slice 2 — Multi-producer B2B (the unlock)
-Let the supply chain reach **more than one producer per resource**, so a second farm/factory can
-actually trade. Change `MarketSystem.producerOf()` from "first active match" to an **allocator**
-that splits each buyer's order across all active producers of the resource (by price, then
-capacity, deterministic tie-break). Flag-gated; with one producer per resource (the seeded city)
-it's a pure no-op. **This is the prerequisite for slices 3–4 and for producer competition (B).**
+### ✅ Slice 2 — Multi-producer B2B (the unlock) · SHIPPED (`bb18b52`)
+The supply chain now reaches **every active producer of a resource**, not just the first.
+`MarketSystem.producerOf()` (first match) became `producersOf()` (the id-sorted pool); each
+buyer's procurement is **split across the pool proportional to each producer's stock** (capped by
+stock, remaining want, and the buyer's cash), and price utilization is measured against the
+pool's **summed** capacity so added supply softens price instead of reading as overload.
+- **Structural no-op** for the seeded city (one producer per resource ⇒ the loops collapse to the
+  old math) — byte-identity guarded by the soak/determinism/round-trip suite. 397 tests green.
+- `producerPool.test.ts` proves a two-farm town splits the bakery's grain orders across **both**
+  farms, conserved + deterministic.
+- **This is the prerequisite for slices 3–4 and for producer competition (B).**
 
 ### Slice 3 — Opportunity-driven producer entry
 With slice 2 in place, extend the slice-1 opportunity trigger to **producers** (farm, mine,
