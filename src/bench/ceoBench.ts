@@ -27,6 +27,7 @@ import {
   BENCH_TURNS,
   BENCH_WEALTH_ELASTICITY,
   BENCH_OWNER_DIVIDEND_SHARE,
+  BENCH_CREDIT_ENABLED,
   BENCH_BRAND_DEMAND_ELASTICITY,
   BENCH_GROWTH_START_CAPITAL,
   BENCH_GROWTH_BRAND_ELASTICITY,
@@ -161,6 +162,10 @@ function setupScenario(config: CeoBenchConfig): {
     // Freeze the producer wage floor too (Phase 18-pre): it lifts the CEO's input
     // costs via the cost-plus B2B floor, which would drift historical scores.
     producerWageFloor: 0,
+    // Freeze credit OFF (Phase 18j): no Bank, no borrowing — so a live CREDIT_ENABLED flip never
+    // moves the historical scorecards, and the bench world has exactly seven businesses.
+    creditEnabled: BENCH_CREDIT_ENABLED,
+    includeBank: false,
     residentBrain: config.residentBrain ?? "off",
     agenticResidentIds: config.agenticResidentIds,
   });

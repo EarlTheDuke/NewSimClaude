@@ -1,6 +1,13 @@
 # Phase 18 — Credit & Finance (banking)
 
-> **STATUS: RESUMED as Initiative C / leg C1 (2026-06-08). 18a SHIPPED.** This is the detailed,
+> **STATUS: COMPLETE (2026-06-08) — Initiative C / leg C1. All of 18a–18j SHIPPED.** A conserving
+> Bank, borrow/repay levers, interest accrual, default settlement, a netted observation, a rules
+> heuristic, savings interest, and a frozen bench — all flag-gated, default byte-identical (460
+> tests green). The one remaining decision is the deliberate **live engagement**: flip
+> `CREDIT_ENABLED=true` (+ `includeBank`) after a tuning sweep, per the falsifiable-bar guidance — left
+> to the user, since it changes the default game and the design says credit may only *tie* OFF.
+>
+> This is the detailed,
 > adversarially-verified design for the credit leg of [INITIATIVE-04-GDP-GROWTH.md](INITIATIVE-04-GDP-GROWTH.md).
 > Designed via a multi-agent workflow (3 independent designs — minimal-first, conservation-first,
 > CEO-lever-first — each stress-tested for money-leaks and determinism breaks, then synthesized).
@@ -86,7 +93,7 @@ The adversarial pass forced these. They are non-negotiable and baked into the sl
 | **✅ 18g** | Observation slice — SHIPPED: surfaced `debtPrincipal/debtInterest/borrowed/debtServicePaid` (off `biz.debt`, absent ⇒ debt-free) + `creditRate` (present only when credit engaged); **netted financing out of `dayProfit`/`dayRent`** via `dayFinancing = dayBorrowed − dayDebtService` (a `borrowed` field added to the ephemeral Bookmark; the `max(0,…)` handles repay+delete). Zero when credit-free ⇒ observation byte-identical. Tests: fields match the ledger, debt-free omits them, off ⇒ all undefined, A/B shows a loan isn't read as profit. 453 tests green. |
 | **✅ 18h** | Mechanism SHIPPED (live flag deferred): taught `RuleBasedProvider` a conservative borrow-to-invest (capacity-bound + profitable) / repay-when-flush heuristic, gated on `o.creditRate` (dormant by default ⇒ byte-identical); added **debt-service-before-dividends** to `DistributionSystem` (gated on credit + debt; threaded `creditEnabled`/`creditRate`). A 2-yr soak (seeds 1 & 7) proves credit is **available, conserving, harmless** — economy stays alive + conserved while firms borrow/service/repay/default, bank never dies, credit exercised (`debtService>0`); deterministic + round-trips. **`CREDIT_ENABLED` stays false** — flipping it live (changing the default game) is a deliberate one-line decision after a tuning sweep, per the falsifiable-bar guidance below. 455 tests green. |
 | **✅ 18i** | Savings interest — SHIPPED: `CreditSystem.paySavings` pays each firm a daily yield on idle cash (above its own reserve) as a `bank→saver` transfer, funded from the bank's above-`BANK_RESERVE` float (never dips into it). Doubly dormant (`creditEnabled` + `creditSavingsRate>0`); rate 0 ⇒ no-op ⇒ byte-identical. **Design refinement:** the bank is now **excluded from the distribution sweep** entirely (a financial holder retains its capital rather than paying a daily dividend — replaces 18b's BANK_RESERVE sweep-branch, resolves R8, and lets the bank accumulate to fund savings). Only affects `includeBank` cities. Tests: exact yield to the depositor + conserved, rate 0 unchanged, never below reserve, deterministic. 459 tests green. |
-| **18j** | Benchmark freeze: `BENCH_CREDIT_ENABLED=false`, `includeBank:false` in `ceoBench`; soak re-baseline (credit-ON live only). |
+| **✅ 18j** | Benchmark freeze — SHIPPED: `ceoBench.setupScenario` now passes `creditEnabled: BENCH_CREDIT_ENABLED` (false) + `includeBank: false`, so a future live `CREDIT_ENABLED` flip can never move the historical scorecards (byte-identical now, since false == default; future-proof). `ceoBench.test` scorecards unchanged; a bench-frozen city has no bank + 7 businesses. 460 tests green. |
 
 ---
 

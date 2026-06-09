@@ -20,7 +20,7 @@ GDP compounds over time instead of plateauing?** The ceilings:
 
 ## The legs (dependency-ordered)
 
-### C1 — Credit & finance (banking) · **BUILDING** (18a–18c shipped; 18d–18j underway)
+### C1 — Credit & finance (banking) · **✅ COMPLETE** (18a–18j shipped; live flag deferred)
 A **Bank** as a conserving holder: firms borrow to fund Phase-17 brand / Phase-12 capital faster than
 they can self-fund, pay interest as a daily `firm→bank` transfer, service or default under lifecycle
 pressure, and (optionally) earn yield on idle cash so hoarding isn't free. **This is the

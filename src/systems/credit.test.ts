@@ -634,3 +634,16 @@ describe("CreditSystem — savings interest (Phase 18i)", () => {
     expect(run()).toEqual(run());
   });
 });
+
+/**
+ * Phase 18j — benchmark freeze. The CEO bench builds its world with `creditEnabled:false` +
+ * `includeBank:false` (mirroring `setupScenario`), so credit can never move the historical
+ * scorecards even if the live `CREDIT_ENABLED` is later flipped on.
+ */
+describe("CreditSystem — benchmark freeze (Phase 18j)", () => {
+  it("a credit-frozen (bench) city has no bank and exactly seven businesses", () => {
+    const { world } = createCity({ seed: 1, creditEnabled: false, includeBank: false });
+    expect(world.getBusiness("biz_bank")).toBeUndefined();
+    expect(world.businesses.filter((b) => b.active).length).toBe(7);
+  });
+});
