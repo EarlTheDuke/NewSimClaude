@@ -185,6 +185,14 @@ export interface BusinessAction {
    * (conserved) cash outflow to the ad channel.
    */
   brand?: number;
+  /**
+   * Cash to **borrow** from the Bank this review (Initiative C / Phase 18 credit) — a `bank→firm`
+   * transfer that books `debt.principal`, funding growth faster than retained earnings allow. Clamped
+   * to `[0, maxBorrowPerReview]` here, then to the firm's remaining headroom under
+   * `CREDIT_MAX_PRINCIPAL_PER_FIRM` in `BusinessAgentSystem.applyBorrow`. Inert unless credit is
+   * engaged AND a Bank is seeded; the debt is non-cash bookkeeping, so conservation is untouched.
+   */
+  borrow?: number;
 }
 
 /**
@@ -207,6 +215,8 @@ export interface DecisionLimits {
   maxWagePerTick: number;
   /** Max cash a business may spend on brand/marketing in one review (Phase 17). */
   maxBrandPerReview: number;
+  /** Max cash a business may borrow from the Bank in one review (Phase 18 credit). */
+  maxBorrowPerReview: number;
 }
 
 /** A provider's verdict: what to do, and why. */

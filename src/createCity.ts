@@ -154,6 +154,12 @@ export interface CitySimOptions extends CityOptions {
    * (off ⇒ the system is a no-op ⇒ byte-identical). Strictly opt-in — never implied by other knobs.
    */
   creditEnabled?: boolean;
+  /**
+   * A firm's total outstanding-principal ceiling (Initiative C / Phase 18c). Defaults to the live
+   * {@link CREDIT_MAX_PRINCIPAL_PER_FIRM} (0 ⇒ no borrowing). Engaged later via a tuning sweep; tests
+   * pass an explicit ceiling to exercise the borrow lever.
+   */
+  creditMaxPrincipal?: number;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -241,6 +247,8 @@ export function createCity(options: CitySimOptions = {}): {
       options.brandElasticity,
       wageCapMult,
       options.labourCompetition,
+      options.creditEnabled,
+      options.creditMaxPrincipal,
     );
     sim.addSystem(agent);
   }

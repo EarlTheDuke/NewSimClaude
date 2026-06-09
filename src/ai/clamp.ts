@@ -16,6 +16,9 @@ export const DEFAULT_LIMITS: DecisionLimits = {
   maxWagePerTick: 1,
   // Phase 17 — max cash spent on brand/marketing per review (mirrors maxInvestPerReview).
   maxBrandPerReview: 500,
+  // Phase 18 — max cash borrowed from the Bank per review. The real ceiling is the total-principal
+  // cap (CREDIT_MAX_PRINCIPAL_PER_FIRM) applied in BusinessAgentSystem.applyBorrow.
+  maxBorrowPerReview: 2000,
 };
 
 /**
@@ -66,6 +69,12 @@ export function clampAction(
     // Phase 17 — pure per-review cap; the cash-vs-reserve floor is applied later in
     // BusinessAgentSystem.applyBrand(), where current cash is known (mirrors invest).
     out.brand = clamp(action.brand, 0, limits.maxBrandPerReview);
+  }
+
+  if (action.borrow !== undefined && Number.isFinite(action.borrow)) {
+    // Phase 18 — pure per-review cap; the total-principal ceiling + bank-funds check are applied
+    // later in BusinessAgentSystem.applyBorrow(), where current debt + the bank are known.
+    out.borrow = clamp(action.borrow, 0, limits.maxBorrowPerReview);
   }
 
   return out;

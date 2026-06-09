@@ -12,7 +12,7 @@ import type {
 } from "../ai/types";
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
-import { BUSINESS_RESERVE, CAPITAL_BASELINE, WAGE_CAP_MULT, LABOUR_COMPETITION, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY } from "./constants";
+import { BUSINESS_RESERVE, CAPITAL_BASELINE, WAGE_CAP_MULT, LABOUR_COMPETITION, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY, CREDIT_ENABLED, CREDIT_MAX_PRINCIPAL_PER_FIRM } from "./constants";
 import { ARCHETYPES, desiredHeadcount } from "../world/archetypes";
 import type { MarketSystem } from "./MarketSystem";
 
@@ -81,6 +81,13 @@ export class BusinessAgentSystem implements System {
      * {@link LABOUR_COMPETITION} (off ⇒ `rivalWage` omitted ⇒ wage logic byte-identical).
      */
     private readonly labourCompetition: boolean = LABOUR_COMPETITION,
+    /**
+     * Credit (Initiative C / Phase 18). When true (and a Bank is seeded), a firm may borrow via the
+     * `borrow` lever. Defaults to {@link CREDIT_ENABLED} (off ⇒ no borrowing ⇒ byte-identical).
+     */
+    private readonly creditEnabled: boolean = CREDIT_ENABLED,
+    /** A firm's total outstanding-principal ceiling. Defaults to {@link CREDIT_MAX_PRINCIPAL_PER_FIRM} (0 ⇒ no borrowing). */
+    private readonly creditMaxPrincipal: number = CREDIT_MAX_PRINCIPAL_PER_FIRM,
   ) {
     this.limits = limits;
   }
@@ -157,6 +164,11 @@ export class BusinessAgentSystem implements System {
     const clamped = clampAction(decision.action, biz.price, this.limits);
     if (clamped.setPrice !== undefined) biz.price = clamped.setPrice;
     if (clamped.hire !== undefined && clamped.hire !== 0) this.applyHire(biz, clamped.hire);
+    // Borrow first (Phase 18c): the firm draws cash from the Bank before it decides how much to
+    // spend on brand/invest below, so a same-review expansion can be debt-funded. Absent/0 ⇒ no-op.
+    if (clamped.borrow !== undefined && clamped.borrow > 0) {
+      clamped.borrow = this.applyBorrow(biz, clamped.borrow, day);
+    }
     if (clamped.brand !== undefined && clamped.brand > 0) {
       clamped.brand = this.applyBrand(biz, clamped.brand); // Phase 17 — brand takes its slice first
     }
@@ -230,6 +242,29 @@ export class BusinessAgentSystem implements System {
     if (moved <= 0) return 0; // keep above the stock writes — no phantom spend
     biz.brand = (biz.brand ?? BRAND_BASELINE) + moved * BRAND_PER_DOLLAR;
     biz.brandSpent = (biz.brandSpent ?? 0) + moved;
+    return moved;
+  }
+
+  /**
+   * Phase 18c — draw cash from the Bank and book it as debt. Money moves ONLY via a `bank→firm`
+   * {@link World.transfer} (so `totalMoney()` is untouched); `debt.principal` is non-cash bookkeeping
+   * of what's owed. Guards: do nothing unless credit is engaged; resolve the bank by its fixed id and
+   * never self-lend; cap the draw at the firm's remaining headroom under {@link creditMaxPrincipal};
+   * and — critically — keep the `moved <= 0` check ABOVE the ledger write, so a transfer the bank
+   * couldn't fund books no phantom debt. Returns the cash actually borrowed, for the decision log.
+   */
+  private applyBorrow(biz: Business, requested: number, day: number): number {
+    if (!this.creditEnabled) return 0;
+    const bank = this.world.getBusiness("biz_bank");
+    if (!bank || bank.id === biz.id) return 0; // no bank to borrow from / never self-lend
+    const want = Math.min(requested, this.creditMaxPrincipal - (biz.debt?.principal ?? 0));
+    if (want <= 0) return 0; // at/over the principal ceiling
+    const moved = this.world.transfer(bank.id, biz.id, want); // bank → firm; conserved
+    if (moved <= 0) return 0; // the bank couldn't fund it — book NOTHING
+    const debt = biz.debt ?? { principal: 0, accruedInterest: 0, originDay: day, borrowed: 0 };
+    debt.principal += moved;
+    debt.borrowed = (debt.borrowed ?? 0) + moved;
+    biz.debt = debt;
     return moved;
   }
 

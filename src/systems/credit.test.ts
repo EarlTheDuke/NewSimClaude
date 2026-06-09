@@ -3,6 +3,16 @@ import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "../utils/serialization";
 import { BANK_SEED_CASH } from "./constants";
+import type { BusinessDecision, DecisionProvider } from "../ai/types";
+
+/** A test mind that does nothing but ask to borrow a fixed amount every review. */
+class BorrowProvider implements DecisionProvider {
+  readonly id = "borrow-test";
+  constructor(private readonly amount: number) {}
+  decide(): BusinessDecision {
+    return { action: { borrow: this.amount }, reason: "borrow test" };
+  }
+}
 
 /**
  * Initiative C / Phase 18a — the inert credit seam. The CreditSystem is registered (between
@@ -93,6 +103,74 @@ describe("CreditSystem — seed the Bank (Phase 18b)", () => {
     const run = () => {
       const c = createCity({ seed: 7, includeBank: true });
       c.sim.run(TICKS_PER_DAY * 30);
+      return c.world.serialize();
+    };
+    expect(run()).toEqual(run());
+  });
+});
+
+/**
+ * Phase 18c — the borrow lever. A firm draws cash from the Bank (`bank→firm` transfer) and books
+ * `debt.principal`; money is conserved (debt is non-cash). The per-firm principal ceiling and the
+ * bank's own cash both bound the draw. Tests keep the ceiling **below** the bank's seed (1500) so
+ * the bank stays under its reserve and the distribution sweep never moves its cash — letting us
+ * assert exact balances.
+ */
+describe("CreditSystem — borrow lever (Phase 18c)", () => {
+  const borrowCity = (over = {}) =>
+    createCity({
+      seed: 1,
+      includeBank: true,
+      creditEnabled: true,
+      creditMaxPrincipal: 1000, // below BANK_SEED_CASH (1500) ⇒ bank stays below reserve ⇒ no sweep
+      brain: new BorrowProvider(1000),
+      agenticBusinessIds: ["biz_diner"],
+      ...over,
+    });
+
+  it("borrows from the bank — principal booked, bank funds it exactly, money conserved", () => {
+    const { sim, world } = borrowCity();
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY); // one review → one borrow
+
+    const diner = world.getBusiness("biz_diner")!;
+    expect(diner.debt?.principal).toBe(1000);
+    expect(diner.debt?.borrowed).toBe(1000);
+    expect(world.getBusiness("biz_bank")!.cash).toBe(BANK_SEED_CASH - 1000); // 1500 − 1000 = 500
+    expect(world.totalMoney()).toBeCloseTo(start, 6); // a transfer, not a mint
+  });
+
+  it("stops at the per-firm principal ceiling", () => {
+    const { sim, world } = borrowCity();
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 10); // many reviews, but the ceiling is 1000
+
+    expect(world.getBusiness("biz_diner")!.debt?.principal).toBe(1000); // capped at the ceiling
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("books no phantom debt when the bank can't fund the draw", () => {
+    // Ceiling above the bank's cash: the diner asks for more than the bank holds.
+    const { sim, world } = borrowCity({ creditMaxPrincipal: 5000, brain: new BorrowProvider(5000) });
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 3);
+
+    const diner = world.getBusiness("biz_diner")!;
+    expect(diner.debt?.principal).toBe(BANK_SEED_CASH); // only what the bank actually had (1500)
+    expect(world.getBusiness("biz_bank")!.cash).toBe(0); // lent its float dry, no further debt booked
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("books no debt when credit is disabled (byte-identical lever)", () => {
+    const { sim, world } = borrowCity({ creditEnabled: false });
+    sim.run(TICKS_PER_DAY * 5);
+    expect("debt" in world.getBusiness("biz_diner")!).toBe(false);
+  });
+
+  it("is deterministic with borrowing: same seed twice → identical world", () => {
+    const run = () => {
+      const c = borrowCity({ seed: 7 });
+      c.sim.run(TICKS_PER_DAY * 10);
       return c.world.serialize();
     };
     expect(run()).toEqual(run());
