@@ -4,6 +4,16 @@ This file auto-loads every session in this repo. It is the operating manual; the
 *direction* lives in the docs it points to. Keep it short — link, don't duplicate.
 
 ## Read before planning any new phase or feature
+
+> **Current active direction — the free-market program (read these first).** The three NORTH-STAR
+> core moves are delivered; the live work is a three-leg program: **[INITIATIVE-01-WAGE-CIRCULATION.md](INITIATIVE-01-WAGE-CIRCULATION.md)**
+> (free labour market, done) → **[INITIATIVE-02-BUSINESS-CREATION.md](INITIATIVE-02-BUSINESS-CREATION.md)**
+> (creation & industries, done) → **[INITIATIVE-03-COMPETITION.md](INITIATIVE-03-COMPETITION.md)**
+> (competition, done) → **[INITIATIVE-04-GDP-GROWTH.md](INITIATIVE-04-GDP-GROWTH.md)** (GDP growth:
+> credit C1 done, C2 verified — *GDP plateaus*). The open decision is the **money fork** —
+> **[INITIATIVE-04-C4-MONEY-FORK.md](INITIATIVE-04-C4-MONEY-FORK.md)** (3 paths planned; build conserving
+> trade first). Everything is flag-gated + byte-identical at default; ~461 tests.
+
 1. **[NORTH-STAR.md](NORTH-STAR.md)** — the post-v1 compass. Re-read at every phase
    boundary and check proposed work against the three moves (wants-grow-with-wealth →
    business entry → close the investment loop), the sequencing, and the
@@ -45,7 +55,7 @@ Green on all three before committing. Throwaway/debug harnesses MUST be deleted 
 - Stage files by name; don't `git add -A` / `git add .`.
 
 ## Standing orders
-- **Push after big builds / at good stopping points** → `https://github.com/EarlTheDuke/Sim-Claude-`.
+- **Push after big builds / at good stopping points** → `https://github.com/EarlTheDuke/NewSimClaude`.
 - **Do not port, fork, or copy `CityWithLifeGrok`** — inspiration only, never a code source.
 - Proceed phase by phase, checkpointing each sub-phase; gate high-risk work (e.g. logistics
   trucks) behind a feature flag that defaults OFF.
