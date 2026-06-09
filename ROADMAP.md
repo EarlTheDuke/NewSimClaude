@@ -16,9 +16,27 @@ against [NORTH-STAR.md](NORTH-STAR.md). Phases 0–8 are [MASTER-PLAN.md](MASTER
   it.** Add the mechanism to the live world, but keep it OFF (or frozen) in the CEO bench
   so the skill signal stays clean. This is the NORTH-STAR tension — honor it every time.
 
-## Where we are (updated 2026-06-06)
+## Where we are (updated 2026-06-08)
 
-**Phases 16 + 17 shipped; the investment loop is closed; the macro track 18–21 is SHELVED.**
+**Active direction: the free-market program** — a greenlit, build-all-three sequence that
+supersedes the day-to-day track while the structural macro phases (18–21) stay shelved (they
+resume *inside* leg C):
+
+| | Initiative | Status | Doc |
+|---|---|---|---|
+| **#1** | Free labour market (wages emerge, welfare the only control) | **S0–S3 SHIPPED + crux verified** | `INITIATIVE-01-WAGE-CIRCULATION.md` |
+| **A** | Business creation & industries (firms *born*, not just healed) | **slice 1 SHIPPED** (opportunity-driven storefront entry) | `INITIATIVE-02-BUSINESS-CREATION.md` |
+| **B** | Competition between firms (rivals fight for customers *and* labour) | next | (draft at boundary) |
+| **C** | GDP growth & scaling (economy compounds; money-creation fork returns) | then — **resumes phases 18–21 here** | this doc + `PHASE18-CREDIT.md` |
+
+The order is load-bearing: creation makes rivals → competition makes rivalry bite → scaling needs
+both, and is where Initiative #1's money-creation fork (closed economy pools/stalls) is answered
+by picking the shelved macro phases back up. The phase-16/17 micro work below is the foundation
+all of this builds on.
+
+---
+
+**Foundation (pre-program): Phases 16 + 17 shipped; the investment loop is closed; the macro track 18–21 is SHELVED.**
 
 - **Phase 17 — Demand growth (brand lever)** ✅ shipped a–d (`BRAND_DEMAND_ELASTICITY=0.3` live;
   a `brand` lever for the LM CEO, bench-frozen). See [PHASE17-DEMAND-GROWTH.md](PHASE17-DEMAND-GROWTH.md).
