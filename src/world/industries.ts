@@ -39,6 +39,12 @@ export interface IndustryDef {
    * investing firms and materials for home-building. Replaces the `kind === "factory"` lookups.
    */
   capitalGoodsVendor?: boolean;
+  /**
+   * Storefront retail anchor price (slice 4c) — the reference the price-elastic discretionary
+   * demand model reckons against. Source for `RETAIL_REFERENCE_PRICE` (and the seeded
+   * `DINER_MEAL_PRICE`/`GOODS_PRICE`). Set only on storefronts; absent ⇒ not resident-facing.
+   */
+  retailPrice?: number;
 }
 
 /**
@@ -52,8 +58,8 @@ export const INDUSTRY_REGISTRY: readonly IndustryDef[] = [
   { kind: "mine", produces: "materials", sellsToResidents: false, target: 24, maxPerDay: 22 },
   { kind: "bakery", consumes: "grain", produces: "food", sellsToResidents: false, target: 40, maxPerDay: 35 },
   { kind: "factory", consumes: "materials", produces: "wares", sellsToResidents: false, target: 24, maxPerDay: 22, capitalGoodsVendor: true },
-  { kind: "diner", consumes: "food", sellsToResidents: true, target: 40, maxPerDay: 34 },
-  { kind: "goods", consumes: "wares", sellsToResidents: true, target: 24, maxPerDay: 21 },
+  { kind: "diner", consumes: "food", sellsToResidents: true, target: 40, maxPerDay: 34, retailPrice: 18 },
+  { kind: "goods", consumes: "wares", sellsToResidents: true, target: 24, maxPerDay: 21, retailPrice: 34 },
   { kind: "landlord", sellsToResidents: false, target: 0, maxPerDay: 0, collectsRent: true },
 ];
 

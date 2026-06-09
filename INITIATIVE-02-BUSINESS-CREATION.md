@@ -130,9 +130,18 @@ must dismantle **both**:
   (BusinessAgent invest target + Population build-materials supplier). Byte-identical (404 green).
   *Out of scope (noted):* the two `o.kind` checks in `RuleBasedProvider` (brain heuristics behind the
   decision seam, not economic invariants) and the singleton `getBusiness("biz_landlord")` id lookups.
-- **4c — Dynamic resource maps in `MarketSystem`.** Replace the hardcoded `RESOURCES` array and
-  `prices`/`sold` literals with registry-derived maps over *all* registered resources (stable array
-  order — no object-key iteration). Byte-identical for the seeded four.
+- **✅ 4c — Dynamic resource maps + retail anchors from the registry · SHIPPED.** `MarketSystem`'s
+  `RESOURCES` array and the per-day `sold` map (and `disasters`' shockable list) are now derived
+  from `RESOURCE_REGISTRY` in stable array order, so a new resource flows through procurement,
+  pricing, restore, and shocks automatically. Folded in the deferred `RETAIL_REFERENCE_PRICE`: a
+  storefront's anchor is now a registry `retailPrice` field, and `RETAIL_REFERENCE_PRICE` +
+  `DINER_MEAL_PRICE`/`GOODS_PRICE` derive from it (a new storefront just declares `retailPrice`).
+  Byte-identical for the seeded four (405 green). *Presentation-layer `main.ts` RESOURCES + test
+  helpers left as-is — they're not the economic core (fold in with 4d's UI pass).*
+
+**The economic core is now fully registry-driven** — archetypes, producers, prices, resources, and
+roles all flow from `INDUSTRY_REGISTRY`/`RESOURCE_REGISTRY`. Only the *type widening* (4d) remains to
+make new industries actually registerable.
 - **4d — Widen the types + runtime registration (the capability, flag-gated).** Change
   `BusinessKind`/`ResourceKind` to a branded `string` (keep `SEEDED_KINDS`/`SEEDED_RESOURCES`
   unions for seeds + tests + the frozen bench), and add a deterministic API to register a new

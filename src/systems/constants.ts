@@ -4,7 +4,7 @@
  * and money stays in healthy circulation across the closed economy.
  */
 import type { BusinessKind, Needs, ResourceKind, WorkSchedule } from "../world/types";
-import { RESOURCE_REGISTRY } from "../world/industries";
+import { INDUSTRY_REGISTRY, RESOURCE_REGISTRY } from "../world/industries";
 
 // Daily schedule (hour of day, 0..23)
 export const SLEEP_START_HOUR = 22;
@@ -146,13 +146,16 @@ export const SOCIAL_SPEND = 8; // resident -> social venue per visit (flat fallb
  * back-compat guarantee: the no-agency baseline never moves off its anchor, so it
  * stays byte-identical.
  */
-export const DINER_MEAL_PRICE = 18; // resident -> diner per meal
-export const GOODS_PRICE = 34; // resident -> goods store per leisure/wares purchase
-/** Per-kind anchor retail price the price-elastic *discretionary* demand model reckons against. */
-export const RETAIL_REFERENCE_PRICE: Partial<Record<BusinessKind, number>> = {
-  diner: DINER_MEAL_PRICE,
-  goods: GOODS_PRICE,
-};
+/**
+ * Per-kind anchor retail price the price-elastic *discretionary* demand model reckons against.
+ * Slice 4c: derived from the registry's `retailPrice` (single source) — a new storefront industry
+ * just declares its `retailPrice` and falls into this map automatically.
+ */
+export const RETAIL_REFERENCE_PRICE: Partial<Record<BusinessKind, number>> = Object.fromEntries(
+  INDUSTRY_REGISTRY.filter((d) => d.retailPrice !== undefined).map((d) => [d.kind, d.retailPrice!]),
+);
+export const DINER_MEAL_PRICE = RETAIL_REFERENCE_PRICE.diner!; // resident -> diner per meal (seeded anchor)
+export const GOODS_PRICE = RETAIL_REFERENCE_PRICE.goods!; // resident -> goods store per leisure/wares purchase
 /**
  * Spread of resident willingness-to-pay for discretionary spend (leisure), as a
  * fraction above the anchor. Reservations fan from the anchor (a resident who'll

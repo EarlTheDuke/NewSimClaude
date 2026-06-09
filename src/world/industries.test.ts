@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { INDUSTRY_REGISTRY, RESOURCE_REGISTRY } from "./industries";
 import { ARCHETYPES, PRODUCER_OF } from "./archetypes";
-import { BASE_RESOURCE_PRICE } from "../systems/constants";
+import {
+  BASE_RESOURCE_PRICE,
+  RETAIL_REFERENCE_PRICE,
+  DINER_MEAL_PRICE,
+  GOODS_PRICE,
+} from "../systems/constants";
 
 /**
  * Initiative #2 slice 4a — the industry registry is the single source, and ARCHETYPES /
@@ -75,5 +80,20 @@ describe("industry registry (slice 4a)", () => {
 
   it("derives BASE_RESOURCE_PRICE from the registry's base prices", () => {
     expect(BASE_RESOURCE_PRICE).toEqual({ grain: 4, materials: 5, food: 8, wares: 11 });
+  });
+
+  it("derives the retail anchors from the registry's retailPrice (slice 4c)", () => {
+    // Only storefronts carry a retail anchor; the seeded values are unchanged.
+    expect(RETAIL_REFERENCE_PRICE).toEqual({ diner: 18, goods: 34 });
+    expect(DINER_MEAL_PRICE).toBe(18);
+    expect(GOODS_PRICE).toBe(34);
+    // retailPrice is set exactly on the resident-facing kinds.
+    expect(INDUSTRY_REGISTRY.filter((d) => d.retailPrice !== undefined).map((d) => d.kind)).toEqual([
+      "diner",
+      "goods",
+    ]);
+    expect(INDUSTRY_REGISTRY.filter((d) => d.retailPrice !== undefined).map((d) => d.kind)).toEqual(
+      INDUSTRY_REGISTRY.filter((d) => d.sellsToResidents).map((d) => d.kind),
+    );
   });
 });

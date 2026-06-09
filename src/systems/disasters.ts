@@ -3,6 +3,7 @@ import type { ResourceKind } from "../world/types";
 import type { SeededRNG } from "../utils/rng";
 import type { MarketSystem } from "./MarketSystem";
 import { ARCHETYPES } from "../world/archetypes";
+import { RESOURCE_REGISTRY } from "../world/industries";
 import { PRICE_MAX_MULT, LANDLORD_RESERVE, GRANT_AMOUNT } from "./constants";
 
 /**
@@ -49,7 +50,9 @@ export interface DisasterDef {
   apply(ctx: DisasterContext): DisasterOutcome;
 }
 
-const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
+// Slice 4c: the shockable resources are the registry's, in stable order — a new resource
+// becomes shockable automatically. Byte-identical for the seeded four.
+const RESOURCES: ResourceKind[] = RESOURCE_REGISTRY.map((r) => r.kind);
 
 /** Keep a need value within its valid 0..100 band. */
 function clampNeed(v: number): number {

@@ -3,6 +3,7 @@ import { TICKS_PER_DAY } from "../core/TimeSystem";
 import type { World } from "../world/World";
 import type { Business, ResourceKind } from "../world/types";
 import { ARCHETYPES } from "../world/archetypes";
+import { RESOURCE_REGISTRY } from "../world/industries";
 import {
   BASE_RESOURCE_PRICE,
   PRICE_MIN_MULT,
@@ -24,7 +25,10 @@ import {
   BRAND_DEPRECIATION_RATE,
 } from "./constants";
 
-const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
+// Slice 4c: the resource list is the registry's, in its stable array order (never object-key
+// order) — so a new resource added there flows through procurement, pricing, and restore. For
+// the seeded four this is exactly ["grain","materials","food","wares"], so the market is byte-identical.
+const RESOURCES: ResourceKind[] = RESOURCE_REGISTRY.map((r) => r.kind);
 
 /**
  * The B2B layer (Phase 4). Once per sim-day it runs the supply chain:
@@ -62,7 +66,7 @@ export class MarketSystem implements System {
   update(ctx: SystemContext): void {
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
 
-    const sold: Record<ResourceKind, number> = { grain: 0, materials: 0, food: 0, wares: 0 };
+    const sold = Object.fromEntries(RESOURCES.map((r) => [r, 0])) as Record<ResourceKind, number>;
     this.procure(sold);
     this.produce();
     this.depreciate();
