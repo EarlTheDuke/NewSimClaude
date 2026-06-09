@@ -113,18 +113,27 @@ export class MarketSystem implements System {
   }
 
   /**
-   * The active producer of a resource — found by *kind*, not a fixed id (Phase 15
-   * D), so a respawned producer (which has a new business id) seamlessly takes
-   * over the supply chain when the original dies. Niche detection only spawns a
-   * replacement once a kind is fully extinct, so there is at most one active
-   * producer per resource and the first match in deterministic array order is
-   * unambiguous. For the default city this is exactly the canonical seeded
-   * producer — a pure no-op.
+   * Every active producer of a resource — found by *kind*, not a fixed id (Phase 15
+   * D), so a respawned producer (new business id) seamlessly joins the supply chain.
+   * Initiative #2 slice 2: there may now be **more than one** (opportunity/heal entry,
+   * a future producer entrant), so this returns the whole pool, id-sorted for a stable
+   * deterministic allocation order. For the default city — exactly one producer per
+   * resource — it's a one-element list, so every caller collapses to its old behaviour.
+   */
+  private producersOf(resource: ResourceKind): Business[] {
+    return this.world.businesses
+      .filter((b) => b.active && ARCHETYPES[b.kind].produces === resource)
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  }
+
+  /**
+   * The representative producer of a resource — the first of {@link producersOf} —
+   * used for the single-valued cost floor and price-revert target. With one producer
+   * (the seeded city) this is exactly that producer; with several it's the lowest-id
+   * one, a stable stand-in until producer-level price discovery lands in Initiative B.
    */
   private producerOf(resource: ResourceKind): Business | undefined {
-    return this.world.businesses.find(
-      (b) => b.active && ARCHETYPES[b.kind].produces === resource,
-    );
+    return this.producersOf(resource)[0];
   }
 
   private procure(sold: Record<ResourceKind, number>): void {
@@ -140,24 +149,35 @@ export class MarketSystem implements System {
       // an understaffed buyer doesn't stockpile input it can't turn into output.
       const outStock = a.sellsToResidents ? biz.inventory : biz.resources[a.produces!] ?? 0;
       const deficit = Math.min(this.effectiveCapacity(biz), Math.max(0, this.effectiveTarget(biz) - outStock));
-      const want = Math.max(0, deficit - (biz.resources[input] ?? 0));
+      let want = Math.max(0, deficit - (biz.resources[input] ?? 0));
       if (want <= 0) continue;
 
-      const producer = this.producerOf(input);
-      if (!producer || !producer.active) continue;
+      // Initiative #2 slice 2 — fill the order from the WHOLE producer pool, not just
+      // the first. Each producer supplies a share proportional to its stock (the bigger
+      // supplier sells more), capped by its stock, the remaining want, and the buyer's
+      // cash. With one producer this is a single pass of the old math — byte-identical.
       const price = this.prices[input];
-      const avail = producer.resources[input] ?? 0;
-      const units = Math.floor(Math.min(want, avail, biz.cash / price));
-      if (units <= 0) continue;
+      const producers = this.producersOf(input);
+      const totalAvail = producers.reduce((s, p) => s + (p.resources[input] ?? 0), 0);
+      if (totalAvail <= 0) continue;
+      for (const producer of producers) {
+        if (want <= 0) break;
+        const avail = producer.resources[input] ?? 0;
+        if (avail <= 0) continue;
+        const share = Math.min(want, avail, Math.ceil((want * avail) / totalAvail));
+        const units = Math.floor(Math.min(share, biz.cash / price));
+        if (units <= 0) continue;
 
-      const cost = units * price;
-      const paid = this.world.transfer(biz.id, producer.id, cost);
-      if (paid <= 0) continue;
-      const bought = Math.floor(paid / price);
-      producer.resources[input] = avail - bought;
-      biz.resources[input] = (biz.resources[input] ?? 0) + bought;
-      producer.pnl.revenue += paid;
-      sold[input] += bought;
+        const cost = units * price;
+        const paid = this.world.transfer(biz.id, producer.id, cost);
+        if (paid <= 0) continue;
+        const bought = Math.floor(paid / price);
+        producer.resources[input] = avail - bought;
+        biz.resources[input] = (biz.resources[input] ?? 0) + bought;
+        producer.pnl.revenue += paid;
+        sold[input] += bought;
+        want -= bought;
+      }
     }
   }
 
@@ -337,13 +357,15 @@ export class MarketSystem implements System {
    */
   private adjustPrices(sold: Record<ResourceKind, number>): void {
     for (const res of RESOURCES) {
-      const producer = this.producerOf(res);
-      // Measure how hard the producer worked against its *effective* capacity,
+      const producers = this.producersOf(res);
+      const producer = producers[0]; // representative for the cost floor / revert target
+      // Measure how hard the producers worked against their *effective* capacity,
       // not the flat maxPerDay (Phase 12b) — otherwise an understaffed producer's
       // brisk-but-small output would read as a slow day and the price would sag
-      // when it should firm up. At baseline this equals maxPerDay, so prices are
-      // unchanged for the seeded city.
-      const cap = producer ? this.effectiveCapacity(producer) : 0;
+      // when it should firm up. Summed across the whole pool (Initiative #2 slice 2)
+      // so a second producer's added capacity softens the price, not inflates it; with
+      // one producer this is its lone capacity, so prices are unchanged for the seeded city.
+      const cap = producers.reduce((s, p) => s + this.effectiveCapacity(p), 0);
       const utilization = cap > 0 ? sold[res] / cap : 0;
       const base = BASE_RESOURCE_PRICE[res];
       const floor = this.priceFloor(res, producer);
