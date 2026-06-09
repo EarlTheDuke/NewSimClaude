@@ -133,6 +133,13 @@ export interface CitySimOptions extends CityOptions {
    * industry in `extraIndustries`, or it simply won't be supplied.
    */
   extraResources?: readonly ResourceDef[];
+  /**
+   * Producer competition strength (Initiative B, slice 1) — the exponent that skews the
+   * multi-producer B2B split toward cheaper, more efficient suppliers. Defaults to the live
+   * {@link PRODUCER_COMPETITION} (0 ⇒ proportional-to-stock ⇒ byte-identical). Engage at ~1–2 so
+   * an efficient producer wins more share, out-grows a laggard, and the supply side truly competes.
+   */
+  producerCompetition?: number;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -167,8 +174,10 @@ export function createCity(options: CitySimOptions = {}): {
   const world = buildCity(sim.rng, options);
 
   // Constructed up front so the EventSystem can hold a market reference; it is
-  // still *registered* (run) at its normal position below.
-  const market = new MarketSystem(world);
+  // still *registered* (run) at its normal position below. Initiative B slice 1:
+  // producerCompetition skews the multi-producer split toward cheaper suppliers
+  // (default 0 ⇒ proportional-to-stock ⇒ byte-identical).
+  const market = new MarketSystem(world, options.producerCompetition);
 
   let events: EventSystem | undefined;
   const disasters = options.disasters ?? false;

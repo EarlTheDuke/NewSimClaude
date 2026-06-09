@@ -244,6 +244,18 @@ export const PRODUCER_COST_FLOOR = true;
  * storefront always keeps a margin over what it pays.
  */
 export const PRODUCER_COST_PLUS_MARGIN = 0.15;
+/**
+ * Producer competition strength (Initiative B, slice 1) — the exponent `k` that skews the
+ * multi-producer order split (slice 2) toward the **more efficient** supplier. A buyer's order
+ * is allocated by `weight = stock × (marketPrice / unitCost)^k`, so a producer with a lower unit
+ * cost (cheaper input + wages spread over more capacity) wins **more** share — it earns more,
+ * reinvests, and out-grows a laggard, who shrinks and may exit (→ entry refills). At **0** the
+ * factor is `(…)^0 = 1`, so weight = stock ⇒ the proportional-to-stock slice-2 split, **byte-
+ * identical**. Engage at ~1–2 for visible supply-side competition. Real-world: buyers route
+ * contracts to the cheaper, more reliable supplier, so efficient producers grow and inefficient
+ * ones lose the business. Keeps the single market price (per-producer pricing is a later step).
+ */
+export const PRODUCER_COMPETITION = 0;
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;
 /**

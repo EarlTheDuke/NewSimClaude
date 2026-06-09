@@ -40,15 +40,22 @@ Code audit (2026-06-08) — a lot of "competition" emerged from Initiative #1 + 
 
 ## The slice plan (small, flag-gated, default byte-identical — the house pattern)
 
-### B1 — Producer competition (share by competitiveness) · the clear gap, first
-Make the multi-producer order split **competitive** instead of proportional-to-stock: a buyer
-prefers the **more competitive** producer (lower unit cost and/or better effective capacity), so the
-efficient producer wins more orders, earns more, reinvests, and grows — while a laggard shrinks and
-eventually exits (→ entry refills). Keep the **single market price** for now (per-producer pricing is
-a bigger change, deferred); compete on **share**. Bounded by a **share floor** (the supply-side twin
-of the storefront truce) so it can't instantly monopolize. Flag-gated; default = today's
-proportional split ⇒ byte-identical. *Real-world:* buyers route orders to the cheaper/more reliable
-supplier, so efficient producers grow and inefficient ones lose the contract.
+### ✅ B1 — Producer competition (share by competitiveness) · SHIPPED
+The multi-producer order split now weights each producer's pull by **competitiveness**:
+`weight = stock × (marketPrice / unitCost) ^ PRODUCER_COMPETITION`, where unit cost is the producer's
+input + wage bill spread over its effective capacity (the same cost the price floor reckons). A
+cheaper, more efficient producer wins **more** share, earns more, and out-grows a laggard. Keeps the
+**single market price** (per-producer pricing deferred). Flag-gated via `producerCompetition` (the
+exponent; **0 ⇒ proportional-to-stock ⇒ byte-identical**; engage ~1–2). 412 tests green.
+- **Also fixed slice 2's split to be _truly_ proportional** (divide the still-wanted units by the
+  *remaining* pull, a suffix sum — equal producers now split ~evenly; the old code biased share
+  toward the lowest-id producer). Single-producer seeded city stays byte-identical; only multi-
+  producer cases (all flag-gated) change, and none assert exact shares.
+- `producerPool.test.ts`: at strength 0 two equal farms split ~50/50; at strength 2 the cheaper
+  farm wins clearly more, conserved + deterministic. *Real-world:* buyers route contracts to the
+  cheaper/more reliable supplier, so efficient producers grow and inefficient ones lose the business.
+- *Deferred (noted):* a hard share floor / truce (today a laggard's share decays smoothly toward
+  zero as cost diverges, then it exits → entry refills — which is the intended B3 churn).
 
 ### B2 — Rival-aware wages (the wage war + a truce)
 Surface a `rivalWage` signal (what same-kind rivals pay) in the observation, and let a firm **bid to

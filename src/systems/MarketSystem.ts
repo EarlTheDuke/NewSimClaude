@@ -15,6 +15,7 @@ import {
   PRICE_REVERT_SNAP,
   PRODUCER_COST_FLOOR,
   PRODUCER_COST_PLUS_MARGIN,
+  PRODUCER_COMPETITION,
   WORK_TICKS_PER_DAY,
   CAPITAL_BASELINE,
   CAPITAL_OUTPUT_ELASTICITY,
@@ -61,7 +62,15 @@ export class MarketSystem implements System {
    */
   private readonly lastUtilization = new Map<string, number>();
 
-  constructor(private readonly world: World) {}
+  /**
+   * @param producerCompetition Initiative B slice 1 — the exponent that skews the multi-producer
+   * order split toward cheaper suppliers. Defaults to the live {@link PRODUCER_COMPETITION} (0 ⇒
+   * proportional-to-stock ⇒ byte-identical); the bench/tests pass an explicit value.
+   */
+  constructor(
+    private readonly world: World,
+    private readonly producerCompetition: number = PRODUCER_COMPETITION,
+  ) {}
 
   update(ctx: SystemContext): void {
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
@@ -156,19 +165,29 @@ export class MarketSystem implements System {
       let want = Math.max(0, deficit - (biz.resources[input] ?? 0));
       if (want <= 0) continue;
 
-      // Initiative #2 slice 2 — fill the order from the WHOLE producer pool, not just
-      // the first. Each producer supplies a share proportional to its stock (the bigger
-      // supplier sells more), capped by its stock, the remaining want, and the buyer's
-      // cash. With one producer this is a single pass of the old math — byte-identical.
+      // Initiative #2 slice 2 — fill the order from the WHOLE producer pool, not just the
+      // first. Each producer's pull is its stock × its competitiveness (Initiative B slice 1):
+      // a cheaper, more efficient supplier wins MORE of the order. At PRODUCER_COMPETITION 0
+      // the factor is 1, so the pull is just stock — the proportional-to-stock split, and with
+      // one producer a single pass of the old math — byte-identical. Each take is capped by the
+      // producer's stock, the remaining want, and the buyer's cash.
       const price = this.prices[input];
       const producers = this.producersOf(input);
-      const totalAvail = producers.reduce((s, p) => s + (p.resources[input] ?? 0), 0);
-      if (totalAvail <= 0) continue;
-      for (const producer of producers) {
+      const pull = producers.map((p) => (p.resources[input] ?? 0) * this.competitiveness(p, input));
+      // suffix[i] = pull of producer i and all after it. Dividing the still-wanted units by the
+      // REMAINING pull (not the original total) makes the split truly proportional — equal pull ⇒
+      // even split — instead of biasing toward the lowest-id producer. Single producer: suffix[0]
+      // = its pull, so its share = the whole order — byte-identical. A zero-stock producer has pull
+      // 0 and is skipped. (Strength 0 ⇒ pull = stock ⇒ a fair proportional-to-stock split.)
+      const suffix = new Array<number>(producers.length + 1).fill(0);
+      for (let i = producers.length - 1; i >= 0; i--) suffix[i] = suffix[i + 1]! + pull[i]!;
+      if (suffix[0]! <= 0) continue;
+      for (let i = 0; i < producers.length; i++) {
         if (want <= 0) break;
+        const producer = producers[i]!;
         const avail = producer.resources[input] ?? 0;
-        if (avail <= 0) continue;
-        const share = Math.min(want, avail, Math.ceil((want * avail) / totalAvail));
+        if (avail <= 0 || pull[i]! <= 0) continue;
+        const share = Math.min(want, avail, Math.ceil((want * pull[i]!) / suffix[i]!));
         const units = Math.floor(Math.min(share, biz.cash / price));
         if (units <= 0) continue;
 
@@ -183,6 +202,25 @@ export class MarketSystem implements System {
         want -= bought;
       }
     }
+  }
+
+  /**
+   * A producer's competitiveness for a resource (Initiative B slice 1) — the multiplier on its
+   * stock-share of an order. `(marketPrice / unitCost) ^ producerCompetition`: a producer whose
+   * unit cost (input price + wage bill spread over its effective capacity, the same cost the
+   * {@link priceFloor} reckons) sits **below** the market price is profitable and wins MORE share;
+   * one **above** it loses share. At strength 0 it is exactly 1 — weight = stock, byte-identical.
+   * Pure: reads prices/staffing/capital, moves no cash, no RNG.
+   */
+  private competitiveness(p: Business, resource: ResourceKind): number {
+    if (this.producerCompetition <= 0) return 1; // off ⇒ weight is pure stock (slice-2 split)
+    const a = ARCHETYPES[p.kind];
+    const inputCost = a.consumes ? this.prices[a.consumes] : 0;
+    const capacity = this.effectiveCapacity(p);
+    const wageCost =
+      capacity > 0 ? (p.wagePerTick * p.employeeIds.length * WORK_TICKS_PER_DAY) / capacity : 0;
+    const unitCost = Math.max(inputCost + wageCost, 1e-6);
+    return Math.pow(this.prices[resource] / unitCost, this.producerCompetition);
   }
 
   private produce(): void {
