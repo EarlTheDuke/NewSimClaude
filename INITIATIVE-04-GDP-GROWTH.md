@@ -45,11 +45,19 @@ from there.
 > 18b adds the bank via the registry + role flag. Re-verify every file/line in PHASE18-CREDIT.md
 > against current code before building each slice.
 
-### C2 — Population & demographics scaling · mostly shipped (verify + extend)
-HP3 already does births / mortality / coming-of-age / in-migration / home construction (the labour
-force and customer base *broaden*, not just deepen). C2 is largely **verification** that population
-growth compounds GDP under the full A+B+credit stack, plus any targeted extension (e.g. migration
-responding to the freed wage). Detail drafted at the boundary (`PHASE19-*`).
+### C2 — Population & demographics scaling · ✅ VERIFIED — with a pivotal finding
+HP3 already does births / mortality / coming-of-age / in-migration / home construction. `gdpGrowthSoak.test.ts`
+runs the **whole stack** (free market + A creation + B competition + C1 credit + population growth)
+for **four years on seeds 1 & 7** and locks the result:
+- **The economy is conserved, alive, and self-sustaining** the whole way; population grows (HP3 fires).
+- **THE FINDING — GDP does NOT compound; it plateaus.** Late GDP sits in a band around early GDP
+  (neither collapse nor sustained growth) because **population self-limits at its housing/wealth cap**,
+  so demand-led growth tops out. *Population-led growth within conservation cannot, by itself, lift the
+  GDP ceiling.*
+- **Why it matters:** this is the empirical motivation for **C4 (external trade — an outside demand
+  channel)** and **C5 (the money-creation decision)**. The closed, conserved economy is healthy but
+  bounded; breaking the ceiling needs demand or money from *outside* the closed loop. Exactly the
+  Initiative-#1 S3 fork, now with four-year evidence at the full-stack scale.
 
 ### C3 — Government & fiscal · the G in GDP
 A **Treasury** holder: taxes (sales/income/corporate) as transfers in, public spending + transfers
