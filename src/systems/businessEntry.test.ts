@@ -156,6 +156,48 @@ describe("BusinessEntrySystem — business birth", () => {
       };
       expect(build()).toEqual(build());
     });
+
+    // --- Slice 3: the bottleneck moves upstream — a slammed PRODUCER draws a rival ---
+    const PRODUCER_KINDS = ["farm", "mine", "bakery", "factory"];
+    /** A bigger town (population > jobs) slams the whole chain AND leaves a jobless pool to staff entrants. */
+    function slammedChain() {
+      return slammedTown({
+        opportunityEntry: true,
+        secondDiner: true,
+        residentCount: 30, // population > jobs ⇒ a real labour pool...
+        unemployed: 12, // ...without gutting the base (18 stay employed and staff it)
+      });
+    }
+
+    it("founds a second producer, co-located, when a supply bottleneck runs capacity-bound", () => {
+      const { sim, world } = slammedChain();
+      const startMoney = world.totalMoney();
+
+      sim.run(TICKS_PER_DAY * 20);
+
+      // The producer that runs flat-out first draws a rival founded *beside* it.
+      const seconds = world.businesses.filter(
+        (b) => b.active && b.id.includes("_gen") && PRODUCER_KINDS.includes(b.kind),
+      );
+      expect(seconds.length).toBeGreaterThan(0); // a supply bottleneck drew a rival producer
+      const rival = seconds[0]!;
+      const incumbent = world.businesses.find((b) => b.kind === rival.kind && !b.id.includes("_gen"))!;
+      // Co-located with the incumbent — producers compete on supply, not on map position.
+      expect(rival.locationId).toBe(incumbent.locationId);
+      // It actually trades: slice 2's pooled procurement routes orders to the newcomer.
+      expect(rival.pnl.revenue).toBeGreaterThan(0);
+      // The closed economy held through the upstream birth.
+      expect(world.totalMoney()).toBeCloseTo(startMoney, 4);
+    });
+
+    it("producer entry is deterministic and money-conserving", () => {
+      const build = () => {
+        const c = slammedChain();
+        c.sim.run(TICKS_PER_DAY * 20);
+        return c.world.serialize();
+      };
+      expect(build()).toEqual(build());
+    });
   });
 
   it("self-heals: forced exits across the chain are refilled over a churning run (D4)", () => {

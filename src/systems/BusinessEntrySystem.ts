@@ -21,12 +21,22 @@ import {
 const ENTRANT_KINDS: BusinessKind[] = ["diner", "goods", "farm", "mine", "bakery", "factory"];
 
 /**
- * Kinds an *opportunity* entrant (Initiative #2 slice 1) can found a second firm of:
- * only storefronts, the kinds {@link EconomySystem.storeForResident} already splits
- * demand across by price + distance. A second *producer* would sit unreached behind
- * MarketSystem's first-match `producerOf`, so it is deliberately out of scope here.
+ * Storefront kinds an opportunity entrant can found a second firm of (Initiative #2
+ * slice 1). {@link EconomySystem.storeForResident} splits resident demand across them
+ * by price + distance, so a rival opens **across town** to win the far-side customers.
  */
 const STOREFRONT_KINDS: BusinessKind[] = ["diner", "goods"];
+
+/**
+ * Producer kinds an opportunity entrant can found a second firm of (Initiative #2 slice
+ * 3 — unlocked by slice 2's multi-producer B2B). A capacity-bound producer is a *supply*
+ * bottleneck; a second one **co-locates** (B2B is by resource, not place) and {@link
+ * MarketSystem} splits the chain's orders across the pool, so its output actually sells.
+ */
+const PRODUCER_KINDS: BusinessKind[] = ["farm", "mine", "bakery", "factory"];
+
+/** All kinds opportunity entry considers — storefronts first (visible consumer demand), then producers. */
+const OPPORTUNITY_KINDS: BusinessKind[] = [...STOREFRONT_KINDS, ...PRODUCER_KINDS];
 
 function residentIndex(id: string): number {
   return Number(id.split("_")[1] ?? 0);
@@ -51,12 +61,13 @@ function residentIndex(id: string): number {
  * **Two birth modes, both off the same machinery (fund → staff → own):**
  *  - *Heal* ({@link BUSINESS_ENTRY}, on): refill a kind that has gone fully **extinct**,
  *    reopening at the dead firm's spot — the original creative-destruction birth half.
- *  - *Opportunity* ({@link OPPORTUNITY_ENTRY}, off by default — Initiative #2 slice 1):
- *    found a **second** storefront of a kind that is alive but **overstretched** (every
- *    incumbent ran capacity-bound and solvent), opening it **across town** so the
- *    price+distance demand split actually hands it customers. Generalizes entry from
- *    "refill the dead" to "challenge the busy." Scoped to storefronts (diner, goods);
- *    second producers wait on a later slice (MarketSystem reaches only the first).
+ *  - *Opportunity* ({@link OPPORTUNITY_ENTRY}, off by default — Initiative #2 slices 1+3):
+ *    found a **second** firm of a kind that is alive but **overstretched** (every
+ *    incumbent ran capacity-bound and solvent). A *storefront* rival opens **across town**
+ *    so the price+distance demand split hands it customers (slice 1); a *producer* rival
+ *    **co-locates** (B2B is by resource, not place) and slice 2's multi-producer chain
+ *    splits orders to it (slice 3). Generalizes entry from "refill the dead" to
+ *    "challenge the busy" — across both the consumer and supply sides of the chain.
  *
  * Heal outranks opportunity, and at most one birth fires per cooldown.
  *
@@ -104,12 +115,14 @@ export class BusinessEntrySystem implements System {
       }
     }
 
-    // Then opportunity: a storefront kind running flat-out and solvent attracts a rival.
+    // Then opportunity: a kind running flat-out and solvent attracts a rival. A storefront
+    // rival opens across town (geographic demand split); a producer co-locates (B2B by
+    // resource), its output sold via slice 2's multi-producer chain.
     if (opportunityOn) {
       const kind = this.opportunityNiche();
       const founder = kind !== undefined ? this.entrepreneur() : undefined;
       if (kind !== undefined && founder) {
-        this.found(kind, founder, true);
+        this.found(kind, founder, STOREFRONT_KINDS.includes(kind));
         this.lastEntryDay = day;
       }
     }
@@ -126,19 +139,21 @@ export class BusinessEntrySystem implements System {
   }
 
   /**
-   * The first storefront kind (fixed order) that is a standing *opportunity* — alive
-   * but overstretched. It qualifies when the kind has at least one but fewer than
-   * {@link MAX_FIRMS_PER_KIND} active firms, and *every* one of them yesterday both
-   * ran **capacity-bound** ({@link OPPORTUNITY_UTIL}+ utilization — flat-out, a sign
-   * of unmet demand) and held enough cash to be plainly **solvent** ({@link
-   * NEW_FIRM_CAPITAL}+ — a profitable niche, not a dying one). An unstaffed firm has
-   * no utilization reading and never qualifies (that's a staffing gap, not an entry
-   * opportunity). Read-only + deterministic: fixed kind order, integer-free thresholds.
+   * The first kind (fixed order — storefronts then producers) that is a standing
+   * *opportunity* — alive but overstretched. It qualifies when the kind has at least
+   * one but fewer than {@link MAX_FIRMS_PER_KIND} active firms, and *every* one of them
+   * yesterday both ran **capacity-bound** ({@link OPPORTUNITY_UTIL}+ utilization —
+   * flat-out, a sign of unmet demand: a slammed storefront, or a supply-bottleneck
+   * producer) and held enough cash to be plainly **solvent** ({@link NEW_FIRM_CAPITAL}+
+   * — a profitable niche, not a dying one). An unstaffed firm has no utilization reading
+   * and never qualifies (a staffing gap, not an entry opportunity). Producer entry is
+   * only reachable because slice 2 lets the chain buy from more than one producer.
+   * Read-only + deterministic: fixed kind order, integer-free thresholds.
    */
   private opportunityNiche(): BusinessKind | undefined {
     const market = this.market;
     if (!market) return undefined;
-    return STOREFRONT_KINDS.find((kind) => {
+    return OPPORTUNITY_KINDS.find((kind) => {
       const firms = this.world.businesses.filter((b) => b.kind === kind && b.active);
       if (firms.length === 0 || firms.length >= MAX_FIRMS_PER_KIND) return false;
       return firms.every((b) => {

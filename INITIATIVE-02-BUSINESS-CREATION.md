@@ -74,11 +74,18 @@ pool's **summed** capacity so added supply softens price instead of reading as o
   farms, conserved + deterministic.
 - **This is the prerequisite for slices 3–4 and for producer competition (B).**
 
-### Slice 3 — Opportunity-driven producer entry
-With slice 2 in place, extend the slice-1 opportunity trigger to **producers** (farm, mine,
-bakery, factory): a capacity-bound, solvent producer of a resource the chain is short on attracts
-a second producer. Same conserving birth machinery; now the new producer's output is actually
-bought. Flag-gated.
+### ✅ Slice 3 — Opportunity-driven producer entry · SHIPPED
+The slice-1 opportunity trigger now also covers **producers** (farm, mine, bakery, factory): a
+capacity-bound, solvent producer attracts a second one. Unlike a storefront rival, a producer
+rival **co-locates** (B2B is by resource, not place) — and slice 2's pooled procurement routes
+real orders to it, so it trades from day one. Same `OPPORTUNITY_ENTRY` flag (off ⇒ byte-identical),
+same conserving fund→staff→own machinery; `STOREFRONT_KINDS`/`PRODUCER_KINDS` split decides
+cross-town vs co-located placement.
+- Test: a bigger, richer town (population > jobs, so there's a jobless pool that doesn't gut the
+  base) slams the chain; the first producer to run flat-out draws a co-located rival that trades
+  and conserves money, deterministically. 399 tests green.
+- *Observed:* under heavy demand the rival appears on whichever producer slams first (mine, then
+  farm in the seed-1 fixture) — the bottleneck, wherever it is, is what attracts entry.
 
 ### Slice 4 — Data-driven industries (the big one)
 Make `BusinessKind` / `ResourceKind` / `ARCHETYPES` / `PRODUCER_OF` **data-driven** so genuinely
