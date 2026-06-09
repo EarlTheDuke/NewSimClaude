@@ -1,5 +1,6 @@
 import type { BusinessKind, ResourceKind } from "./types";
 import { DESIRED_HEADCOUNT } from "../systems/constants";
+import { INDUSTRY_REGISTRY, RESOURCE_REGISTRY } from "./industries";
 
 /**
  * The economic identity of each business archetype (Phase 4). The MarketSystem
@@ -15,6 +16,15 @@ import { DESIRED_HEADCOUNT } from "../systems/constants";
  *    is demand-driven: it only makes/buys what sell-through drew down, so the
  *    whole chain self-sizes to what residents actually consume.
  *  - `maxPerDay`: a hard per-day production/restock ceiling.
+ *
+ * Phase 14: maxPerDay is sized TIGHT — just above each chain's real daily
+ * drawdown — so steady-state utilization runs ~0.85 and demand presses against
+ * capacity. That's what makes investment productive (the Solow engine). These
+ * numbers are calibrated empirically (14a probe) and validated in the soak.
+ *
+ * Initiative #2 slice 4a: the values are no longer a hand-keyed Record but are
+ * **derived from {@link INDUSTRY_REGISTRY}** (the single source) — a pure data move,
+ * byte-identical. As a lookup table (`ARCHETYPES[kind]`) its key order is irrelevant.
  */
 export interface Archetype {
   consumes?: ResourceKind;
@@ -24,26 +34,18 @@ export interface Archetype {
   maxPerDay: number;
 }
 
-// Phase 14: maxPerDay is sized TIGHT — just above each chain's real daily
-// drawdown — so steady-state utilization runs ~0.85 and demand presses against
-// capacity. That's what makes investment productive: as wealth-elastic demand
-// grows, capacity binds and a firm reinvests to chase it (the Solow engine). The
-// pre-14 calibration left ~75% slack (util ~0.4), so investing was pointless and
-// the invest lever self-extinguished. `target` is the inventory buffer (≥ peak
-// demand and ≥ maxPerDay) so a busy day doesn't empty the shelves; storefronts
-// are the tightest link so they bind — and fund investment — first, and the chain
-// then deepens demand-end-backward. These numbers are calibrated empirically
-// (14a probe) and validated in the soak; capacity is the only thing the invest
-// lever raises, so prices read utilization against effectiveCapacity, not maxPerDay.
-export const ARCHETYPES: Record<BusinessKind, Archetype> = {
-  farm: { produces: "grain", sellsToResidents: false, target: 50, maxPerDay: 36 },
-  mine: { produces: "materials", sellsToResidents: false, target: 24, maxPerDay: 22 },
-  bakery: { consumes: "grain", produces: "food", sellsToResidents: false, target: 40, maxPerDay: 35 },
-  factory: { consumes: "materials", produces: "wares", sellsToResidents: false, target: 24, maxPerDay: 22 },
-  diner: { consumes: "food", sellsToResidents: true, target: 40, maxPerDay: 34 },
-  goods: { consumes: "wares", sellsToResidents: true, target: 24, maxPerDay: 21 },
-  landlord: { sellsToResidents: false, target: 0, maxPerDay: 0 },
-};
+export const ARCHETYPES = Object.fromEntries(
+  INDUSTRY_REGISTRY.map((d) => [
+    d.kind,
+    {
+      consumes: d.consumes,
+      produces: d.produces,
+      sellsToResidents: d.sellsToResidents,
+      target: d.target,
+      maxPerDay: d.maxPerDay,
+    } satisfies Archetype,
+  ]),
+) as Record<BusinessKind, Archetype>;
 
 /**
  * How many workers a business wants on staff (Phase 15 A). A *producing* business
@@ -57,10 +59,16 @@ export function desiredHeadcount(kind: BusinessKind): number {
   return ARCHETYPES[kind].maxPerDay > 0 ? DESIRED_HEADCOUNT : 0;
 }
 
-/** The single producer business id for each tradeable resource. */
-export const PRODUCER_OF: Record<ResourceKind, string> = {
-  grain: "biz_farm",
-  materials: "biz_mine",
-  food: "biz_bakery",
-  wares: "biz_factory",
-};
+/**
+ * The single seeded producer business id for each tradeable resource — derived from
+ * the registry (the kind that produces it, at its canonical `biz_<kind>` seed id).
+ * The live supply chain finds producers by *kind* ({@link MarketSystem}'s pool), so
+ * this is the seed/observability convention, not the runtime lookup.
+ */
+export const PRODUCER_OF = Object.fromEntries(
+  RESOURCE_REGISTRY.map((r) => {
+    const producer = INDUSTRY_REGISTRY.find((d) => d.produces === r.kind);
+    if (!producer) throw new Error(`PRODUCER_OF: no industry produces "${r.kind}"`);
+    return [r.kind, `biz_${producer.kind}`];
+  }),
+) as Record<ResourceKind, string>;

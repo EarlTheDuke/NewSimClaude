@@ -4,6 +4,7 @@
  * and money stays in healthy circulation across the closed economy.
  */
 import type { BusinessKind, Needs, ResourceKind, WorkSchedule } from "../world/types";
+import { RESOURCE_REGISTRY } from "../world/industries";
 
 // Daily schedule (hour of day, 0..23)
 export const SLEEP_START_HOUR = 22;
@@ -211,13 +212,14 @@ export const JOB_CHANGE_COOLDOWN_DAYS = 5; // min days between a resident's job 
 export const RAISE_COOLDOWN_DAYS = 7; // min days between a resident's raise requests
 
 // Economy depth & markets (Phase 4)
-/** Starting B2B price for each tradeable resource ($/unit). */
-export const BASE_RESOURCE_PRICE: Record<ResourceKind, number> = {
-  grain: 4,
-  materials: 5,
-  food: 8,
-  wares: 11,
-};
+/**
+ * Starting B2B price for each tradeable resource ($/unit). Initiative #2 slice 4a:
+ * derived from {@link RESOURCE_REGISTRY} (the single source) rather than hand-keyed —
+ * a pure data move, byte-identical for the seeded four.
+ */
+export const BASE_RESOURCE_PRICE = Object.fromEntries(
+  RESOURCE_REGISTRY.map((r) => [r.kind, r.basePrice]),
+) as Record<ResourceKind, number>;
 /** A resource price stays within [base*MIN, base*MAX] — bounds runaway moves. */
 export const PRICE_MIN_MULT = 0.4;
 // Caps input-cost swings below the fixed retail prices (diner 18, goods 34): a

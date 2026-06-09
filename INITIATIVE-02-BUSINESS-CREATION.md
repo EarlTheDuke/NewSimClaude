@@ -114,10 +114,14 @@ must dismantle **both**:
    declares), so logic keys off *what a firm does*, not *what it's named*.
 
 #### Sub-slices (each flag-gated / byte-identical until 4d turns capability on)
-- **4a — Registry as the single source (pure refactor, zero behavior change).** Introduce
-  `INDUSTRY_REGISTRY` holding exactly today's 7 kinds + 4 resources, and *derive* `ARCHETYPES` /
-  `PRODUCER_OF` / `BASE_RESOURCE_PRICE` / `RETAIL_REFERENCE_PRICE` from it. Keep the union types
-  (as `keyof typeof INDUSTRY_REGISTRY`). Guard: the 399-test suite stays byte-identical.
+- **✅ 4a — Registry as the single source (pure refactor, zero behavior change) · SHIPPED.**
+  New leaf module `src/world/industries.ts` holds `INDUSTRY_REGISTRY` (the 7 kinds) +
+  `RESOURCE_REGISTRY` (the 4 resources) as **stable arrays**; `ARCHETYPES` / `PRODUCER_OF`
+  (archetypes.ts) and `BASE_RESOURCE_PRICE` (constants.ts) are now **derived** from them. Union
+  types unchanged. `industries.test.ts` pins the derivation + the seeded values; the 399-test soak
+  suite stayed byte-identical (404 total green). *Deferred:* `RETAIL_REFERENCE_PRICE` and the
+  renderer's color map fold into the registry in 4b/4c (they reference `DINER_MEAL_PRICE`/presentation,
+  so moving them cleanly belongs with the capability-flag step — kept out of 4a to avoid an import cycle).
 - **4b — Capability flags replace identity special-cases (pure refactor).** Add role flags to
   `Archetype` (`collectsRent`/rentier, `capitalGoodsVendor`; reuse `sellsToResidents`). Rewrite the
   `kind === "landlord"|"diner"|"goods"|"factory"` sites to read the flag. Byte-identical.
