@@ -26,7 +26,7 @@ resume *inside* leg C):
 |---|---|---|---|
 | **#1** | Free labour market (wages emerge, welfare the only control) | **S0–S3 SHIPPED + crux verified** | `INITIATIVE-01-WAGE-CIRCULATION.md` |
 | **A** | Business creation & industries (firms *born*, not just healed) | **COMPLETE** (slices 1–4: opportunity entry storefronts+producers, multi-producer B2B, data-driven industries) | `INITIATIVE-02-BUSINESS-CREATION.md` |
-| **B** | Competition between firms (rivals fight for customers *and* labour) | next | (draft at boundary) |
+| **B** | Competition between firms (rivals fight for customers *and* labour) | **PLANNED** (building B1: producer competition) | `INITIATIVE-03-COMPETITION.md` |
 | **C** | GDP growth & scaling (economy compounds; money-creation fork returns) | then — **resumes phases 18–21 here** | this doc + `PHASE18-CREDIT.md` |
 
 The order is load-bearing: creation makes rivals → competition makes rivalry bite → scaling needs
