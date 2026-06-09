@@ -1,4 +1,7 @@
-# CityWithLifeClaude
+# NewSimClaude — Free-Market Economy
+
+> A fork of CityWithLifeClaude that grows the living city into a **free-market economy observatory**
+> (see *Now: the Free-Market Economy fork* below). The foundation it builds on:
 
 A small, watchable city economy that **runs, lives, and grows** by itself. It starts
 as twelve residents and seven businesses — they wake, commute, work, eat, and
@@ -45,8 +48,28 @@ self-sustaining economy.** What's in it now:
   `LIFE-TRACE.md`.
 
 Everything stays **money-conserved to the cent and deterministic from seed + snapshot**
-across the entire living cycle (≈378 tests, multi-year soaks on seeds 1 & 7). Forward
+across the entire living cycle (≈409 tests, multi-year soaks on seeds 1 & 7). Forward
 detail lives in the `PHASE*.md` docs + `LIFE-TRACE.md` + the git log.
+
+## Now: the Free-Market Economy fork
+
+This fork (**NewSimClaude**) takes the living city and turns it into a **free-market economy
+observatory** — a greenlit, build-all-three **program** (see `ROADMAP.md` + `NORTH-STAR.md`):
+
+- **Initiative #1 — Free labour market** (`INITIATIVE-01-WAGE-CIRCULATION.md`): wages **emerge**
+  from firms competing for scarce labour rather than being set; welfare is the one control; the
+  artificial citizen's dividend is **weaned**. Shipped + the crux experiment verified — a closed,
+  conserved economy *can* self-circulate on wages + welfare without the dividend pump (quieter and
+  more unequal; money pools in firm cash).
+- **Initiative A — Business creation & industries** (`INITIATIVE-02-BUSINESS-CREATION.md`):
+  **COMPLETE.** The economy now **self-expands** — a firm running flat-out and profitable draws a
+  rival (storefronts across town, producers co-located), the B2B chain serves **multiple producers**
+  per resource, and **new industries are data-driven**, registerable at city-build time.
+- **Next:** **B — Competition between firms** (labour poaching + producer price wars) → **C — GDP
+  growth & scaling** (where the money-creation question returns).
+
+Every slice is flag-gated and **byte-identical at its default**, so the seeded baseline never moves
+until a lever is deliberately engaged.
 
 ---
 

@@ -38,10 +38,14 @@ Your two "later" items fold right in: the better window into the world is also t
 
 ## Quick-reference checklist (distilled — scan before each phase)
 
-- [ ] **#1 Wants grow with wealth** — the keystone. Lifts the demand ceiling; unlocks capital/investment; gives the benchmark score-separation. Highest value, highest blast radius (moves every number + every soak baseline).
-- [ ] **#2 Business entry** — new firms are *born*, not just die. Self-heals collapse (the 4/8); adds market-entry as a testable decision.
-- [ ] **#3 Close the investment loop** — profit → owners, invest lever, reinvest. Productivity engine; only bites *after* #1 makes demand headroom.
-- [ ] **Sequence:** #1 → #2 → #3.
+**The three core moves are delivered (2026-06-08).** The active layer is now the free-market
+**program** — A) business creation & industries → B) competition → C) GDP growth & scaling — which
+builds on top of them (see [ROADMAP.md](ROADMAP.md) + [INITIATIVE-02-BUSINESS-CREATION.md](INITIATIVE-02-BUSINESS-CREATION.md)).
+
+- [x] **#1 Wants grow with wealth** — the keystone. *Delivered:* Phase 13 (wealth-elastic demand) + Phase 17 (brand/marketing lever). Consumption rises with wealth; the demand ceiling lifts.
+- [x] **#2 Business entry** — new firms are *born*, not just die. *Delivered:* Phase 15 D (self-heal) **and Initiative A** — opportunity-driven entry (storefronts + producers) and data-driven new industries. Market entry is now a real, testable decision.
+- [x] **#3 Close the investment loop** — profit → owners, invest lever, reinvest. *Delivered:* Phase 16 (retain/distribute) + the Phase-18-pre wage-floor fix; capital compounds ~25× over 2yr.
+- [x] **Sequence:** #1 → #2 → #3 — followed; all three shipped, in order.
 - [ ] **Gate behind toggles, later:** population lifecycle, banking/credit, external trade; plus texture (goods/services, households, skills/inequality, neighborhoods/land value).
 - [ ] **Hold the tension:** build realism into the *world model*; benchmark via *curated scenarios* that freeze most of it and spotlight one decision domain. Determinism is the gold.
 - [ ] **Later, converging:** a better window into the world == the agent's observation space; "Claude plays" == that observation/action surface + the existing brain seam.

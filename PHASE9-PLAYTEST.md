@@ -287,3 +287,20 @@ Status: `open` → `fixed (commit)` / `wontfix (reason)`.
 **Root cause (the real blocker):** the economy runs at **~25–50% capacity utilization — ~75% slack everywhere**. With that much headroom, investing in *more* capacity is genuinely unwarranted (it sits idle), so no trigger-tuning or target-scaling makes investment productive. Confirmed by a demand sweep: utilization stays ~0.49 even at **3× demand** (only ~0.60 at 5×).
 
 **What it actually needs (a proper future phase, not a slice):** recalibrate the **whole supply chain's base capacity (`maxPerDay` per archetype) downward** so demand presses against capacity (utilization runs ~0.85). Only then does investing (raising the ceiling) translate into more output sold. This is a **chain-wide rebalance**: it breaks the Phase-12a no-op baseline, will cause stockouts until every archetype is re-tuned, and needs heavy soak validation — high value, high risk. Pair it with the reverted `target × capital` scaling (which becomes useful once the lever fires often). **In the meantime, 13c's demand-driven GDP growth (consumption ~doubles/year) stands as the keystone's realized payoff.** Alternatively, pursue North-Star **#2 (business entry)** next instead — likely a cleaner win than the capacity rebalance.
+
+> **The path actually taken (Phase 14 capacity rebalance later shipped; then the project pivoted).**
+> Phase 14 (capacity rebalance) and Phases 15–18 *did* ship after this note — see `ROADMAP.md`,
+> `PHASE14-CAPACITY-REBALANCE.md`, `PHASE15-LIVING-FIRM-ECONOMY.md`, `PHASE16-RETAIN-DISTRIBUTE.md`,
+> `PHASE17-DEMAND-GROWTH.md`. The project then **forked to "NewSimClaude — Free-Market Economy"** and
+> moved to a higher layer of work, logged in its own initiative docs (this play-log is now historical):
+>
+> - **Initiative #1 — Free labour market** (`INITIATIVE-01-WAGE-CIRCULATION.md`): wages *emerge* from
+>   firms competing for scarce labour; welfare is the one control; the artificial dividend is weaned.
+>   S0–S3 shipped + the crux experiment verified (a closed economy self-circulates without the
+>   dividend, just quieter and more unequal).
+> - **Initiative A — Business creation & industries** (`INITIATIVE-02-BUSINESS-CREATION.md`): **the
+>   "pursue #2 next" suggestion above, realized.** COMPLETE — opportunity-driven entry (a busy niche
+>   draws a rival, storefronts + producers), multi-producer B2B, and **data-driven industries** (new
+>   kinds registerable at build time). 409 tests, every slice byte-identical at its default.
+> - **Next:** Initiative **B — Competition between firms** (labour poaching + producer price wars),
+>   then **C — GDP growth & scaling**. Forward sequence in `ROADMAP.md`; compass in `NORTH-STAR.md`.
