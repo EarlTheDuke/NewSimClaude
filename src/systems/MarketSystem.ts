@@ -3,7 +3,7 @@ import { TICKS_PER_DAY } from "../core/TimeSystem";
 import type { World } from "../world/World";
 import type { Business, ResourceKind } from "../world/types";
 import { ARCHETYPES } from "../world/archetypes";
-import { RESOURCE_REGISTRY } from "../world/industries";
+import { RESOURCE_KINDS } from "../world/industries";
 import {
   BASE_RESOURCE_PRICE,
   PRICE_MIN_MULT,
@@ -25,10 +25,10 @@ import {
   BRAND_DEPRECIATION_RATE,
 } from "./constants";
 
-// Slice 4c: the resource list is the registry's, in its stable array order (never object-key
-// order) — so a new resource added there flows through procurement, pricing, and restore. For
-// the seeded four this is exactly ["grain","materials","food","wares"], so the market is byte-identical.
-const RESOURCES: ResourceKind[] = RESOURCE_REGISTRY.map((r) => r.kind);
+// Slice 4: the resource list is the registry's LIVE array (slice 4d resets it per build), in
+// stable chain order — so a city's extra resources flow through procurement, pricing, restore,
+// and shocks. For the seeded four it is ["grain","materials","food","wares"] ⇒ byte-identical.
+const RESOURCES: ResourceKind[] = RESOURCE_KINDS;
 
 /**
  * The B2B layer (Phase 4). Once per sim-day it runs the supply chain:

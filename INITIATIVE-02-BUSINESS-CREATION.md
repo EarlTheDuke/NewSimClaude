@@ -5,7 +5,7 @@
 >
 > | | Initiative | Role | Status |
 > |---|---|---|---|
-> | **A** | **Business creation & industries** (this doc) | more firms + new industries are *born* into demand | **slice 1 SHIPPED** |
+> | **A** | **Business creation & industries** (this doc) | more firms + new industries are *born* into demand | **COMPLETE (slices 1–4)** |
 > | **B** | **Competition between firms** | rivals fight over customers *and* workers | next |
 > | **C** | **GDP growth & scaling** | the economy compounds; the money-creation fork returns | then |
 >
@@ -142,11 +142,33 @@ must dismantle **both**:
 **The economic core is now fully registry-driven** — archetypes, producers, prices, resources, and
 roles all flow from `INDUSTRY_REGISTRY`/`RESOURCE_REGISTRY`. Only the *type widening* (4d) remains to
 make new industries actually registerable.
-- **4d — Widen the types + runtime registration (the capability, flag-gated).** Change
-  `BusinessKind`/`ResourceKind` to a branded `string` (keep `SEEDED_KINDS`/`SEEDED_RESOURCES`
-  unions for seeds + tests + the frozen bench), and add a deterministic API to register a new
-  industry. Off by default ⇒ the seeded city is unchanged; on, a new kind/resource/chain can exist
-  — and (a follow-on) be *founded* into demand via the slice-1/3 entry machinery.
+- **✅ 4d — Construction-time industry registration (the capability) · SHIPPED.** A city can now be
+  built with **extra industries** that flow through the whole economic core. Three parts:
+  1. **Centralized, mutable derived tables.** `ARCHETYPES` / `PRODUCER_OF` / `BASE_RESOURCE_PRICE` /
+     `RETAIL_REFERENCE_PRICE` / `RESOURCE_KINDS` moved into `industries.ts` as singletons that
+     `resetIndustries(extraIndustries, extraResources)` rebuilds **in place** (same refs, so every
+     importer stays live; archetypes.ts/constants.ts re-export). `createCity` calls it per build —
+     reset-to-seeded-plus-extras, which is idempotent ⇒ seeded cities stay byte-identical and keeps
+     determinism + test isolation (the documented constraint: all live cities in a process share one
+     registry).
+  2. **No type-widening needed.** Because 4b made the sim core **capability-driven** (no `kind === X`),
+     a new kind doesn't require widening `BusinessKind` to `string` — which under
+     `noUncheckedIndexedAccess` cascaded 66 "possibly-undefined" errors across every registry lookup.
+     Instead the unions stay closed and an extra industry's kind reaches the registry through **one
+     contained cast** at the registration boundary; the runtime tables hold it, the capability logic
+     handles it. Cleaner and far lower-risk than the originally-planned `(string & {})` widen.
+  3. **End-to-end seeding + demo.** `cityGen` seeds a firm per extra industry (placed on the grid,
+     owned, staffed by the normal round-robin). `extraIndustries.test.ts` registers a new **"orchard"**
+     kind producing grain; the bakery buys its grain via slice 2's multi-producer pool, so it **trades
+     end-to-end**, conserves money, and is deterministic — with the seeded city byte-identical (409 green).
+  - *Follow-ons (noted):* resident-facing new kinds need **need→kind routing** in `EconomySystem`
+    (today hardcodes diner→hunger, goods→social); **runtime-born** industries (invented mid-run) need
+    the chosen-against snapshot persistence; presentation `main.ts`/renderer color maps want a default
+    for unknown kinds. None block the construction-time capability.
+
+**Initiative A (Business creation & industries) is COMPLETE** — slices 1–3 (opportunity entry for
+storefronts + producers, multi-producer B2B) and slice 4 (data-driven industries). Next program leg:
+**B — Competition between firms** (labour poaching + producer price competition).
 
 #### Invariants to hold (call-outs for the build)
 - **Determinism:** the registry is a **stable array**, iterated in order — never object-key/Map

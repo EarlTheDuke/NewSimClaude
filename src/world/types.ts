@@ -61,6 +61,15 @@ export type BusinessKind =
 export type ResourceKind = "grain" | "materials" | "food" | "wares";
 
 /**
+ * Initiative #2 slice 4d note: the seeded kinds/resources above stay the closed unions so all
+ * typed code (and `noUncheckedIndexedAccess`) keeps its safety. A city's **extra** industries
+ * (registered at build time via `resetIndustries`) carry kinds outside these unions — they reach
+ * the registry through a single contained cast at the registration boundary, and the sim core
+ * handles them by **capability flag** (slice 4b), never by kind identity. So new industries work
+ * at runtime without widening every `Record<BusinessKind, …>` lookup to a possibly-undefined one.
+ */
+
+/**
  * An enterprise with cash, a simple P&L, and (for diner/goods) something to
  * sell. Producers/processors hold resource stock and trade it B2B; the landlord
  * collects rent and has no storefront visits.

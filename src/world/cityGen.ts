@@ -10,6 +10,7 @@ import type {
 } from "./types";
 import { RENT_PER_DAY, DINER_MEAL_PRICE, GOODS_PRICE, CAPITAL_BASELINE, PRODUCER_WAGE_FLOOR, HOME_CAPACITY_MAX, HOME_CAPACITY_MIN } from "../systems/constants";
 import { ARCHETYPES } from "./archetypes";
+import type { IndustryDef } from "./industries";
 
 /**
  * Builds the default small city, deterministically from the given RNG.
@@ -79,6 +80,13 @@ export interface CityOptions {
    */
   unemployed?: number;
   /**
+   * Extra industries to seed beyond the core seven (Initiative #2 slice 4d). Each registered
+   * industry (via `resetIndustries`, called by createCity) gets a firm seeded here — placed on
+   * the grid, owned by a resident past the seeded owners, and crewed by the normal staffing
+   * round-robin. Off by default (empty) ⇒ the seeded city is byte-identical.
+   */
+  extraIndustries?: readonly IndustryDef[];
+  /**
    * Opt in to a second, rival diner (Phase 11b). Adds `biz_diner_2` — a faithful
    * twin of the original diner under a different owner — at the bottom-right
    * retail node, so residents choose between two food sellers on price + distance.
@@ -146,6 +154,39 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
       { id: "biz_diner_2", name: diner2Loc.name, kind: "diner", ownerId: ownerOf(7), locationId: diner2Loc.id, cash: 4000, inventory: 40, price: DINER_MEAL_PRICE, employeeIds: [], wagePerTick: 0.17, pnl: pnl(), resources: { food: 0 }, active: true, capital: CAPITAL_BASELINE },
     );
   }
+
+  // Initiative #2 slice 4d — seed a firm for each EXTRA industry registered for this city
+  // (createCity calls resetIndustries first, so its archetype already exists by now). Each is
+  // placed on a deterministic grid node, owned by a resident past the seeded seven, and pushed
+  // BEFORE the staffing round-robin below so it is crewed like any seeded producer/storefront.
+  // Skipped entirely (byte-identical) when there are no extras.
+  (options.extraIndustries ?? []).forEach((def, i) => {
+    const node = nodes[i % nodes.length]!;
+    const loc: Location = { id: `loc_${def.kind}`, name: `${def.kind} #1`, type: "workplace", nodeId: node.id };
+    locations.push(loc);
+    businesses.push({
+      id: `biz_${def.kind}`,
+      name: loc.name,
+      kind: def.kind,
+      ownerId: ownerOf(7 + i), // owners past the seeded seven
+      locationId: loc.id,
+      cash: def.sellsToResidents ? 4000 : 3000, // storefronts seeded richer, like diner/goods vs producers
+      inventory: 0,
+      price: def.retailPrice ?? 0,
+      employeeIds: [],
+      wagePerTick: 0.12,
+      pnl: pnl(),
+      resources: def.sellsToResidents
+        ? def.consumes
+          ? { [def.consumes]: 0 }
+          : {}
+        : def.produces
+          ? { [def.produces]: 0 }
+          : {},
+      active: true,
+      capital: CAPITAL_BASELINE,
+    });
+  });
 
   // --- Homes on the left/middle columns (c = 0,1) ---
   const homeNodes: string[] = [];

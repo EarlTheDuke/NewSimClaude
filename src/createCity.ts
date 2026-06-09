@@ -1,6 +1,7 @@
 import { Simulation } from "./core/Simulation";
 import { World } from "./world/World";
 import { buildCity, type CityOptions } from "./world/cityGen";
+import { resetIndustries, type ResourceDef } from "./world/industries";
 import { WorldSystem } from "./systems/WorldSystem";
 import { BrainSystem } from "./systems/BrainSystem";
 import { MovementSystem } from "./systems/MovementSystem";
@@ -125,6 +126,13 @@ export interface CitySimOptions extends CityOptions {
   populationGrowth?: boolean;
   /** Override population growth knobs (HP3 rate/cooldown/prosperity). Defaults to the live constants. */
   populationOptions?: PopulationOptions;
+  /**
+   * Extra **resources** a city's extra industries trade (Initiative #2 slice 4d) — registered into
+   * the live registry alongside {@link CityOptions.extraIndustries} before the city is built. Off by
+   * default (empty) ⇒ the seeded economy is byte-identical. A new resource needs a producing
+   * industry in `extraIndustries`, or it simply won't be supplied.
+   */
+  extraResources?: readonly ResourceDef[];
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -152,6 +160,10 @@ export function createCity(options: CitySimOptions = {}): {
 } {
   const seed = options.seed ?? 1;
   const sim = new Simulation({ seed });
+  // Initiative #2 slice 4d — register this city's industries (seeded + any extras) before building,
+  // so ARCHETYPES/resources/prices reflect them. With no extras this restores the seeded economy
+  // verbatim ⇒ byte-identical. Per-build reset keeps determinism + test isolation (see industries.ts).
+  resetIndustries(options.extraIndustries, options.extraResources);
   const world = buildCity(sim.rng, options);
 
   // Constructed up front so the EventSystem can hold a market reference; it is

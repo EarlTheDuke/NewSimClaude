@@ -25,7 +25,7 @@ resume *inside* leg C):
 | | Initiative | Status | Doc |
 |---|---|---|---|
 | **#1** | Free labour market (wages emerge, welfare the only control) | **S0–S3 SHIPPED + crux verified** | `INITIATIVE-01-WAGE-CIRCULATION.md` |
-| **A** | Business creation & industries (firms *born*, not just healed) | **slice 1 SHIPPED** (opportunity-driven storefront entry) | `INITIATIVE-02-BUSINESS-CREATION.md` |
+| **A** | Business creation & industries (firms *born*, not just healed) | **COMPLETE** (slices 1–4: opportunity entry storefronts+producers, multi-producer B2B, data-driven industries) | `INITIATIVE-02-BUSINESS-CREATION.md` |
 | **B** | Competition between firms (rivals fight for customers *and* labour) | next | (draft at boundary) |
 | **C** | GDP growth & scaling (economy compounds; money-creation fork returns) | then — **resumes phases 18–21 here** | this doc + `PHASE18-CREDIT.md` |
 

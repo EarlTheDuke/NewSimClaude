@@ -3,8 +3,8 @@
  * chosen so a resident sleeps ~at night, works the day, eats once or twice,
  * and money stays in healthy circulation across the closed economy.
  */
-import type { BusinessKind, Needs, ResourceKind, WorkSchedule } from "../world/types";
-import { INDUSTRY_REGISTRY, RESOURCE_REGISTRY } from "../world/industries";
+import type { Needs, WorkSchedule } from "../world/types";
+import { BASE_RESOURCE_PRICE, RETAIL_REFERENCE_PRICE } from "../world/industries";
 
 // Daily schedule (hour of day, 0..23)
 export const SLEEP_START_HOUR = 22;
@@ -146,14 +146,10 @@ export const SOCIAL_SPEND = 8; // resident -> social venue per visit (flat fallb
  * back-compat guarantee: the no-agency baseline never moves off its anchor, so it
  * stays byte-identical.
  */
-/**
- * Per-kind anchor retail price the price-elastic *discretionary* demand model reckons against.
- * Slice 4c: derived from the registry's `retailPrice` (single source) — a new storefront industry
- * just declares its `retailPrice` and falls into this map automatically.
- */
-export const RETAIL_REFERENCE_PRICE: Partial<Record<BusinessKind, number>> = Object.fromEntries(
-  INDUSTRY_REGISTRY.filter((d) => d.retailPrice !== undefined).map((d) => [d.kind, d.retailPrice!]),
-);
+// Slice 4: the retail anchors + base resource prices are owned by the registry now (the single,
+// mutable source) and re-exported here for back-compat. The seeded diner/goods anchors derive
+// from it (a new storefront just declares its own `retailPrice`).
+export { BASE_RESOURCE_PRICE, RETAIL_REFERENCE_PRICE };
 export const DINER_MEAL_PRICE = RETAIL_REFERENCE_PRICE.diner!; // resident -> diner per meal (seeded anchor)
 export const GOODS_PRICE = RETAIL_REFERENCE_PRICE.goods!; // resident -> goods store per leisure/wares purchase
 /**
@@ -214,15 +210,7 @@ export const PRODUCER_WAGE_FLOOR = 0.12;
 export const JOB_CHANGE_COOLDOWN_DAYS = 5; // min days between a resident's job switches
 export const RAISE_COOLDOWN_DAYS = 7; // min days between a resident's raise requests
 
-// Economy depth & markets (Phase 4)
-/**
- * Starting B2B price for each tradeable resource ($/unit). Initiative #2 slice 4a:
- * derived from {@link RESOURCE_REGISTRY} (the single source) rather than hand-keyed —
- * a pure data move, byte-identical for the seeded four.
- */
-export const BASE_RESOURCE_PRICE = Object.fromEntries(
-  RESOURCE_REGISTRY.map((r) => [r.kind, r.basePrice]),
-) as Record<ResourceKind, number>;
+// Economy depth & markets (Phase 4) — BASE_RESOURCE_PRICE is re-exported from the registry above.
 /** A resource price stays within [base*MIN, base*MAX] — bounds runaway moves. */
 export const PRICE_MIN_MULT = 0.4;
 // Caps input-cost swings below the fixed retail prices (diner 18, goods 34): a
