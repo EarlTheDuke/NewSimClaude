@@ -12,7 +12,7 @@ import type {
 } from "../ai/types";
 import { clampAction, DEFAULT_LIMITS } from "../ai/clamp";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
-import { BUSINESS_RESERVE, CAPITAL_BASELINE, WAGE_CAP_MULT, LABOUR_COMPETITION, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY, CREDIT_ENABLED, CREDIT_MAX_PRINCIPAL_PER_FIRM } from "./constants";
+import { BUSINESS_RESERVE, CAPITAL_BASELINE, WAGE_CAP_MULT, LABOUR_COMPETITION, RETAIL_REFERENCE_PRICE, BRAND_BASELINE, BRAND_PER_DOLLAR, BRAND_DEMAND_ELASTICITY, CREDIT_ENABLED, CREDIT_MAX_PRINCIPAL_PER_FIRM, CREDIT_DAILY_INTEREST_RATE } from "./constants";
 import { ARCHETYPES, desiredHeadcount } from "../world/archetypes";
 import type { MarketSystem } from "./MarketSystem";
 
@@ -21,6 +21,8 @@ interface Bookmark {
   day: number;
   cash: number;
   pnl: ProfitAndLoss;
+  /** Cumulative cash borrowed on the current loan at mark time (Phase 18g) — diffed to net financing out of dayProfit. Absent on pre-18 saves ⇒ read as 0. */
+  borrowed?: number;
 }
 
 /**
@@ -88,6 +90,8 @@ export class BusinessAgentSystem implements System {
     private readonly creditEnabled: boolean = CREDIT_ENABLED,
     /** A firm's total outstanding-principal ceiling. Defaults to {@link CREDIT_MAX_PRINCIPAL_PER_FIRM} (0 ⇒ no borrowing). */
     private readonly creditMaxPrincipal: number = CREDIT_MAX_PRINCIPAL_PER_FIRM,
+    /** Daily interest rate, surfaced in the observation (Phase 18g) so a mind can judge borrowing. Defaults to {@link CREDIT_DAILY_INTEREST_RATE}. */
+    private readonly creditRate: number = CREDIT_DAILY_INTEREST_RATE,
   ) {
     this.limits = limits;
   }
@@ -126,7 +130,7 @@ export class BusinessAgentSystem implements System {
     const req: DecisionRequest = { observation: this.observe(biz, day), limits: this.limits };
     // Advance the bookmark now so tomorrow's deltas measure from this instant,
     // regardless of when an async decision actually applies.
-    this.marks.set(biz.id, { day, cash: biz.cash, pnl: { ...biz.pnl } });
+    this.marks.set(biz.id, { day, cash: biz.cash, pnl: { ...biz.pnl }, borrowed: biz.debt?.borrowed ?? 0 });
 
     let result: BusinessDecision | Promise<BusinessDecision>;
     try {
@@ -351,7 +355,15 @@ export class BusinessAgentSystem implements System {
     const dayRevenue = biz.pnl.revenue - prevPnl.revenue;
     const dayWages = biz.pnl.wagesPaid - prevPnl.wagesPaid;
     const dayDistributed = biz.pnl.distributed - prevPnl.distributed;
-    const dayProfit = biz.cash - prevCash; // cash identity for non-landlords
+    // Phase 18g — net FINANCING out of the cash identity so a loan doesn't read as profit and debt
+    // service doesn't read as rent. dayFinancing = cash drawn in (borrow) − cash paid out (interest +
+    // principal, the debtService delta). Both are 0 in a credit-free city ⇒ dayProfit/dayRent are
+    // unchanged ⇒ byte-identical. (Borrow can't be inferred after a loan is repaid+deleted; the
+    // max(0,…) treats that as no new draw — correct, since a repay isn't a borrow.)
+    const dayDebtService = (biz.pnl.debtService ?? 0) - (prevPnl.debtService ?? 0);
+    const dayBorrowed = Math.max(0, (biz.debt?.borrowed ?? 0) - (mark?.borrowed ?? 0));
+    const dayFinancing = dayBorrowed - dayDebtService;
+    const dayProfit = biz.cash - prevCash - dayFinancing; // operating cash change, financing excluded
     const dayRent = dayRevenue - dayWages - dayDistributed - dayProfit;
 
     // What the competing storefronts of this kind charge, averaged. Undefined
@@ -408,6 +420,14 @@ export class BusinessAgentSystem implements System {
       brand: biz.brand,
       brandSpent: biz.brandSpent,
       brandElasticity: this.brandElasticity,
+      // Phase 18g — credit state, read-only. The debt fields come straight off `biz.debt` (absent ⇒
+      // debt-free), `debtServicePaid` is the day's interest+principal outflow, and `creditRate` is
+      // present only when credit is engaged so a mind can tell the lever is live.
+      debtPrincipal: biz.debt?.principal,
+      debtInterest: biz.debt?.accruedInterest,
+      borrowed: biz.debt?.borrowed,
+      debtServicePaid: biz.debt ? dayDebtService : undefined,
+      creditRate: this.creditEnabled ? this.creditRate : undefined,
     };
   }
 

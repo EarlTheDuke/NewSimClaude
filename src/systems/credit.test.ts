@@ -3,7 +3,12 @@ import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "../utils/serialization";
 import { BANK_SEED_CASH, BANKRUPT_GRACE_DAYS } from "./constants";
-import type { BusinessDecision, DecisionProvider } from "../ai/types";
+import type {
+  BusinessDecision,
+  BusinessObservation,
+  DecisionProvider,
+  DecisionRequest,
+} from "../ai/types";
 
 /** A test mind that does nothing but ask to borrow a fixed amount every review. */
 class BorrowProvider implements DecisionProvider {
@@ -20,6 +25,32 @@ class RepayProvider implements DecisionProvider {
   constructor(private readonly fraction: number) {}
   decide(): BusinessDecision {
     return { action: { repay: this.fraction }, reason: "repay test" };
+  }
+}
+
+/** Records the last observation it saw, so a test can assert what the mind was shown. */
+class CaptureProvider implements DecisionProvider {
+  readonly id = "capture";
+  last: BusinessObservation | undefined;
+  decide(req: DecisionRequest): BusinessDecision {
+    this.last = req.observation;
+    return { action: {}, reason: "capture" };
+  }
+}
+
+/** Borrows once (first review), then just records the observation — to test financing netting. */
+class BorrowOnceThenCapture implements DecisionProvider {
+  readonly id = "borrow-once-capture";
+  last: BusinessObservation | undefined;
+  private borrowed = false;
+  constructor(private readonly amount: number) {}
+  decide(req: DecisionRequest): BusinessDecision {
+    this.last = req.observation;
+    if (!this.borrowed) {
+      this.borrowed = true;
+      return { action: { borrow: this.amount }, reason: "borrow once" };
+    }
+    return { action: {}, reason: "observe" };
   }
 }
 
@@ -382,5 +413,94 @@ describe("CreditSystem — default settlement (Phase 18f)", () => {
       return c.world.serialize();
     };
     expect(run()).toEqual(run());
+  });
+});
+
+/**
+ * Phase 18g — surface credit state in the observation (read-only) and net financing out of
+ * `dayProfit`/`dayRent`, so a mind sees its debt and isn't fooled into reading a loan as profit or
+ * debt service as rent. Credit-free observations are unchanged (the netting is zero).
+ */
+describe("CreditSystem — observation + financing netting (Phase 18g)", () => {
+  it("surfaces the debt fields and the rate from the ledger", () => {
+    const capture = new CaptureProvider();
+    const { sim, world } = createCity({
+      seed: 1,
+      includeBank: true,
+      creditEnabled: true,
+      creditDailyRate: 0.02,
+      brain: capture,
+      agenticBusinessIds: ["biz_diner"],
+    });
+    lendTo(world, "biz_diner", 800, 30);
+    sim.run(TICKS_PER_DAY); // the diner's review shows the loan (interest accrues after the review)
+
+    expect(capture.last?.debtPrincipal).toBe(800);
+    expect(capture.last?.debtInterest).toBe(30);
+    expect(capture.last?.borrowed).toBe(800);
+    expect(capture.last?.creditRate).toBe(0.02);
+  });
+
+  it("a debt-free firm omits the debt fields but still sees the rate (the lever is available)", () => {
+    const capture = new CaptureProvider();
+    const { sim } = createCity({
+      seed: 1,
+      includeBank: true,
+      creditEnabled: true,
+      creditDailyRate: 0.02,
+      brain: capture,
+      agenticBusinessIds: ["biz_diner"],
+    });
+    sim.run(TICKS_PER_DAY);
+    expect(capture.last?.debtPrincipal).toBeUndefined();
+    expect(capture.last?.debtServicePaid).toBeUndefined();
+    expect(capture.last?.creditRate).toBe(0.02); // credit engaged ⇒ a mind can tell
+  });
+
+  it("omits credit fields entirely when credit is off (byte-identical observation)", () => {
+    const capture = new CaptureProvider();
+    const { sim } = createCity({ seed: 1, brain: capture, agenticBusinessIds: ["biz_diner"] });
+    sim.run(TICKS_PER_DAY);
+    expect(capture.last?.creditRate).toBeUndefined();
+    expect(capture.last?.debtPrincipal).toBeUndefined();
+  });
+
+  it("surfaces the day's debt service for a firm carrying debt; money conserved", () => {
+    const capture = new CaptureProvider();
+    const { sim, world } = createCity({
+      seed: 1,
+      includeBank: true,
+      creditEnabled: true,
+      creditDailyRate: 0.05,
+      brain: capture,
+      agenticBusinessIds: ["biz_diner"],
+    });
+    lendTo(world, "biz_diner", 1000, 0);
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 3);
+
+    expect(capture.last?.debtPrincipal).toBe(1000);
+    expect(capture.last?.debtServicePaid).toBeGreaterThan(0); // interest paid this day, surfaced
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("nets a same-review borrow out of dayProfit — a loan isn't read as profit", () => {
+    // Two identical cities; in one the diner borrows once. With financing netted, the borrowing
+    // firm's reported dayProfit must NOT jump by ~the loan — the gap stays far below the draw.
+    const make = (borrow: boolean) => {
+      const cap = borrow ? new BorrowOnceThenCapture(1000) : new CaptureProvider();
+      const { sim } = createCity({
+        seed: 1,
+        includeBank: true,
+        creditEnabled: true,
+        creditDailyRate: 0.01,
+        creditMaxPrincipal: 5000,
+        brain: cap,
+        agenticBusinessIds: ["biz_diner"],
+      });
+      sim.run(TICKS_PER_DAY * 2);
+      return cap.last!.dayProfit;
+    };
+    expect(Math.abs(make(true) - make(false))).toBeLessThan(500); // not ~1000 (the borrow)
   });
 });

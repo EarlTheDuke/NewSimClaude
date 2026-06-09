@@ -255,6 +255,7 @@ export function createCity(options: CitySimOptions = {}): {
       options.labourCompetition,
       options.creditEnabled,
       options.creditMaxPrincipal,
+      options.creditDailyRate,
     );
     sim.addSystem(agent);
   }

@@ -137,6 +137,20 @@ export interface BusinessObservation {
    * pre-17 observations.
    */
   brandElasticity?: number;
+  /** Outstanding loan principal owed to the Bank (Phase 18 credit); absent ⇒ debt-free. */
+  debtPrincipal?: number;
+  /** Accrued-but-unpaid interest owed to the Bank (Phase 18); absent ⇒ none owed. */
+  debtInterest?: number;
+  /** Cumulative cash drawn from the Bank on the current loan (Phase 18); absent ⇒ debt-free. */
+  borrowed?: number;
+  /** Cash paid to the Bank (interest + principal) during the day just ended (Phase 18); absent ⇒ debt-free. */
+  debtServicePaid?: number;
+  /**
+   * The daily interest rate the Bank charges (Phase 18) — present **only when credit is engaged**, so
+   * a mind can tell that borrowing is available and judge whether an expansion's return clears the
+   * interest. Absent ⇒ no credit (the lever is dead, like brand at elasticity 0).
+   */
+  creditRate?: number;
 }
 
 /**
