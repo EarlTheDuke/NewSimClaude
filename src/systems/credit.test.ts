@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "../utils/serialization";
-import { BANK_SEED_CASH } from "./constants";
+import { BANK_SEED_CASH, BANKRUPT_GRACE_DAYS } from "./constants";
 import type { BusinessDecision, DecisionProvider } from "../ai/types";
 
 /** A test mind that does nothing but ask to borrow a fixed amount every review. */
@@ -320,6 +320,65 @@ describe("CreditSystem — repay lever (Phase 18e)", () => {
       });
       lendTo(c.world, "biz_diner", 1200, 80);
       c.sim.run(TICKS_PER_DAY * 8);
+      return c.world.serialize();
+    };
+    expect(run()).toEqual(run());
+  });
+});
+
+/**
+ * Phase 18f — default settlement. When a debtor goes bankrupt, the husk's residual cash settles to
+ * the Bank FIRST (interest then principal), before the owner; any unrecovered debt is a real bank
+ * capital loss, written off as a non-cash claim. Conserving — priority changes who receives, not the
+ * total. Off ⇒ the Phase-15-D liquidation (husk → owner).
+ */
+describe("CreditSystem — default settlement (Phase 18f)", () => {
+  /** A farm one day from bankruptcy, holding cash in (0,1) so it both fails AND has cash to recover, with debt. */
+  function bankruptFarm(creditEnabled: boolean) {
+    const c = createCity({ seed: 1, includeBank: true, creditEnabled, businessEntry: false });
+    const farm = c.world.getBusiness("biz_farm")!;
+    for (const id of farm.employeeIds) {
+      const w = c.world.getResident(id);
+      if (w) { w.jobId = ""; w.wagePerTick = 0; }
+    }
+    farm.employeeIds = []; // no crew ⇒ no production
+    farm.resources = {}; // no stock to sell ⇒ no income
+    farm.inventory = 0;
+    farm.debt = { principal: 1000, accruedInterest: 0, originDay: 0, borrowed: 1000 };
+    farm.cash = 0.5; // in (0,1): below the bankruptcy floor (1) yet leaves 0.5 to recover
+    farm.insolventDays = BANKRUPT_GRACE_DAYS - 1; // next day-boundary tips it over
+    return { c, farm, bank: c.world.getBusiness("biz_bank")! };
+  }
+
+  it("pays the bank first; unrecovered debt is a written-off bank loss; money conserved", () => {
+    const { c, farm, bank } = bankruptFarm(true);
+    const start = c.world.totalMoney();
+    const bankBefore = bank.cash; // the bank doesn't trade, so its cash moves only via the recovery
+
+    c.sim.run(TICKS_PER_DAY); // one boundary → bankrupt + settle
+
+    expect(farm.active).toBe(false);
+    expect(farm.debt).toBeUndefined(); // the 999.5 unrecovered is the bank's loss, written off
+    expect(bank.cash).toBeCloseTo(bankBefore + 0.5, 6); // the husk's 0.5 went to the BANK (paid first)
+    expect(c.world.totalMoney()).toBeCloseTo(start, 6); // conserved through the default
+  });
+
+  it("control — credit off: the bank recovers nothing (Phase-15-D liquidation to the owner)", () => {
+    const { c, farm, bank } = bankruptFarm(false);
+    const start = c.world.totalMoney();
+    const bankBefore = bank.cash;
+
+    c.sim.run(TICKS_PER_DAY);
+
+    expect(farm.active).toBe(false);
+    expect(bank.cash).toBeCloseTo(bankBefore, 6); // settlement skipped — bank got nothing; husk → owner
+    expect(c.world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("is deterministic through a debtor bankruptcy", () => {
+    const run = () => {
+      const { c } = bankruptFarm(true);
+      c.sim.run(TICKS_PER_DAY * 3);
       return c.world.serialize();
     };
     expect(run()).toEqual(run());

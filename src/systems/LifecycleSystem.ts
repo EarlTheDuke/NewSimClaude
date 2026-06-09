@@ -7,6 +7,7 @@ import {
   BANKRUPT_GRACE_DAYS,
   EVICTION_GRACE_DAYS,
   RECYCLE_BANKRUPT_ASSETS,
+  CREDIT_ENABLED,
 } from "./constants";
 import { cheapestVacantHome } from "../world/housing";
 import { ARCHETYPES } from "../world/archetypes";
@@ -30,7 +31,11 @@ import { ARCHETYPES } from "../world/archetypes";
  */
 export class LifecycleSystem implements System {
   readonly id = "lifecycle";
-  constructor(private readonly world: World) {}
+  constructor(
+    private readonly world: World,
+    /** Whether credit default-settlement is live (Phase 18f); defaults to {@link CREDIT_ENABLED} (off ⇒ Phase-15-D liquidation, byte-identical). */
+    private readonly creditEnabled: boolean = CREDIT_ENABLED,
+  ) {}
 
   update(ctx: SystemContext): void {
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
@@ -56,6 +61,23 @@ export class LifecycleSystem implements System {
       worker.wagePerTick = 0;
     }
     biz.employeeIds = [];
+
+    // Default settlement (Phase 18f): a bankrupt debtor settles to the BANK *first*, before its
+    // owner — recovery = min(husk cash, owed), interest then principal. Any unrecovered debt is a
+    // real bank capital loss (the bank paid out the cash at borrow time and simply doesn't get it
+    // back); written off as a non-cash claim, so the total is untouched — priority changes only WHO
+    // receives. Gated on credit; a debt-free firm is byte-identical to the Phase-15-D liquidation.
+    if (this.creditEnabled && biz.debt) {
+      const bank = this.world.getBusiness("biz_bank");
+      if (bank && bank.id !== biz.id) {
+        const owed = biz.debt.principal + biz.debt.accruedInterest;
+        const recovered = this.world.transfer(biz.id, bank.id, Math.min(biz.cash, owed)); // husk → bank
+        const interestRecovered = Math.min(recovered, biz.debt.accruedInterest);
+        biz.debt.accruedInterest -= interestRecovered;
+        biz.debt.principal -= recovered - interestRecovered;
+      }
+      delete biz.debt; // the firm is dead; whatever's left unrecovered is the bank's loss, written off
+    }
 
     // Liquidation (Phase 15 D): the husk's residual cash goes to its owner as
     // recouped equity — returning that money to circulation instead of freezing it

@@ -293,7 +293,7 @@ export function createCity(options: CitySimOptions = {}): {
   // Lifecycle runs after the economy, market, and any agents so it judges each
   // holder on the fully-settled day: bankruptcy off true end-of-day cash, and
   // eviction off the rent actually paid this day.
-  sim.addSystem(new LifecycleSystem(world));
+  sim.addSystem(new LifecycleSystem(world, options.creditEnabled));
   // Business entry runs right after lifecycle (Phase 15 D): it sees the day's
   // bankruptcies settled, then refills any niche they emptied — before Macro reads
   // the day's vitals. Inert until a kind goes extinct, so the seeded city is
