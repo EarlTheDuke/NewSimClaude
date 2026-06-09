@@ -64,12 +64,15 @@ A **Treasury** holder: taxes (sales/income/corporate) as transfers in, public sp
 out (welfare already prototypes this). A real fiscal lever and a new benchmark scenario; frozen OFF
 in the firm-CEO bench. Conserving (every tax/transfer routes through the treasury). Draft `PHASE20-*`.
 
-### C4 — External trade · breaks the closed boundary (**where the money fork really bites**)
-A **port** that buys exports and sells imports at world prices — injects **outside demand** and an
-external growth/shock channel, lifting the hardest ceiling (the closed economy). This is the leg
-where outside money can enter: model the port as a **conserving current-account holder** (trade nets
-through it), or make any outside in/outflow **explicit, bounded, and measured** so `totalMoney()`
-stays auditable. **The money-creation fork is decided here, with evidence.** Draft `PHASE21-*`.
+### C4 — The money fork · **PLANNED (all three paths)** — see [INITIATIVE-04-C4-MONEY-FORK.md](INITIATIVE-04-C4-MONEY-FORK.md)
+The C2 plateau (GDP doesn't compound within conservation) forces the decision. Three paths are fully
+planned in the fork doc: **(a) external trade** — a *conserving* port that injects outside demand,
+lifting the ceiling **inside** the sacred invariant (recommended first); **(b) bounded money creation**
+— a monetary authority with an audited `mint`/`burn`, which **deliberately relaxes** the sacred
+conservation invariant (your explicit call, the deliberate escalation if (a)'s bounded growth isn't
+enough); **(c) accept the plateau** — bank the closed-economy result and pivot to the benchmark +
+visualization tracks. **Recommendation: build (a), measure its lift, then revisit (b) vs (c) with
+evidence.** Awaiting your direction.
 
 ### C5 — GDP growth measurement + the explicit money decision
 A clear **real-GDP-growth** metric over a long soak across the whole program, and the deliberate,
