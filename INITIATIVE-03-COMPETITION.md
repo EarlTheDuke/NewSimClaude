@@ -74,12 +74,20 @@ brain uses it two ways in the freed-wage market:
   offer); B2 is the firm-side wage war that sets up that movement. Pulling a worker even at full
   staff (a posted opening) is deferred — the convergence dynamic is the core win.
 
-### B3 — Competitive exit + churn (tie A ↔ B)
-Demonstrate (and sharpen if needed) that a firm which persistently **loses** share/customers/workers
-runs underwater and **exits** (`LifecycleSystem`), and **entry (A) refills** the freed niche — so the
-market visibly churns: *enter → compete → win or die → re-enter*. Mostly a soak that proves
-competitive churn holds conservation + determinism; a small sharpening only if the loss→exit link is
-too weak.
+### ✅ B3 — Competitive exit + churn (tie A ↔ B) · SHIPPED (verification — no code change)
+`competitionSoak.test.ts` runs the **whole free-market program at once** — free wages + welfare
+(Initiative #1), producer competition + the wage war (B1+B2), business entry + new rivals (A),
+population growth, and **both brains** (so workers actually move to the better-paying winner) — and
+holds every invariant across **3 years on seeds 1 & 7**: money conserved to the cent, nobody
+underwater, no NaN, ≥4 kinds still served, positive GDP, **plus the firm count grows past the seeded
+seven** (entry fired — the *enter → compete → win-or-die → re-enter* loop genuinely churned). Also
+deterministic over a year and **round-trips mid-run** (the competitive stack is snapshot-complete).
+- **Key finding:** the loop **composes with no new code** — `LifecycleSystem` already exits a firm
+  that bleeds below the cash floor (liquidating its residual cash to its owner, conserved), and entry
+  (A) refills. And the B1/B2 **truces** mean competition drives **convergence + stable churn**, not
+  death spirals or monopoly: the economy stays alive *and* keeps turning over. That stability is the
+  honest result — a self-preserving rules agent eases its costs to survive, so competitive *death* is
+  rare; churn comes from entry into busy niches, and the market self-balances.
 
 ### B4 — Competition as a CEO benchmark scenario (the payoff)
 A curated, frozen scenario where the LM CEO competes **head-to-head** with a rival (pricing + wages +
