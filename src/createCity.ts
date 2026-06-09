@@ -160,6 +160,12 @@ export interface CitySimOptions extends CityOptions {
    * pass an explicit ceiling to exercise the borrow lever.
    */
   creditMaxPrincipal?: number;
+  /**
+   * Flat daily interest rate on outstanding loan principal (Initiative C / Phase 18d) — the
+   * `firm→bank` charge. Defaults to the live {@link CREDIT_DAILY_INTEREST_RATE} (0 ⇒ no interest).
+   * Engaged later via a tuning sweep; tests pass a rate to exercise accrual.
+   */
+  creditDailyRate?: number;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -282,7 +288,7 @@ export function createCity(options: CitySimOptions = {}): {
   // Credit/finance (Initiative C / Phase 18) runs between distribution and lifecycle, so a firm's
   // debt service is taken after its dividend is set but before solvency is judged. Inert at the
   // default (CREDIT_ENABLED off ⇒ no-op) ⇒ byte-identical. Slice 18a: a no-op stub.
-  sim.addSystem(new CreditSystem(world, options.creditEnabled));
+  sim.addSystem(new CreditSystem(world, options.creditEnabled, options.creditDailyRate));
 
   // Lifecycle runs after the economy, market, and any agents so it judges each
   // holder on the fully-settled day: bankruptcy off true end-of-day cash, and

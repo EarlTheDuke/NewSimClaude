@@ -176,3 +176,67 @@ describe("CreditSystem — borrow lever (Phase 18c)", () => {
     expect(run()).toEqual(run());
   });
 });
+
+/**
+ * Phase 18d — interest accrual. The CreditSystem stub goes live: each day every loan is charged
+ * `principal × rate` as a `firm→bank` transfer (capped at the firm's cash; any shortfall parks in
+ * `accruedInterest`). Money is conserved (the bank gains exactly what firms pay). Rate 0 ⇒ no-op.
+ */
+describe("CreditSystem — interest accrual (Phase 18d)", () => {
+  const lend = (over = {}) =>
+    createCity({
+      seed: 1,
+      includeBank: true,
+      creditEnabled: true,
+      creditMaxPrincipal: 1000, // < bank seed (1500) ⇒ bank stays below reserve ⇒ no sweep
+      brain: new BorrowProvider(1000),
+      agenticBusinessIds: ["biz_diner"],
+      ...over,
+    });
+
+  it("charges daily interest as a firm→bank transfer; the bank recoups it; money conserved", () => {
+    const { sim, world } = lend({ creditDailyRate: 0.01 });
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 30);
+
+    const diner = world.getBusiness("biz_diner")!;
+    expect(diner.debt?.principal).toBe(1000);
+    expect(diner.pnl.debtService).toBeGreaterThan(0); // paid interest over the month
+    expect(world.getBusiness("biz_bank")!.cash).toBeGreaterThan(BANK_SEED_CASH - 1000); // float back + interest
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("parks unpayable interest in accruedInterest (a non-cash claim), money conserved", () => {
+    const { sim, world } = lend({ creditDailyRate: 0.5 }); // a brutal rate to force a shortfall
+    sim.run(TICKS_PER_DAY); // borrow + first charge
+    const diner = world.getBusiness("biz_diner")!;
+    diner.cash = 0; // now broke — it can't pay the next charges
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY * 3);
+
+    expect(diner.debt!.accruedInterest).toBeGreaterThan(0); // unpayable interest piled up as a claim
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("rate 0 ⇒ byte-identical: borrowed, but no interest and no debtService field", () => {
+    const { sim, world } = lend({ creditDailyRate: 0 });
+    sim.run(TICKS_PER_DAY * 20);
+    const diner = world.getBusiness("biz_diner")!;
+    expect(diner.debt?.principal).toBe(1000);
+    expect(diner.pnl.debtService).toBeUndefined();
+  });
+
+  it("save/reload resumes mid-loan: interest keeps accruing identically", () => {
+    const original = lend({ creditDailyRate: 0.01 });
+    original.sim.run(TICKS_PER_DAY * 10);
+    const json = snapshotToJSON(original.sim.serialize());
+
+    const loaded = lend({ seed: 42, creditDailyRate: 0.01 });
+    loaded.sim.restore(snapshotFromJSON(json));
+    expect(loaded.world.serialize()).toEqual(original.world.serialize());
+
+    original.sim.run(TICKS_PER_DAY * 10);
+    loaded.sim.run(TICKS_PER_DAY * 10);
+    expect(loaded.world.serialize()).toEqual(original.world.serialize());
+  });
+});
