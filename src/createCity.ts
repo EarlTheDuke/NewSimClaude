@@ -166,6 +166,13 @@ export interface CitySimOptions extends CityOptions {
    * Engaged later via a tuning sweep; tests pass a rate to exercise accrual.
    */
   creditDailyRate?: number;
+  /**
+   * Daily yield the Bank pays on a firm's idle cash (Initiative C / Phase 18i) — the `bank→saver`
+   * rate, so hoarded retained earnings aren't free net worth. Defaults to the live
+   * {@link CREDIT_SAVINGS_DAILY_RATE} (0 ⇒ no savings ⇒ byte-identical). The borrow−savings spread is
+   * the bank's margin.
+   */
+  creditSavingsRate?: number;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -297,7 +304,9 @@ export function createCity(options: CitySimOptions = {}): {
   // Credit/finance (Initiative C / Phase 18) runs between distribution and lifecycle, so a firm's
   // debt service is taken after its dividend is set but before solvency is judged. Inert at the
   // default (CREDIT_ENABLED off ⇒ no-op) ⇒ byte-identical. Slice 18a: a no-op stub.
-  sim.addSystem(new CreditSystem(world, options.creditEnabled, options.creditDailyRate));
+  sim.addSystem(
+    new CreditSystem(world, options.creditEnabled, options.creditDailyRate, options.creditSavingsRate),
+  );
 
   // Lifecycle runs after the economy, market, and any agents so it judges each
   // holder on the fully-settled day: bankruptcy off true end-of-day cash, and

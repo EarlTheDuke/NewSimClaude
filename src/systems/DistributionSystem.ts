@@ -5,7 +5,6 @@ import { ARCHETYPES } from "../world/archetypes";
 import {
   LANDLORD_RESERVE,
   BUSINESS_RESERVE,
-  BANK_RESERVE,
   CREDIT_ENABLED,
   CREDIT_DAILY_INTEREST_RATE,
   PROFIT_DISTRIBUTION_CAP,
@@ -66,12 +65,12 @@ export class DistributionSystem implements System {
     const residents = this.world.residents;
     if (residents.length === 0) return;
     for (const biz of this.world.businesses) {
-      if (!biz.active) continue;
-      const reserve = ARCHETYPES[biz.kind].bank
-        ? BANK_RESERVE // the bank keeps its lending float — not swept to the ordinary reserve
-        : ARCHETYPES[biz.kind].collectsRent
-          ? LANDLORD_RESERVE
-          : BUSINESS_RESERVE;
+      // The Bank (Phase 18) retains its capital — a financial holder doesn't pay a daily dividend
+      // (and so its interest income isn't siphoned to an owner, R8), and it keeps a float to lend +
+      // pay savings interest. Skipped entirely; only ever present under `includeBank` (opt-in), so
+      // the default seven-business city is byte-identical.
+      if (!biz.active || ARCHETYPES[biz.kind].bank) continue;
+      const reserve = ARCHETYPES[biz.kind].collectsRent ? LANDLORD_RESERVE : BUSINESS_RESERVE;
       // Phase 16 — the firm pays out only `payoutRate` of its capped surplus; the
       // rest is retained as cash to reinvest. Default 1.0 ⇒ full distribution,
       // byte-identical to pre-Phase-16.

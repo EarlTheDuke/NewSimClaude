@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createCity } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "../utils/serialization";
-import { BANK_SEED_CASH, BANKRUPT_GRACE_DAYS } from "./constants";
+import { BANK_SEED_CASH, BANKRUPT_GRACE_DAYS, BUSINESS_RESERVE, BANK_RESERVE } from "./constants";
 import type {
   BusinessDecision,
   BusinessObservation,
@@ -569,4 +569,68 @@ describe("CreditSystem — engaged with the rules brain (Phase 18h)", () => {
     loaded.sim.run(TICKS_PER_DAY * 40);
     expect(loaded.world.serialize()).toEqual(original.world.serialize());
   }, 120_000);
+});
+
+/**
+ * Phase 18i — optional savings interest (doubly dormant: needs credit on AND a positive savings
+ * rate). The Bank pays a daily yield on a firm's idle cash, funded from its own above-reserve float,
+ * so retained earnings carry a cost-of-carry (the borrow−savings spread). Conserving; rate 0 ⇒ no-op.
+ */
+describe("CreditSystem — savings interest (Phase 18i)", () => {
+  /** A non-trading farm holding idle cash (so its only cash change is the yield) + a capitalised bank. */
+  function saverCity(creditSavingsRate: number) {
+    const c = createCity({ seed: 1, includeBank: true, creditEnabled: true, creditSavingsRate, businessEntry: false });
+    const farm = c.world.getBusiness("biz_farm")!;
+    for (const id of farm.employeeIds) {
+      const w = c.world.getResident(id);
+      if (w) { w.jobId = ""; w.wagePerTick = 0; }
+    }
+    farm.employeeIds = []; // no crew/stock ⇒ no production, no trading
+    farm.resources = {};
+    farm.payoutRate = 0; // retain ⇒ distribution won't sweep its idle cash
+    farm.cash = 10_000; // idle cash above its reserve
+    const bank = c.world.getBusiness("biz_bank")!;
+    bank.cash = 50_000; // capitalised (the bank now retains, not swept) so it can pay savings
+    return { c, farm, bank };
+  }
+
+  it("pays a daily yield on idle cash; the depositor's gain == the bank's drop; conserved", () => {
+    const { c, farm, bank } = saverCity(0.01);
+    const start = c.world.totalMoney();
+    const farmBefore = farm.cash;
+    const bankBefore = bank.cash;
+
+    c.sim.run(TICKS_PER_DAY); // one day → savings
+
+    const savings = (10_000 - BUSINESS_RESERVE) * 0.01; // idle × rate
+    expect(farm.cash).toBeCloseTo(farmBefore + savings, 6); // the depositor's exact yield (the formula)
+    expect(bank.cash).toBeLessThan(bankBefore); // the bank funded the yield (to the farm + any other savers)
+    expect(c.world.totalMoney()).toBeCloseTo(start, 6); // every cent the bank paid landed in a saver
+
+  });
+
+  it("rate 0 ⇒ byte-identical (no yield paid)", () => {
+    const { c, farm } = saverCity(0);
+    const farmBefore = farm.cash;
+    c.sim.run(TICKS_PER_DAY);
+    expect(farm.cash).toBe(farmBefore); // non-trading + no savings ⇒ unchanged
+  });
+
+  it("never pays below the bank's reserve", () => {
+    const { c, farm, bank } = saverCity(0.01);
+    bank.cash = BANK_RESERVE; // at its reserve ⇒ nothing above to pay
+    const farmBefore = farm.cash;
+    c.sim.run(TICKS_PER_DAY);
+    expect(bank.cash).toBeGreaterThanOrEqual(BANK_RESERVE);
+    expect(farm.cash).toBe(farmBefore); // no yield paid
+  });
+
+  it("is deterministic with savings", () => {
+    const run = () => {
+      const { c } = saverCity(0.01);
+      c.sim.run(TICKS_PER_DAY * 5);
+      return c.world.serialize();
+    };
+    expect(run()).toEqual(run());
+  });
 });
