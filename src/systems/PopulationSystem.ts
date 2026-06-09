@@ -4,7 +4,7 @@ import type { World } from "../world/World";
 import type { Resident, ResidentOrigin } from "../world/types";
 import { cheapestVacantHome, occupantsByHome } from "../world/housing";
 import { scheduleFor, FIRST_NAMES } from "../world/cityGen";
-import { desiredHeadcount } from "../world/archetypes";
+import { ARCHETYPES, desiredHeadcount } from "../world/archetypes";
 import {
   POPULATION_GROWTH,
   IN_MIGRATION_COOLDOWN_DAYS,
@@ -225,7 +225,7 @@ export class PopulationSystem implements System {
     if (day - this.lastBuildDay < this.buildCooldownDays) return;
     const landlord = this.world.getBusiness("biz_landlord");
     if (!landlord || landlord.cash - HOME_BUILD_COST < HOME_BUILD_RESERVE) return;
-    const factory = this.world.businesses.find((b) => b.kind === "factory" && b.active);
+    const factory = this.world.businesses.find((b) => ARCHETYPES[b.kind].capitalGoodsVendor && b.active);
     if (!factory) return; // no materials supplier — can't build this cycle
 
     this.world.transfer(landlord.id, factory.id, HOME_BUILD_COST); // pay for materials (conserved)

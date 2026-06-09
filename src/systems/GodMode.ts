@@ -4,6 +4,7 @@ import { SeededRNG } from "../utils/rng";
 import type { MarketSystem } from "./MarketSystem";
 import type { EventSystem } from "./EventSystem";
 import { DISASTERS, type DisasterKind } from "./disasters";
+import { ARCHETYPES } from "../world/archetypes";
 import { GODMODE_LOG_SIZE, PRICE_MAX_MULT } from "./constants";
 
 /**
@@ -107,7 +108,7 @@ export class GodMode {
 
     let needy: typeof landlord | undefined;
     for (const b of this.world.businesses) {
-      if (!b.active || b.kind === "landlord") continue;
+      if (!b.active || ARCHETYPES[b.kind].collectsRent) continue;
       if (!needy || b.cash < needy.cash) needy = b;
     }
     if (!needy) return null;

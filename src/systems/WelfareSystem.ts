@@ -1,6 +1,7 @@
 import type { System, SystemContext } from "../core/types";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import type { World } from "../world/World";
+import { ARCHETYPES } from "../world/archetypes";
 import {
   BUSINESS_RESERVE,
   LANDLORD_RESERVE,
@@ -70,7 +71,7 @@ export class WelfareSystem implements System {
       .filter((b) => b.active)
       .map((b) => ({
         b,
-        headroom: Math.max(0, b.cash - (b.kind === "landlord" ? LANDLORD_RESERVE : BUSINESS_RESERVE)),
+        headroom: Math.max(0, b.cash - (ARCHETYPES[b.kind].collectsRent ? LANDLORD_RESERVE : BUSINESS_RESERVE)),
       }))
       .filter((c) => c.headroom > 0);
     const totalHeadroom = contributors.reduce((s, c) => s + c.headroom, 0);

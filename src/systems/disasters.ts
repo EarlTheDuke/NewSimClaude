@@ -2,6 +2,7 @@ import type { World } from "../world/World";
 import type { ResourceKind } from "../world/types";
 import type { SeededRNG } from "../utils/rng";
 import type { MarketSystem } from "./MarketSystem";
+import { ARCHETYPES } from "../world/archetypes";
 import { PRICE_MAX_MULT, LANDLORD_RESERVE, GRANT_AMOUNT } from "./constants";
 
 /**
@@ -169,7 +170,7 @@ const grant: DisasterDef = {
 
     let needy: typeof landlord | undefined;
     for (const b of world.businesses) {
-      if (!b.active || b.kind === "landlord") continue;
+      if (!b.active || ARCHETYPES[b.kind].collectsRent) continue;
       if (!needy || b.cash < needy.cash) needy = b;
     }
     if (!needy) return null;

@@ -122,9 +122,14 @@ must dismantle **both**:
   suite stayed byte-identical (404 total green). *Deferred:* `RETAIL_REFERENCE_PRICE` and the
   renderer's color map fold into the registry in 4b/4c (they reference `DINER_MEAL_PRICE`/presentation,
   so moving them cleanly belongs with the capability-flag step — kept out of 4a to avoid an import cycle).
-- **4b — Capability flags replace identity special-cases (pure refactor).** Add role flags to
-  `Archetype` (`collectsRent`/rentier, `capitalGoodsVendor`; reuse `sellsToResidents`). Rewrite the
-  `kind === "landlord"|"diner"|"goods"|"factory"` sites to read the flag. Byte-identical.
+- **✅ 4b — Capability flags replace identity special-cases (pure refactor) · SHIPPED.** Added
+  `collectsRent` (rentier) and `capitalGoodsVendor` to the registry/`Archetype`, and rewrote all
+  seven sim-core identity checks to read the role, not the name: `kind === "landlord"` →
+  `collectsRent` (Distribution + Welfare reserve, disasters + GodMode skip), `kind === "diner"||"goods"`
+  → `sellsToResidents` (Economy business rent), `kind === "factory"` → `capitalGoodsVendor`
+  (BusinessAgent invest target + Population build-materials supplier). Byte-identical (404 green).
+  *Out of scope (noted):* the two `o.kind` checks in `RuleBasedProvider` (brain heuristics behind the
+  decision seam, not economic invariants) and the singleton `getBusiness("biz_landlord")` id lookups.
 - **4c — Dynamic resource maps in `MarketSystem`.** Replace the hardcoded `RESOURCES` array and
   `prices`/`sold` literals with registry-derived maps over *all* registered resources (stable array
   order — no object-key iteration). Byte-identical for the seeded four.

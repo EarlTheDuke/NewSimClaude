@@ -32,6 +32,10 @@ export interface Archetype {
   sellsToResidents: boolean;
   target: number;
   maxPerDay: number;
+  /** Rentier role (slice 4b) — collects rent, no production, larger reserve, disaster-spared. */
+  collectsRent?: boolean;
+  /** Capital-goods / construction-materials vendor (slice 4b) — sells equipment + build materials. */
+  capitalGoodsVendor?: boolean;
 }
 
 export const ARCHETYPES = Object.fromEntries(
@@ -43,6 +47,8 @@ export const ARCHETYPES = Object.fromEntries(
       sellsToResidents: d.sellsToResidents,
       target: d.target,
       maxPerDay: d.maxPerDay,
+      collectsRent: d.collectsRent,
+      capitalGoodsVendor: d.capitalGoodsVendor,
     } satisfies Archetype,
   ]),
 ) as Record<BusinessKind, Archetype>;

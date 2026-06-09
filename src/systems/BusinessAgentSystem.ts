@@ -191,7 +191,7 @@ export class BusinessAgentSystem implements System {
     // The capital-goods seller is whatever factory is currently active — found by
     // kind, not a fixed id, so a respawned factory (Phase 15 D) still takes the
     // payment. No active factory means no one to buy equipment from this review.
-    const factory = this.world.businesses.find((b) => b.active && b.kind === "factory");
+    const factory = this.world.businesses.find((b) => b.active && ARCHETYPES[b.kind].capitalGoodsVendor);
     if (!factory) return 0;
     const moved = this.world.transfer(biz.id, factory.id, want);
     if (moved <= 0) return 0;

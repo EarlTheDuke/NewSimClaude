@@ -28,6 +28,17 @@ export interface IndustryDef {
   target: number;
   /** Hard per-day production / restock ceiling. */
   maxPerDay: number;
+  /**
+   * Rentier role (Initiative #2 slice 4b) — collects rent, runs no production, holds a larger
+   * cash reserve, and is spared physical disasters (it has no premises stock to burn). Replaces
+   * the scattered `kind === "landlord"` identity checks: logic keys off the role, not the name.
+   */
+  collectsRent?: boolean;
+  /**
+   * Capital-goods / construction-materials vendor (slice 4b) — the firm that sells equipment to
+   * investing firms and materials for home-building. Replaces the `kind === "factory"` lookups.
+   */
+  capitalGoodsVendor?: boolean;
 }
 
 /**
@@ -40,10 +51,10 @@ export const INDUSTRY_REGISTRY: readonly IndustryDef[] = [
   { kind: "farm", produces: "grain", sellsToResidents: false, target: 50, maxPerDay: 36 },
   { kind: "mine", produces: "materials", sellsToResidents: false, target: 24, maxPerDay: 22 },
   { kind: "bakery", consumes: "grain", produces: "food", sellsToResidents: false, target: 40, maxPerDay: 35 },
-  { kind: "factory", consumes: "materials", produces: "wares", sellsToResidents: false, target: 24, maxPerDay: 22 },
+  { kind: "factory", consumes: "materials", produces: "wares", sellsToResidents: false, target: 24, maxPerDay: 22, capitalGoodsVendor: true },
   { kind: "diner", consumes: "food", sellsToResidents: true, target: 40, maxPerDay: 34 },
   { kind: "goods", consumes: "wares", sellsToResidents: true, target: 24, maxPerDay: 21 },
-  { kind: "landlord", sellsToResidents: false, target: 0, maxPerDay: 0 },
+  { kind: "landlord", sellsToResidents: false, target: 0, maxPerDay: 0, collectsRent: true },
 ];
 
 /** A tradeable intermediate good and its starting B2B price ($/unit) — source for {@link BASE_RESOURCE_PRICE}. */

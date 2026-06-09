@@ -32,17 +32,21 @@ describe("industry registry (slice 4a)", () => {
         sellsToResidents: d.sellsToResidents,
         target: d.target,
         maxPerDay: d.maxPerDay,
+        collectsRent: d.collectsRent,
+        capitalGoodsVendor: d.capitalGoodsVendor,
       });
     }
   });
 
-  it("pins the seeded archetype values (the byte-identity anchor)", () => {
+  it("pins the seeded archetype values + role flags (the byte-identity anchor)", () => {
     expect(ARCHETYPES.bakery).toEqual({
       consumes: "grain",
       produces: "food",
       sellsToResidents: false,
       target: 40,
       maxPerDay: 35,
+      collectsRent: undefined,
+      capitalGoodsVendor: undefined,
     });
     expect(ARCHETYPES.diner).toEqual({
       consumes: "food",
@@ -50,14 +54,14 @@ describe("industry registry (slice 4a)", () => {
       sellsToResidents: true,
       target: 40,
       maxPerDay: 34,
+      collectsRent: undefined,
+      capitalGoodsVendor: undefined,
     });
-    expect(ARCHETYPES.landlord).toEqual({
-      consumes: undefined,
-      produces: undefined,
-      sellsToResidents: false,
-      target: 0,
-      maxPerDay: 0,
-    });
+    // The two role flags land only where they should — the rentier and the capital-goods vendor.
+    expect(ARCHETYPES.landlord.collectsRent).toBe(true);
+    expect(ARCHETYPES.factory.capitalGoodsVendor).toBe(true);
+    expect(INDUSTRY_REGISTRY.filter((d) => d.collectsRent).map((d) => d.kind)).toEqual(["landlord"]);
+    expect(INDUSTRY_REGISTRY.filter((d) => d.capitalGoodsVendor).map((d) => d.kind)).toEqual(["factory"]);
   });
 
   it("derives PRODUCER_OF as each resource's producing kind at its canonical seed id", () => {

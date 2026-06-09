@@ -2,6 +2,7 @@ import type { System, SystemContext } from "../core/types";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
 import type { World } from "../world/World";
 import type { Business, BusinessKind, Resident } from "../world/types";
+import { ARCHETYPES } from "../world/archetypes";
 import {
   RENT_PER_DAY,
   BUSINESS_RENT_PER_DAY,
@@ -170,7 +171,7 @@ export class EconomySystem implements System {
       resident.rentMissedDays = paid + 1e-9 < rent ? (resident.rentMissedDays ?? 0) + 1 : 0;
     }
     for (const biz of this.world.businesses) {
-      if (biz.kind === "diner" || biz.kind === "goods") {
+      if (ARCHETYPES[biz.kind].sellsToResidents) {
         const paid = this.world.transfer(biz.id, landlord.id, BUSINESS_RENT_PER_DAY);
         landlord.pnl.rentCollected += paid;
       }
