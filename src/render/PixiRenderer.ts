@@ -49,6 +49,12 @@ interface BuildingView {
   workers: Container; // staff-count figures
   label: Text;
   selOutline: Graphics;
+  /** R3-4 silhouette parts — white shapes tinted to their colour × ambient each frame. */
+  decoParts: { g: Graphics; rgb: Rgb }[];
+  deco: Container;
+  /** R3-6 posted-wage placard, shown while the firm bids above its base wage. */
+  wageTag: Text;
+  lastWage: string;
 }
 
 // Life-stage styling (HP3) — purely visual thresholds so the age structure reads at
@@ -583,12 +589,146 @@ export class PixiRenderer implements CityRenderer {
       workers.addChild(wd);
     }
 
-    container.addChild(glow, base, windows, mask, planks, bar, workers, label, selOutline);
+    // R3-4 — the building's identity: a per-kind silhouette (the port's dock + boat, the
+    // bank's columns, the mint's coin, the factory chimney…), built once in white and
+    // tinted to its colour × ambient each frame. Homes and unknown kinds get none.
+    const deco = new Container();
+    const bizHere = this.world.businesses.find((b) => b.locationId === loc.id);
+    const decoParts = bizHere ? this.buildDeco(deco, bizHere.kind, half) : [];
+
+    // R3-6 — the posted-wage placard: visible while the firm bids above its base wage,
+    // so the labour war is readable on the map instead of buried in the ticker.
+    const wageTag = new Text({
+      text: "",
+      style: {
+        fontFamily: "system-ui, sans-serif",
+        fontSize: 9,
+        fontWeight: "bold",
+        fill: 0xffe09a,
+        stroke: { color: 0x0e1116, width: 3 },
+      },
+    });
+    wageTag.anchor.set(0.5, 1);
+    wageTag.position.set(0, -half - 9);
+    wageTag.visible = false;
+
+    container.addChild(glow, base, windows, mask, planks, deco, bar, workers, label, wageTag, selOutline);
     this.buildingsLayer?.addChild(container);
 
-    const view: BuildingView = { container, glow, base, windows, planks, bar, fill, workers, label, selOutline };
+    const view: BuildingView = {
+      container,
+      glow,
+      base,
+      windows,
+      planks,
+      bar,
+      fill,
+      workers,
+      label,
+      selOutline,
+      decoParts,
+      deco,
+      wageTag,
+      lastWage: "",
+    };
     this.buildingViews.set(loc.id, view);
     return view;
+  }
+
+  /**
+   * R3-4 — build a kind's silhouette into `deco` and return its tintable parts. Small,
+   * legible shapes anchored to the 26px box: civic trio first (the C4 story buildings),
+   * then the seeded seven. White geometry; the caller tints colour × ambient per frame.
+   */
+  private buildDeco(deco: Container, kind: string, half: number): { g: Graphics; rgb: Rgb }[] {
+    const parts: { g: Graphics; rgb: Rgb }[] = [];
+    const add = (rgb: Rgb, build: (g: Graphics) => void): void => {
+      const g = new Graphics();
+      build(g);
+      deco.addChild(g);
+      parts.push({ g, rgb });
+    };
+    switch (kind) {
+      case "port": {
+        // The dock: a water patch off the right gable, pier planks reaching to a moored
+        // boat — hull, mast, and a little sail. Boom Town's front door, no longer a box.
+        add([46, 89, 134], (g) => g.ellipse(half + 13, 6, 13, 7).fill(0xffffff)); // harbour water
+        add([122, 88, 50], (g) => {
+          for (let i = 0; i < 3; i++) g.rect(half - 1, 1 + i * 4, 9 + i * 2, 2).fill(0xffffff); // pier planks
+        });
+        add([140, 60, 48], (g) =>
+          g.poly([half + 8, 6, half + 20, 6, half + 17, 10, half + 11, 10]).fill(0xffffff),
+        ); // hull
+        add([200, 200, 210], (g) => {
+          g.rect(half + 13, -4, 1.4, 10).fill(0xffffff); // mast
+          g.poly([half + 14.5, -4, half + 20, 1, half + 14.5, 1]).fill(0xffffff); // sail
+        });
+        break;
+      }
+      case "bank": {
+        add([214, 205, 182], (g) => {
+          g.poly([-half - 2, -half, half + 2, -half, 0, -half - 8]).fill(0xffffff); // pediment
+          for (const cx of [-7, 0, 7]) g.rect(cx - 1.5, -4, 3, half + 2).fill(0xffffff); // columns
+        });
+        break;
+      }
+      case "authority": {
+        // The mint: a pediment like the bank's plus a coin face — the printing press's home.
+        add([214, 205, 182], (g) => g.poly([-half - 2, -half, half + 2, -half, 0, -half - 8]).fill(0xffffff));
+        add([212, 175, 55], (g) => {
+          g.circle(0, 2, 6).fill(0xffffff);
+          g.circle(0, 2, 6).stroke({ width: 1, color: 0x0e1116, alpha: 0.6 });
+          g.rect(-1, -1, 2, 6).fill({ color: 0x0e1116, alpha: 0.6 }); // the $ bar of the coin
+        });
+        break;
+      }
+      case "factory": {
+        add([90, 70, 110], (g) => {
+          g.rect(half - 9, -half - 9, 5, 10).fill(0xffffff); // chimney above the roofline
+          g.rect(half - 10, -half - 11, 7, 2.5).fill(0xffffff); // crown
+        });
+        break;
+      }
+      case "mine": {
+        add([150, 130, 90], (g) => {
+          g.moveTo(-8, -half + 2).lineTo(0, -half - 9).stroke({ width: 2, color: 0xffffff }); // pithead A-frame
+          g.moveTo(8, -half + 2).lineTo(0, -half - 9).stroke({ width: 2, color: 0xffffff });
+          g.circle(0, -half - 9, 2.5).stroke({ width: 1.5, color: 0xffffff }); // the wheel
+        });
+        break;
+      }
+      case "farm":
+      case "orchard": {
+        add([95, 150, 70], (g) => {
+          for (let i = 0; i < 3; i++) {
+            g.moveTo(-half - 12, -2 + i * 5).lineTo(-half - 2, -2 + i * 5).stroke({ width: 2, color: 0xffffff }); // field rows
+          }
+        });
+        break;
+      }
+      case "bakery": {
+        add([205, 140, 90], (g) => {
+          for (let i = 0; i < 4; i++) g.rect(-half + 1 + i * 6.5, -half - 3, 4.5, 4).fill(0xffffff); // striped awning
+        });
+        break;
+      }
+      case "diner": {
+        add([220, 90, 80], (g) => {
+          g.rect(half - 2, -half - 7, 1.5, 7).fill(0xffffff); // sign post
+          g.circle(half - 1, -half - 9, 3.5).fill(0xffffff); // the diner sign
+        });
+        break;
+      }
+      case "goods": {
+        add([90, 140, 210], (g) => {
+          g.rect(-half + 2, -half - 5, 12, 4).fill(0xffffff); // shop fascia board
+        });
+        break;
+      }
+      default:
+        break; // landlord, bank-less homes, unknown data-driven kinds: the plain box stands
+    }
+    return parts;
   }
 
   private updateBuildingView(
@@ -606,6 +746,7 @@ export class PixiRenderer implements CityRenderer {
       v.planks.tint = dimInt(PLANK_RGB, a);
       v.planks.visible = true;
       v.windows.visible = false;
+      v.deco.visible = false; // a shuttered firm loses its dressing — just boards
     } else {
       const baseRgb = biz ? BUSINESS_RGB[biz.kind] ?? BUSINESS_RGB_DEFAULT : HOME_RGB;
       v.base.tint = dimInt(baseRgb, a);
@@ -631,6 +772,11 @@ export class PixiRenderer implements CityRenderer {
     }
     v.label.tint = dimInt(LABEL_RGB, Math.max(a, 0.7));
     v.selOutline.visible = isSelected;
+    // R3-4 — silhouette parts follow the daylight like the building itself.
+    if (!(biz && !biz.active)) {
+      v.deco.visible = true;
+      for (const p of v.decoParts) p.g.tint = dimInt(p.rgb, a);
+    }
     // Visual economic state (R3): prosperity glow (capital), inventory bar, worker
     // figures (headcount) — active firms only; homes + shuttered show none.
     if (biz && biz.active) {
@@ -644,12 +790,25 @@ export class PixiRenderer implements CityRenderer {
       v.workers.children.forEach((c, i) => {
         c.visible = i < crew;
       });
+      // R3-6 — the posted-wage placard: shown while the firm bids above its base wage,
+      // so a labour war reads on the map (rival placards leapfrogging each other).
+      const baseWage = biz.baseWagePerTick ?? biz.wagePerTick;
+      const bidding = baseWage > 0 && biz.wagePerTick > baseWage * 1.02;
+      if (bidding) {
+        const tag = `$${biz.wagePerTick.toFixed(2)}/t`;
+        if (tag !== v.lastWage) {
+          v.wageTag.text = tag;
+          v.lastWage = tag;
+        }
+      }
+      v.wageTag.visible = bidding;
     } else {
       v.glow.visible = false;
       v.bar.visible = false;
       v.workers.children.forEach((c) => {
         c.visible = false;
       });
+      v.wageTag.visible = false;
     }
   }
 
