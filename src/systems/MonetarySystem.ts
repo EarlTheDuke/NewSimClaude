@@ -36,10 +36,27 @@ export class MonetarySystem implements System {
     /** Whether the press is live; defaults to {@link MONETARY_ENABLED} (off ⇒ inert). */
     private readonly enabled: boolean = MONETARY_ENABLED,
     /** Daily supply growth, as a fraction of the current total; defaults to {@link MONETARY_DAILY_GROWTH_RATE} (0 ⇒ inert). */
-    private readonly rate: number = MONETARY_DAILY_GROWTH_RATE,
+    private rate: number = MONETARY_DAILY_GROWTH_RATE,
     /** Hard $/day mint ceiling; defaults to {@link MONETARY_DAILY_MINT_CAP} (0 ⇒ inert — the bound must be set deliberately). */
-    private readonly cap: number = MONETARY_DAILY_MINT_CAP,
+    private cap: number = MONETARY_DAILY_MINT_CAP,
   ) {}
+
+  /**
+   * God's monetary lever (the live view's policy panel / dev handle): change the k-percent rule
+   * mid-run without rebuilding the world — a deliberate intervention, like a GodMode strike.
+   * Headless runs, tests, and the bench never call this, so their constructor policy stands; the
+   * audited mint doorway (and the `enabled` master gate) is unchanged. Real-world: the central
+   * bank announcing a new money-growth target.
+   */
+  setPolicy(rate: number, cap: number): void {
+    this.rate = rate;
+    this.cap = cap;
+  }
+
+  /** The current policy rule, for HUD display. */
+  policy(): { rate: number; cap: number } {
+    return { rate: this.rate, cap: this.cap };
+  }
 
   update(ctx: SystemContext): void {
     if (!this.enabled || ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;

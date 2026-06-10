@@ -217,6 +217,26 @@ describe("MonetarySystem — the authority + the k-percent rule (C4 slice b2)", 
     expect(plain.macro.latest()!.minted).toBe(0);
   });
 
+  it("setPolicy flips the press mid-run (God's live lever): inert at 0/0, minting after, inert again", () => {
+    const { sim, world } = createCity({ seed: 1, includeAuthority: true, monetaryEnabled: true });
+    const monetary = sim.getSystem<import("./MonetarySystem").MonetarySystem>("monetary")!;
+    const genesis = world.totalMoney();
+
+    sim.run(TICKS_PER_DAY * 5); // armed but rate 0 / cap 0 ⇒ strictly conserved
+    expect(world.mintedTotal()).toBe(0);
+
+    monetary.setPolicy(RATE, 1_000_000); // God announces a money-growth target
+    sim.run(TICKS_PER_DAY * 5);
+    const mintedWhileOn = world.mintedTotal();
+    expect(mintedWhileOn).toBeGreaterThan(0);
+    expect(monetary.policy()).toEqual({ rate: RATE, cap: 1_000_000 });
+
+    monetary.setPolicy(0, 0); // ...and turns the press back off
+    sim.run(TICKS_PER_DAY * 5);
+    expect(world.mintedTotal()).toBe(mintedWhileOn); // not a cent more
+    expect(world.totalMoney()).toBeCloseTo(genesis + mintedWhileOn, 6); // audit holds throughout
+  });
+
   it("is deterministic and round-trips mid-policy: ledger, wallets, and macro all survive save/load", () => {
     const run = () => {
       const c = engaged(7);

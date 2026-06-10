@@ -1,5 +1,12 @@
 import "./style.css";
 import { createCity, type BrainOption, type ResidentBrainOption } from "./createCity";
+import { RuleBasedResidentProvider } from "./ai/RuleBasedResidentProvider";
+import type {
+  ResidentDecision,
+  ResidentDecisionProvider,
+  ResidentDecisionRequest,
+} from "./ai/residentTypes";
+import type { MonetarySystem } from "./systems/MonetarySystem";
 import { SPEED_OPTIONS, type SpeedMultiplier } from "./core/TimeSystem";
 import { snapshotToJSON, snapshotFromJSON } from "./utils/serialization";
 import { CanvasRenderer, type Pick, type DisasterMarker, type ThoughtBubble, type MapToast } from "./render/CanvasRenderer";
@@ -23,9 +30,39 @@ const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
 
-const SAVE_KEY = "cwlc.save.v1";
+// ── Scenario seam — "?scenario=boom" loads Boom Town (Phase 9 Arc 3, live) ──────────────
+// The C4 playthrough city, watchable: the Harbor Port trades from day one, the City Reserve
+// stands dormant until God sets a policy (dev handle → monetary.setPolicy), and Joy (res_9)
+// is PLAYED rather than ruled — her moves are queued via window.cwlc.joy.queue, and she
+// stands pat between them. Every other resident lives on the rules mind, newcomers included.
+// No param ⇒ the default demo below, byte-for-byte as before.
+const boom = new URLSearchParams(location.search).get("scenario") === "boom";
+
+const SAVE_KEY = boom ? "cwlc.save.boom.v1" : "cwlc.save.v1"; // scenario-scoped, so saves never cross worlds
 const WIDTH = 640;
 const HEIGHT = 480;
+
+/**
+ * The Boom Town resident mind: the whole town runs on the deterministic rules — except the
+ * avatar, who is played live. Queued decisions apply one per daily review (the play-harness
+ * contract); an empty queue means Joy stands pat, because her life belongs to her player.
+ */
+class JoyAndTheTown implements ResidentDecisionProvider {
+  readonly id = "claude-joy";
+  private readonly rules = new RuleBasedResidentProvider();
+  private readonly queued: ResidentDecision[] = [];
+  constructor(private readonly avatar: string) {}
+  /** Queue Joy's next move (applied at the next day boundary). Returns the queue depth. */
+  queue(action: ResidentDecision["action"], reason: string): number {
+    this.queued.push({ action, reason });
+    return this.queued.length;
+  }
+  decide(req: ResidentDecisionRequest): ResidentDecision | Promise<ResidentDecision> {
+    if (req.observation.residentId !== this.avatar) return this.rules.decide(req);
+    return this.queued.shift() ?? { action: {}, reason: "Living the day as it comes." };
+  }
+}
+const joyMind = boom ? new JoyAndTheTown("res_9") : undefined;
 
 // The businesses run on the deterministic rule-based brain by default — fully
 // watchable, zero-config. To run them on Claude instead, swap in the provider:
@@ -55,7 +92,51 @@ const agenticResidentIds = "all" as const;
 // is the watchable AI city economy the project is for; the decision traces narrate
 // every move. (Set agenticBusinessIds back to just the storefronts for the calmer,
 // pre-Phase-15 view.)
-const { sim, world, market, macro, agent, residentAgent, events, god, population, welfare } = createCity({
+const { sim, world, market, macro, agent, residentAgent, events, god, population, welfare } = createCity(
+  boom
+    ? {
+        // ── BOOM TOWN (?scenario=boom) — Phase 9 Arc 3, live and watchable ──────────────
+        // The whole verified free-market program + the C4 money fork: the Harbor Port trades
+        // from day one (its $20k reserve is the finite foreign demand battery), credit and
+        // competition run hot, the town can grow — and unlike the headless arc, EVERY
+        // resident is agentic, so the labour market can carry the boom to the street (the
+        // P11-4 contrast, played out on screen). The City Reserve is seeded and ARMED
+        // (monetaryEnabled) but inert at rate 0 / cap 0 — God flips the press live via
+        // cwlc.monetary.setPolicy(rate, cap). Joy (res_9) is the player's avatar.
+        seed: 9,
+        brain,
+        residentBrain: joyMind!,
+        agenticResidentIds: "all",
+        agenticBusinessIds: [
+          "biz_diner",
+          "biz_diner_2",
+          "biz_goods",
+          "biz_farm",
+          "biz_mine",
+          "biz_bakery",
+          "biz_factory",
+        ],
+        secondDiner: true,
+        disasters: true,
+        populationGrowth: true,
+        populationOptions: { births: true, mortality: true, construction: true, dynamicRent: true },
+        wageCapMult: 8,
+        welfareRatio: 0.5,
+        welfareSubsistence: 2,
+        dividendWean: 0.5,
+        producerCompetition: 2,
+        labourCompetition: true,
+        opportunityEntry: true,
+        includeBank: true,
+        creditEnabled: true,
+        creditDailyRate: 0.003,
+        creditMaxPrincipal: 4000,
+        includePort: true,
+        tradeEnabled: true,
+        includeAuthority: true,
+        monetaryEnabled: true, // armed; rate 0 + cap 0 keep it inert until God sets a policy
+      }
+    : {
   seed: 1,
   brain,
   residentBrain,
@@ -121,11 +202,12 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
   extraIndustries: [
     { kind: "orchard" as BusinessKind, produces: "grain", sellsToResidents: false, target: 50, maxPerDay: 36 },
   ],
-});
+      },
+);
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>NewSimClaude — Free-Market Economy <span class="hint">· free wage + welfare + business entry + new industry (port 5174)</span></h1>
+  <h1>NewSimClaude — ${boom ? "BOOM TOWN <span class=\"hint\">· Arc 3 live: the harbor trades, the City Reserve waits, and Joy is played (seed 9, port 5174)</span>" : "Free-Market Economy <span class=\"hint\">· free wage + welfare + business entry + new industry (port 5174)</span>"}</h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
@@ -711,6 +793,20 @@ function renderMacro(): void {
       vitalCard("Inequality (Gini)", latest.gini.toFixed(2), history.map((s) => s.gini), "#db6d28"),
       vitalCard("Velocity", latest.velocity.toFixed(2), history.map((s) => s.velocity), "#3fb950"),
       vitalCard("Welfare / day", money(welfareHistory[welfareHistory.length - 1] ?? 0), welfareHistory, "#ffa657"),
+      // C4 trade + money cards — live wherever a port/authority exists; 0-flat otherwise.
+      ...(boom
+        ? [
+            vitalCard("Exports / day", money(latest.exports), history.map((s) => s.exports), "#58d6ff"),
+            vitalCard("Imports / day", money(latest.imports), history.map((s) => s.imports), "#ff9e58"),
+            vitalCard(
+              "Port reserve",
+              money(world.getBusiness("biz_port")?.cash ?? 0),
+              history.map(() => world.getBusiness("biz_port")?.cash ?? 0),
+              "#7ee787",
+            ),
+            vitalCard("Minted / day", money(latest.minted), history.map((s) => s.minted), "#f778ba"),
+          ]
+        : []),
     ].join("");
   }
 
@@ -813,6 +909,11 @@ if (isDev) {
     population,
     renderFrame,
     renderer,
+    god,
+    welfare,
+    // Boom Town levers (undefined in the default demo): God's printing press + the played Joy.
+    monetary: sim.getSystem<MonetarySystem>("monetary"),
+    joy: joyMind,
   };
 }
 
