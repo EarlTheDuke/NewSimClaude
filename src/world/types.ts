@@ -319,4 +319,11 @@ export interface WorldSnapshot {
   locations: Location[];
   businesses: Business[];
   residents: Resident[];
+  /**
+   * The monetary audit ledger (Initiative C / C4 path b): cumulative money ever minted/burned via
+   * the audited {@link World.mint}/{@link World.burn} primitives. Present in the snapshot ONLY
+   * once non-zero — every strictly-conserved save (the default, the bench, all of history) omits
+   * it and is byte-identical. Restoring a snapshot without it reads as zeros.
+   */
+  monetary?: { minted: number; burned: number };
 }

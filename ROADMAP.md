@@ -7,9 +7,13 @@ against [NORTH-STAR.md](NORTH-STAR.md). Phases 0–8 are [MASTER-PLAN.md](MASTER
 
 ## Standing principles (hold for every phase)
 
-- **Money conserved to the cent** (only via `World.transfer`) and **deterministic from
-  seed + snapshot.** Breaking either is a bug, not a tradeoff. New subsystems that move
-  money (a bank, a treasury, a port) must be *conserving holders*, never mint/burn.
+- **Money conserved-and-audited to the cent** (only via `World.transfer`) and **deterministic
+  from seed + snapshot.** Breaking either is a bug, not a tradeoff. New subsystems that move
+  money (a bank, a treasury, a port) must be *conserving holders*, never mint/burn — with ONE
+  sanctioned exception (C4 path b, user-greenlit 2026-06-09): the monetary authority, which may
+  create/destroy money ONLY through the audited `World.mint`/`World.burn` primitives, so
+  `totalMoney() === genesis + minted − burned` holds to the cent. The default city and the CEO
+  bench never mint and stay strictly conserved.
 - **Ship flag-gated, default-OFF/no-op slices** (the 12a/13a/14a/15/16 pattern) — the
   brain-off baseline stays byte-identical until each slice is deliberately engaged.
 - **Realism in the world model; benchmark through curated scenarios that freeze most of

@@ -37,9 +37,14 @@ This file auto-loads every session in this repo. It is the operating manual; the
 ## Non-negotiable invariants (breaking one is a bug, not a tradeoff)
 - **Determinism is sacred.** Seeded RNG only; no `Math.random`, no wall-clock, no
   Set/Map iteration-order surprises. A run must reproduce exactly from its seed + snapshot.
-- **The economy is closed.** Money moves *only* through `World.transfer`. `world.totalMoney()`
-  is conserved to the cent across any number of ticks. Non-cash quantities (inventory,
-  capital) never touch the money invariant.
+- **The economy is conserved-and-audited.** Money moves *only* through `World.transfer` —
+  **except** the ONE sanctioned monetary authority (C4 path b, user-greenlit 2026-06-09): the
+  audited `World.mint`/`World.burn` primitives, which change the supply by exactly what they
+  log. The auditable invariant: `world.totalMoney() === genesis + mintedTotal() − burnedTotal()`
+  **to the cent across any number of ticks** — and the default city and the CEO bench never
+  mint/burn, so they stay *strictly* conserved (counters 0 ⇒ the old invariant verbatim). Any
+  OTHER change to the total is a bug, full stop. Non-cash quantities (inventory, capital) never
+  touch the money invariant.
 - **Every mind is behind the seam.** All AI decisions go through the model-agnostic
   `DecisionProvider` interface (rules / mock / Claude swap without touching the sim).
 - **Rendering only reads.** The view layer may never mutate simulation state.

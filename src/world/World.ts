@@ -9,11 +9,17 @@ import type {
 
 /**
  * The shared, mutable city state. Systems read and mutate it each tick; it
- * owns no behaviour beyond lookups, pathfinding, money transfer, and snapshot.
+ * owns no behaviour beyond lookups, pathfinding, money movement, and snapshot.
  *
  * Money is only ever moved with {@link transfer}, so the sum across all
  * residents and businesses is conserved — the closed economy the MVP is built
- * to demonstrate.
+ * to demonstrate. ONE sanctioned exception exists (Initiative C / C4 path b,
+ * the user's explicit 2026-06-09 decision): the audited {@link mint} /
+ * {@link burn} primitives, which change the supply by exactly what they log —
+ * so the invariant generalizes to `totalMoney() === genesis + mintedTotal() −
+ * burnedTotal()`, auditable to the cent. Nothing in the default city (or the
+ * CEO bench) ever calls them: with both counters at 0 the strict invariant is
+ * unchanged.
  */
 export class World {
   nodes: MapNode[] = [];
@@ -21,6 +27,11 @@ export class World {
   locations: Location[] = [];
   businesses: Business[] = [];
   residents: Resident[] = [];
+
+  /** Cumulative money created via {@link mint} (the audit ledger's credit side). */
+  private minted = 0;
+  /** Cumulative money destroyed via {@link burn} (the audit ledger's debit side). */
+  private burned = 0;
 
   private nodeById = new Map<string, MapNode>();
   private locationById = new Map<string, Location>();
@@ -141,7 +152,53 @@ export class World {
     throw new Error(`World.transfer: unknown money holder "${id}"`);
   }
 
-  /** Total money across residents + businesses — should be invariant. */
+  /**
+   * Create `amount` of NEW money at a holder (Initiative C / C4 path b) — the monetary
+   * authority's printing press, and the ONE sanctioned way money enters the world after genesis.
+   * Deliberately separate from {@link transfer}: a transfer moves existing money and cannot
+   * change the total; a mint changes the total by exactly what it logs into {@link mintedTotal},
+   * keeping `totalMoney() === genesis + minted − burned` auditable to the cent. Real-world: the
+   * central bank crediting an account with newly issued currency. Returns the amount minted.
+   * NEVER call this from ordinary economic code — only a monetary-policy system may.
+   */
+  mint(toId: string, amount: number): number {
+    if (amount <= 0) return 0;
+    const to = this.holderBalance(toId); // throws on an unknown holder — no minting into the void
+    to.set(to.get() + amount);
+    this.minted += amount;
+    return amount;
+  }
+
+  /**
+   * Destroy up to `amount` of money at a holder (C4 path b) — the printing press run in reverse,
+   * capped at the holder's balance so no balance ever goes negative. Logs into
+   * {@link burnedTotal}, preserving the audit identity. Real-world: the central bank retiring
+   * currency from circulation. Returns the amount actually burned.
+   */
+  burn(fromId: string, amount: number): number {
+    if (amount <= 0) return 0;
+    const from = this.holderBalance(fromId);
+    const burned = Math.min(amount, from.get());
+    if (burned <= 0) return 0;
+    from.set(from.get() - burned);
+    this.burned += burned;
+    return burned;
+  }
+
+  /** Cumulative money ever minted (0 in any strictly-conserved run). */
+  mintedTotal(): number {
+    return this.minted;
+  }
+
+  /** Cumulative money ever burned (0 in any strictly-conserved run). */
+  burnedTotal(): number {
+    return this.burned;
+  }
+
+  /**
+   * Total money across residents + businesses. Invariant: equals genesis in a strictly-conserved
+   * run, and `genesis + mintedTotal() − burnedTotal()` once a monetary authority operates.
+   */
   totalMoney(): number {
     let sum = 0;
     for (const r of this.residents) sum += r.money;
@@ -156,6 +213,11 @@ export class World {
       locations: this.locations,
       businesses: this.businesses,
       residents: this.residents,
+      // The monetary audit ledger rides in the snapshot ONLY once it is non-zero, so every
+      // strictly-conserved save (all of them, until path b is engaged) is byte-identical.
+      ...(this.minted > 0 || this.burned > 0
+        ? { monetary: { minted: this.minted, burned: this.burned } }
+        : {}),
     });
   }
 
@@ -166,6 +228,8 @@ export class World {
     this.locations = s.locations;
     this.businesses = s.businesses;
     this.residents = s.residents;
+    this.minted = s.monetary?.minted ?? 0; // pre-C4b saves carry no ledger ⇒ strictly conserved
+    this.burned = s.monetary?.burned ?? 0;
     this.reindex();
   }
 }
