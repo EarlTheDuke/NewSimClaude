@@ -6,7 +6,7 @@ import {
   formatCeoScorecard,
   ablationStudy,
 } from "./ceoBench";
-import { BENCH_START_CAPITAL, BENCH_TURNS, BENCH_TRADE_ENABLED } from "../systems/constants";
+import { BENCH_START_CAPITAL, BENCH_TURNS, BENCH_TRADE_ENABLED, BENCH_MONETARY_ENABLED } from "../systems/constants";
 
 const SEED = 9;
 
@@ -82,6 +82,16 @@ describe("CEO benchmark (Phase 10d)", () => {
       // BENCH_TRADE_ENABLED); this tripwire keeps the frozen constant from ever drifting on —
       // flipping the live TRADE_ENABLED must never move a historical scorecard.
       expect(BENCH_TRADE_ENABLED).toBe(false);
+    });
+  });
+
+  describe("monetary freeze (C4 slice b4)", () => {
+    it("the bench stays STRICTLY conserved: no authority, no minting, ever", () => {
+      // The structural pin lives in ceoBench.ts (includeAuthority: false, monetaryEnabled:
+      // BENCH_MONETARY_ENABLED); together with the "neither mints nor burns a dollar" assertion
+      // above, the bench keeps the ORIGINAL strict invariant even though the live world's was
+      // deliberately relaxed (C4b) — skill must never ride the money supply.
+      expect(BENCH_MONETARY_ENABLED).toBe(false);
     });
   });
 

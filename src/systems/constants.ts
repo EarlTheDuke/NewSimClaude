@@ -373,6 +373,13 @@ export const MONETARY_DAILY_GROWTH_RATE = 0;
  * mint at all (the bound must be set deliberately, alongside the rate, to engage the press).
  */
 export const MONETARY_DAILY_MINT_CAP = 0;
+/**
+ * The CEO benchmark stays STRICTLY conserved (slice b4, mirroring {@link BENCH_CREDIT_ENABLED} /
+ * {@link BENCH_TRADE_ENABLED}): no authority, no minting, ever — skill scores must never ride the
+ * money supply, and the bench's "neither mints nor burns a dollar" guarantee is part of its
+ * historical contract.
+ */
+export const BENCH_MONETARY_ENABLED = false;
 
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;

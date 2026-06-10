@@ -29,6 +29,7 @@ import {
   BENCH_OWNER_DIVIDEND_SHARE,
   BENCH_CREDIT_ENABLED,
   BENCH_TRADE_ENABLED,
+  BENCH_MONETARY_ENABLED,
   BENCH_BRAND_DEMAND_ELASTICITY,
   BENCH_GROWTH_START_CAPITAL,
   BENCH_GROWTH_BRAND_ELASTICITY,
@@ -171,6 +172,10 @@ function setupScenario(config: CeoBenchConfig): {
     // CEO, never a demand battery, and a live TRADE_ENABLED flip must not move history.
     tradeEnabled: BENCH_TRADE_ENABLED,
     includePort: false,
+    // Keep the bench STRICTLY conserved (C4 slice b4): no authority, no minting — the bench's
+    // "neither mints nor burns a dollar" guarantee is part of its historical contract.
+    monetaryEnabled: BENCH_MONETARY_ENABLED,
+    includeAuthority: false,
     residentBrain: config.residentBrain ?? "off",
     agenticResidentIds: config.agenticResidentIds,
   });

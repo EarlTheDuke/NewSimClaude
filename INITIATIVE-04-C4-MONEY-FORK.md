@@ -4,15 +4,29 @@
 > [INITIATIVE-04-GDP-GROWTH.md](INITIATIVE-04-GDP-GROWTH.md), [NORTH-STAR.md](NORTH-STAR.md), and
 > the sacred invariants in [CLAUDE.md](CLAUDE.md).
 
-> **DECISION (2026-06-09): the user chose (a) → (b).** Path (a) is **BUILT & VERIFIED** (slices
-> a1–a6 shipped, flag-gated, bench-frozen). **THE (a) RESULT:** outside demand lifts GDP +25–45%
-> while the port's finite reserve funds it — and the lift **outlives the battery**: the export boom
-> finances a ~2× town (in-migration/births/construction) whose own demand holds GDP above the C2
-> plateau after the foreign money is fully spent (`tradeGrowthSoak.test.ts`, seeds 1 & 7,
-> conservation to the cent throughout). The bound is real too: the battery exhausts in ~1 year and
-> is never refilled — *unbounded* growth needs money creation. **Path (b) is now in flight as the
-> user's explicit, deliberate decision to relax the conservation invariant** the audited way
-> (mint/burn logged, bounded, measured; default + bench stay strictly conserved).
+> **DECISION (2026-06-09): the user chose (a) → (b). BOTH ARE NOW BUILT & VERIFIED.**
+>
+> **THE (a) RESULT** (slices a1–a6; `tradeGrowthSoak.test.ts`, seeds 1 & 7): outside demand lifts
+> GDP +25–45% while the port's finite reserve funds it — and the lift **outlives the battery**:
+> the export boom finances a ~2× town (in-migration/births/construction) whose own demand holds
+> GDP above the C2 plateau after the foreign money is fully spent. Conservation to the cent
+> throughout. The bound is real: the battery exhausts in ~1 year and is never refilled.
+>
+> **THE (b) RESULT** (slices b1–b4; `monetaryGrowthSoak.test.ts`, seeds 1 & 7): the conservation
+> invariant was **formally relaxed** to *"totalMoney() = genesis + mintedTotal() − burnedTotal(),
+> to the cent"* — one audited doorway (`World.mint`/`burn`), a Monetary Authority, and a bounded
+> k-percent helicopter rule. Under a loose rule (0.2%/day, capped $400/day) **the press delivers
+> what the port could not: an unbounded lift** — the daily issue compounds with the supply and
+> never exhausts; GDP ends ≈ 2.2× the closed control and still climbing, again through the
+> structural channel (~2.2× population). A modest drip (0.05%/day) mostly *pools* (velocity
+> falls, GDP ≈ control). Model limit, stated plainly: **no price inflation can show** — B2B
+> prices are band-clamped and retail reckons against frozen anchors, so new money becomes real
+> activity or pooling, never rising prices; true inflation needs unanchored prices (future work).
+> The default city and the CEO bench never mint and remain **strictly** conserved.
+>
+> **The C5 question is thereby answered with evidence:** within strict conservation the ceiling
+> lifts *boundedly* (trade); lifting it *without bound* requires money creation, which is now
+> available as an explicit, audited, bounded policy — never an accidental leak.
 
 ## The question, with evidence
 

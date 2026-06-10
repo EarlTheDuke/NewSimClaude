@@ -64,7 +64,7 @@ A **Treasury** holder: taxes (sales/income/corporate) as transfers in, public sp
 out (welfare already prototypes this). A real fiscal lever and a new benchmark scenario; frozen OFF
 in the firm-CEO bench. Conserving (every tax/transfer routes through the treasury). Draft `PHASE20-*`.
 
-### C4 — The money fork · **(a) BUILT & VERIFIED; (b) IN FLIGHT** — see [INITIATIVE-04-C4-MONEY-FORK.md](INITIATIVE-04-C4-MONEY-FORK.md)
+### C4 — The money fork · **✅ (a) AND (b) BOTH BUILT & VERIFIED (2026-06-09)** — see [INITIATIVE-04-C4-MONEY-FORK.md](INITIATIVE-04-C4-MONEY-FORK.md)
 The C2 plateau forced the decision; the user chose **(a) → (b)** (2026-06-09). **(a) external
 trade is COMPLETE** (slices a1–a6): a conserving Port (`includePort` + `tradeEnabled`, default
 byte-identical, bench-frozen) buys producer surplus at frozen world prices (the GDP exports term),
@@ -73,15 +73,24 @@ sells imports to genuinely-starved firms with the local market holding right of 
 FINDING (`tradeGrowthSoak.test.ts`):** outside demand lifts GDP +25–45% while the battery funds
 it, and the lift **outlives the battery** — the export boom finances a ~2× town whose own demand
 holds GDP above the plateau after the foreign money is spent. Bounded (the battery dies in ~1
-year, never refilled), conserved to the cent. **(b) bounded money creation is now in flight** as
-the explicit user decision — audited `mint`/`burn`, bounded supply rule, default + bench strictly
-conserved.
+year, never refilled), conserved to the cent. **(b) bounded money creation is COMPLETE too**
+(slices b1–b4): the invariant formally relaxed to *genesis + minted − burned, to the cent*
+through one audited doorway (`World.mint`/`burn`), a Monetary Authority, and a bounded k-percent
+helicopter rule. **THE (b) FINDING (`monetaryGrowthSoak.test.ts`):** the press delivers what the
+port could not — an *unbounded* lift (GDP ≈ 2.2× the closed control at 18 months and climbing;
+the daily issue compounds and never exhausts), again via the structural channel (~2.2×
+population); a modest drip pools instead. Model limit recorded: the sim's price anchors mean no
+inflation can show. Default + bench never mint — strictly conserved.
 
-### C5 — GDP growth measurement + the explicit money decision
-A clear **real-GDP-growth** metric over a long soak across the whole program, and the deliberate,
-evidence-based call on the Initiative-#1 fork: did credit (C1) + population (C2) + trade (C4) lift
-the ceilings enough *within conservation*, or is bounded money creation warranted? Document the
-answer like the S3 result.
+### C5 — GDP growth measurement + the explicit money decision · **✅ ANSWERED WITH EVIDENCE**
+The question was: did credit (C1) + population (C2) + trade (C4) lift the ceilings enough *within
+conservation*, or is bounded money creation warranted? The two growth soaks
+(`tradeGrowthSoak.test.ts`, `monetaryGrowthSoak.test.ts`) are the measurement, and the fork doc
+records the decision trail: credit + population alone **plateau**; **trade (C4a) lifts the
+ceiling boundedly within strict conservation** (and the lift outlives its battery, structurally);
+**money creation (C4b) lifts it without bound** under the audited relaxation the user explicitly
+sanctioned (2026-06-09). Both levers ship flag-gated, default-off, bench-frozen — the S3-style
+documented result.
 
 ## Sequencing rationale
 **C1 (credit) first** — it directly answers the S3 pooling finding within conservation, is fully

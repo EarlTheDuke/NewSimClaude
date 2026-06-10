@@ -9,13 +9,13 @@ This file auto-loads every session in this repo. It is the operating manual; the
 > core moves are delivered; the live work is a three-leg program: **[INITIATIVE-01-WAGE-CIRCULATION.md](INITIATIVE-01-WAGE-CIRCULATION.md)**
 > (free labour market, done) → **[INITIATIVE-02-BUSINESS-CREATION.md](INITIATIVE-02-BUSINESS-CREATION.md)**
 > (creation & industries, done) → **[INITIATIVE-03-COMPETITION.md](INITIATIVE-03-COMPETITION.md)**
-> (competition, done) → **[INITIATIVE-04-GDP-GROWTH.md](INITIATIVE-04-GDP-GROWTH.md)** (GDP growth:
-> C1 credit done; C2 verified — *GDP plateaus*; **C4 path (a) conserving trade BUILT & VERIFIED**
-> — the port lifts GDP within conservation and the lift *outlives* its finite battery). Decision
-> record + the (a) result: **[INITIATIVE-04-C4-MONEY-FORK.md](INITIATIVE-04-C4-MONEY-FORK.md)**;
-> **path (b) bounded money creation is in flight** (user-greenlit 2026-06-09 — the audited
-> mint/burn relaxation; default + bench stay strictly conserved). Everything flag-gated +
-> byte-identical at default; ~492 tests.
+> (competition, done) → **[INITIATIVE-04-GDP-GROWTH.md](INITIATIVE-04-GDP-GROWTH.md)** (GDP growth
+> — **✅ COMPLETE THROUGH THE C4 MONEY FORK, 2026-06-09**: C1 credit; C2 *the plateau*; C4 path
+> (a) conserving trade — bounded lift that *outlives* its battery — AND path (b) the audited
+> Monetary Authority — *unbounded* lift; C5 answered with evidence). Decision record + both
+> results: **[INITIATIVE-04-C4-MONEY-FORK.md](INITIATIVE-04-C4-MONEY-FORK.md)**. The conservation
+> invariant is now *conserved-and-audited* (see below); the default city and the CEO bench never
+> mint and stay strictly conserved. Everything flag-gated + byte-identical at default; ~508 tests.
 
 1. **[NORTH-STAR.md](NORTH-STAR.md)** — the post-v1 compass. Re-read at every phase
    boundary and check proposed work against the three moves (wants-grow-with-wealth →
