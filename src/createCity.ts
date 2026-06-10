@@ -1,7 +1,7 @@
 import { Simulation } from "./core/Simulation";
 import { World } from "./world/World";
 import { buildCity, type CityOptions } from "./world/cityGen";
-import { resetIndustries, BANK_INDUSTRY, PORT_INDUSTRY, type ResourceDef } from "./world/industries";
+import { resetIndustries, BANK_INDUSTRY, PORT_INDUSTRY, AUTHORITY_INDUSTRY, type ResourceDef } from "./world/industries";
 import { WorldSystem } from "./systems/WorldSystem";
 import { BrainSystem } from "./systems/BrainSystem";
 import { MovementSystem } from "./systems/MovementSystem";
@@ -15,6 +15,7 @@ import { NeedsSystem } from "./systems/NeedsSystem";
 import { LifecycleSystem } from "./systems/LifecycleSystem";
 import { CreditSystem } from "./systems/CreditSystem";
 import { TradeSystem } from "./systems/TradeSystem";
+import { MonetarySystem } from "./systems/MonetarySystem";
 import { BusinessEntrySystem } from "./systems/BusinessEntrySystem";
 import { MacroSystem } from "./systems/MacroSystem";
 import { PopulationSystem, type PopulationOptions } from "./systems/PopulationSystem";
@@ -182,6 +183,18 @@ export interface CitySimOptions extends CityOptions {
    * trade — exactly like `creditEnabled` vs `includeBank`.
    */
   tradeEnabled?: boolean;
+  /**
+   * Monetary policy (Initiative C / C4b) — THE DELIBERATE RELAXATION of strict conservation
+   * (user-greenlit 2026-06-09). When true (with `includeAuthority`, a rate, and a cap), the
+   * {@link MonetarySystem} mints `min(rate × supply, cap)` daily through the audited
+   * `World.mint` and helicopters it to residents. Defaults to the live {@link MONETARY_ENABLED}
+   * (off ⇒ no-op ⇒ strictly conserved, byte-identical).
+   */
+  monetaryEnabled?: boolean;
+  /** Daily money-supply growth as a fraction of the current total (C4b). Defaults to {@link MONETARY_DAILY_GROWTH_RATE} (0 ⇒ inert). */
+  monetaryGrowthRate?: number;
+  /** Hard $/day mint ceiling (C4b) — the bound in bounded money creation. Defaults to {@link MONETARY_DAILY_MINT_CAP} (0 ⇒ inert). */
+  monetaryDailyCap?: number;
 }
 
 const DEFAULT_AGENTIC = ["biz_diner", "biz_goods"];
@@ -219,10 +232,12 @@ export function createCity(options: CitySimOptions = {}): {
   // cityGen seeds the port firm itself, as new genesis money (the foreign buyers' reserve).
   const includeBank = options.includeBank ?? false;
   const includePort = options.includePort ?? false;
+  const includeAuthority = options.includeAuthority ?? false;
   const registryIndustries = [
     ...(options.extraIndustries ?? []),
     ...(includeBank ? [BANK_INDUSTRY] : []),
     ...(includePort ? [PORT_INDUSTRY] : []),
+    ...(includeAuthority ? [AUTHORITY_INDUSTRY] : []),
   ];
   resetIndustries(registryIndustries, options.extraResources);
   const world = buildCity(sim.rng, options);
@@ -307,6 +322,14 @@ export function createCity(options: CitySimOptions = {}): {
   // the one deliberate control. Inert at the default ratio 0 ⇒ byte-identical.
   const welfare = new WelfareSystem(world, options.welfareRatio, options.welfareSubsistence);
   sim.addSystem(welfare);
+
+  // Monetary policy (Initiative C / C4b) runs right after the welfare floor — both are
+  // transfers-to-residents on the settled day — and before lifecycle/macro, so the day's issue is
+  // in wallets before solvency is judged and vitals are sampled. Inert at the default
+  // (MONETARY_ENABLED off, rate 0, cap 0 ⇒ no-op) ⇒ strictly conserved, byte-identical.
+  sim.addSystem(
+    new MonetarySystem(world, options.monetaryEnabled, options.monetaryGrowthRate, options.monetaryDailyCap),
+  );
 
   let residentAgent: ResidentAgentSystem | undefined;
   const residentBrain = options.residentBrain ?? "off";

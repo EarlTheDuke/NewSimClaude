@@ -71,7 +71,10 @@ export class DistributionSystem implements System {
       // the default seven-business city is byte-identical.
       // The Port (C4a) likewise retains its reserve — its cash is the REST OF THE WORLD'S money
       // (the foreign buyers' demand battery), not city profit to dividend out. Opt-in only.
-      if (!biz.active || ARCHETYPES[biz.kind].bank || ARCHETYPES[biz.kind].port) continue;
+      // The Monetary Authority (C4b) holds freshly-issued public money in transit to residents —
+      // never profit; the helicopter, not the dividend sweep, is its outflow. Opt-in only.
+      const a = ARCHETYPES[biz.kind];
+      if (!biz.active || a.bank || a.port || a.monetaryAuthority) continue;
       const reserve = ARCHETYPES[biz.kind].collectsRent ? LANDLORD_RESERVE : BUSINESS_RESERVE;
       // Phase 16 — the firm pays out only `payoutRate` of its capped surplus; the
       // rest is retained as cash to reinvest. Default 1.0 ⇒ full distribution,

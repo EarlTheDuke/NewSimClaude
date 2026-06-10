@@ -60,6 +60,14 @@ export interface IndustryDef {
    * city is built with `includePort`.
    */
   port?: boolean;
+  /**
+   * The Monetary Authority role (Initiative C / C4 path b) — the city's central bank: the ONLY
+   * entity sanctioned to call the audited `World.mint`/`World.burn`. It holds no lasting cash
+   * (each day's issue passes straight through to residents), pays no dividend, and is never
+   * bankrupted (a $0 balance is its resting state, not failure). Set only on the authority
+   * archetype, registered solely when a city is built with `includeAuthority`.
+   */
+  monetaryAuthority?: boolean;
 }
 
 /** The economic identity a system reads by kind — the IndustryDef minus its `kind` tag. */
@@ -73,6 +81,7 @@ export interface Archetype {
   capitalGoodsVendor?: boolean;
   bank?: boolean;
   port?: boolean;
+  monetaryAuthority?: boolean;
 }
 
 /** A tradeable intermediate good and its starting B2B price ($/unit). */
@@ -126,6 +135,20 @@ export const PORT_INDUSTRY: IndustryDef = {
   port: true,
 };
 
+/**
+ * The Monetary Authority archetype (Initiative C / C4 path b) — the city's central bank,
+ * registered into the live registry ONLY when a city is built with `includeAuthority` (never
+ * seeded by default). Same contained-cast pattern as the Bank and the Port. Real-world: the
+ * reserve bank whose policy rule issues new currency into circulation.
+ */
+export const AUTHORITY_INDUSTRY: IndustryDef = {
+  kind: "authority" as BusinessKind,
+  sellsToResidents: false,
+  target: 0,
+  maxPerDay: 0, // produces nothing ⇒ never staffed (desiredHeadcount 0), no capacity
+  monetaryAuthority: true,
+};
+
 /** The seeded four, in chain order (grain/materials are primary; food/wares are processed). */
 export const SEEDED_RESOURCES: readonly ResourceDef[] = [
   { kind: "grain", basePrice: 4 },
@@ -166,6 +189,7 @@ function rebuild(): void {
       capitalGoodsVendor: d.capitalGoodsVendor,
       bank: d.bank,
       port: d.port,
+      monetaryAuthority: d.monetaryAuthority,
     };
   }
 

@@ -104,6 +104,14 @@ export interface CityOptions {
    */
   includePort?: boolean;
   /**
+   * Seed a Monetary Authority (Initiative C / C4b) — the city's central bank, the only entity
+   * sanctioned to call the audited `World.mint`/`burn`. Pushes `biz_authority` + `loc_authority`
+   * with **zero cash** (it issues money by policy, it doesn't hold a genesis float), so the
+   * seeded totals are untouched. Strictly opt-in (never implied by `monetaryEnabled`); off by
+   * default ⇒ byte-identical. The archetype is registered by `createCity`.
+   */
+  includeAuthority?: boolean;
+  /**
    * Opt in to a second, rival diner (Phase 11b). Adds `biz_diner_2` — a faithful
    * twin of the original diner under a different owner — at the bottom-right
    * retail node, so residents choose between two food sellers on price + distance.
@@ -256,6 +264,32 @@ export function buildCity(rng: SeededRNG, options: CityOptions = {}): World {
       resources: {},
       active: true,
       capital: 0, // no plant capital — keeps the port out of MacroSystem.totalCapital
+    });
+  }
+
+  // Initiative C / C4b — seed the Monetary Authority when asked: the central bank, with ZERO
+  // cash (it mints by policy through the audited World.mint; a $0 balance is its resting state —
+  // each day's issue passes straight through to residents). Non-producing, no plant capital,
+  // shielded from dividend sweep + bankruptcy via the monetaryAuthority role flag. Co-located on
+  // the civic block with the landlord/bank. Off by default ⇒ byte-identical.
+  if (options.includeAuthority) {
+    const authorityLoc: Location = { id: "loc_authority", name: "City Reserve", type: "workplace", nodeId: nodeId(3, 1) };
+    locations.push(authorityLoc);
+    businesses.push({
+      id: "biz_authority",
+      name: authorityLoc.name,
+      kind: "authority" as BusinessKind,
+      ownerId: ownerOf(2), // nominal owner (render/typing); the authority never distributes a cent
+      locationId: authorityLoc.id,
+      cash: 0,
+      inventory: 0,
+      price: 0,
+      employeeIds: [],
+      wagePerTick: 0,
+      pnl: pnl(),
+      resources: {},
+      active: true,
+      capital: 0, // no plant capital — keeps the authority out of MacroSystem.totalCapital
     });
   }
 

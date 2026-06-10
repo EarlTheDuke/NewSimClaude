@@ -51,7 +51,10 @@ export class LifecycleSystem implements System {
     // Nor is the Port (C4a): an empty port means FOREIGN DEMAND IS EXHAUSTED (exports pause until
     // imports refill it) — not a business failure to liquidate to a resident owner, which would
     // hand the rest of the world's remaining money to the city and kill imports for good.
-    if (ARCHETYPES[biz.kind].bank || ARCHETYPES[biz.kind].port) return;
+    // Nor is the Monetary Authority (C4b): $0 is its RESTING state (each day's issue passes
+    // straight through to residents) — bankrupting the central bank would kill policy permanently.
+    const a = ARCHETYPES[biz.kind];
+    if (a.bank || a.port || a.monetaryAuthority) return;
     const days = biz.cash < BANKRUPT_CASH_FLOOR ? (biz.insolventDays ?? 0) + 1 : 0;
     biz.insolventDays = days;
     if (days < BANKRUPT_GRACE_DAYS) return;

@@ -34,6 +34,13 @@ export interface MacroSample {
    * later appears inside C). 0 in a portless or trade-off city.
    */
   imports: number;
+  /**
+   * NEW money created that day by the Monetary Authority (C4b) — the day-over-day delta of the
+   * World's audited mint ledger, net of burns. NOT a GDP term (money isn't output); recorded so
+   * the b3 measurement can chart supply growth against GDP and prices. 0 in any
+   * strictly-conserved city.
+   */
+  minted: number;
   /** Cash paid to residents as WAGES that day (dividends are tracked separately in {@link dividend}). */
   payroll: number;
   /** Rent collected that day. */
@@ -77,6 +84,7 @@ interface Cumulative {
   distributed: number;
   exports: number;
   imports: number;
+  minted: number;
 }
 
 /**
@@ -92,7 +100,7 @@ interface Cumulative {
 export class MacroSystem implements System {
   readonly id = "macro";
   private samples: MacroSample[] = [];
-  private prev: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0, imports: 0 };
+  private prev: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0, imports: 0, minted: 0 };
 
   constructor(
     private readonly world: World,
@@ -102,7 +110,9 @@ export class MacroSystem implements System {
   update(ctx: SystemContext): void {
     if (ctx.totalTicks === 0 || ctx.totalTicks % TICKS_PER_DAY !== 0) return;
 
-    const cum: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0, imports: 0 };
+    const cum: Cumulative = { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0, imports: 0, minted: 0 };
+    // The day's net money creation — the audited ledger's delta (0 in a strictly-conserved run).
+    cum.minted = this.world.mintedTotal() - this.world.burnedTotal();
     let totalCapital = 0;
     for (const b of this.world.businesses) {
       cum.payroll += b.pnl.wagesPaid;
@@ -139,6 +149,7 @@ export class MacroSystem implements System {
       investment,
       exports: exported,
       imports: imported,
+      minted: cum.minted - this.prev.minted,
       payroll: wages,
       rent: cum.rent - this.prev.rent,
       unemployed: this.world.residents.filter((r) => r.jobId === "").length,
@@ -184,8 +195,9 @@ export class MacroSystem implements System {
           distributed: s.prev.distributed ?? 0, // pre-observatory saves carry no dividend baseline
           exports: s.prev.exports ?? 0, // pre-C4a saves carry no exports baseline
           imports: s.prev.imports ?? 0, // pre-a3 saves carry no imports baseline
+          minted: s.prev.minted ?? 0, // pre-C4b saves carry no mint baseline
         }
-      : { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0, imports: 0 };
+      : { consumption: 0, payroll: 0, rent: 0, investment: 0, distributed: 0, exports: 0, imports: 0, minted: 0 };
   }
 }
 

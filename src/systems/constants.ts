@@ -347,6 +347,33 @@ export const TRADE_IMPORT_MAX_PER_DAY = 8;
  */
 export const BENCH_TRADE_ENABLED = false;
 
+// --- Bounded money creation (Initiative C / C4 path b) — all INERT here (slice b2). THE
+//     DELIBERATE RELAXATION of strict conservation (user-greenlit 2026-06-09): a Monetary
+//     Authority issues new money through the audited World.mint, under a deterministic, bounded
+//     policy rule. totalMoney() === genesis + minted − burned to the cent, always. The default
+//     city and the CEO bench never mint (slice b4). See INITIATIVE-04-C4-MONEY-FORK.md. ---
+/**
+ * Master switch for monetary policy (C4b). OFF here ⇒ the {@link MonetarySystem} is a no-op even
+ * when an authority is seeded ⇒ the default city is byte-identical and strictly conserved.
+ * Real-world: whether the city's reserve bank actively manages the money supply.
+ */
+export const MONETARY_ENABLED = false;
+/**
+ * Daily money-supply growth target, as a fraction of the CURRENT total supply (C4b) — the policy
+ * rule: each day the authority mints `min(rate × totalMoney, daily cap)` and helicopters it
+ * evenly to residents. Compounding by design — this is exactly how fiat supplies grow — which is
+ * what makes demand (and nominal GDP) unbounded, the property path (a)'s finite battery couldn't
+ * give. 0 ⇒ no minting ⇒ byte-identical. Real-world: a central bank's money-growth target
+ * (0.0002/day ≈ 7.6%/year).
+ */
+export const MONETARY_DAILY_GROWTH_RATE = 0;
+/**
+ * Hard ceiling on a single day's mint, in dollars (C4b) — the BOUND in "bounded money creation":
+ * no policy rule, however misconfigured, can print more than this in one day. 0 ⇒ nothing may
+ * mint at all (the bound must be set deliberately, alongside the rate, to engage the press).
+ */
+export const MONETARY_DAILY_MINT_CAP = 0;
+
 /** Max single-day price move, as a fraction of the current price. */
 export const PRICE_ADJUST_FRACTION = 0.05;
 /**
