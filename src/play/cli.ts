@@ -24,6 +24,7 @@ import { TICKS_PER_DAY } from "../core/TimeSystem";
 import { snapshotFromJSON, snapshotToJSON } from "../utils/serialization";
 import { ScriptedResidentProvider } from "./ScriptedResidentProvider";
 import { DEFAULT_RESIDENT_LIMITS } from "../ai/residentClamp";
+import { desiredHeadcount } from "../world/archetypes";
 import type { ResidentAction, ResidentDecision } from "../ai/residentTypes";
 import type { Needs, ResourceKind } from "../world/types";
 import type { DisasterKind } from "../systems/disasters";
@@ -56,6 +57,13 @@ interface PlayCommand {
   joy?: JoyMove;
   /** God-Mode experiments, applied before the day advances. */
   god?: GodMove[];
+  /**
+   * The printing press (C4b) — God's monetary policy for THIS turn. The dormant City Reserve
+   * (seeded into the Boom Town arc from day 1) mints min(rate × supply, cap)/day through the
+   * audited World.mint and helicopters it to residents while this is set; omit (or rate 0) and
+   * the press is off. The audit ledger rides the save, so flipping it between turns is exact.
+   */
+  press?: { rate: number; cap: number };
 }
 
 function readCommand(): PlayCommand {
@@ -113,12 +121,38 @@ function main(): void {
     ? [{ action: toAction(cmd.joy), reason: cmd.joy.reason ?? "(no reason given)" }]
     : [];
 
+  // ── Arc "Boom Town" (Phase 9 × Initiative C4) ─────────────────────────────
+  // The whole verified free-market program, plus the new harbor: Joy lives through the export
+  // boom from street level. The City Reserve also stands in town from day 1 — dormant — so God
+  // can flip the printing press mid-arc (cmd.press) without rebuilding the world.
+  const press = cmd.press ?? { rate: 0, cap: 0 };
   const city = createCity({
     seed: SEED,
     brain: "rules",
     residentBrain: new ScriptedResidentProvider(moves),
     agenticResidentIds: [AVATAR],
     disasters: true,
+    agenticBusinessIds: ["biz_diner", "biz_goods", "biz_farm", "biz_factory", "biz_mine", "biz_bakery"],
+    secondDiner: true,
+    wageCapMult: 8,
+    welfareRatio: 0.5,
+    welfareSubsistence: 2,
+    dividendWean: 0.5,
+    producerCompetition: 2,
+    labourCompetition: true,
+    opportunityEntry: true,
+    includeBank: true,
+    creditEnabled: true,
+    creditDailyRate: 0.003,
+    creditMaxPrincipal: 4000,
+    populationGrowth: true,
+    populationOptions: { births: true, mortality: true, construction: true, dynamicRent: true },
+    includePort: true,
+    tradeEnabled: true,
+    includeAuthority: true, // the dormant City Reserve — the press waits for cmd.press
+    monetaryEnabled: press.rate > 0 && press.cap > 0,
+    monetaryGrowthRate: press.rate,
+    monetaryDailyCap: press.cap,
   });
   const { sim, world, market, macro, residentAgent, events, god } = city;
 
@@ -182,13 +216,24 @@ function main(): void {
 
   // The menu of legal moves, so my next choice is informed.
   out.push("");
-  out.push(`JOB OPTIONS (switchJobTo · cooldown ${L.jobChangeCooldownDays}d):`);
+  out.push(`JOB OPTIONS (switchJobTo · cooldown ${L.jobChangeCooldownDays}d · only HIRING doors open):`);
   for (const b of world.businesses.filter((b) => b.id !== joy.jobId)) {
-    out.push(`  ${b.id.padEnd(14)} ${b.name.padEnd(20)} ${money2(b.wagePerTick)}/tick${b.active ? "" : " [CLOSED]"}`);
+    const seats = desiredHeadcount(b.kind);
+    const status = !b.active
+      ? " [CLOSED]"
+      : seats === 0
+        ? " [no jobs]"
+        : b.employeeIds.length < seats
+          ? ` [HIRING ${b.employeeIds.length}/${seats}]`
+          : " [full]";
+    out.push(`  ${b.id.padEnd(14)} ${b.name.padEnd(20)} ${money2(b.wagePerTick)}/tick${status}`);
   }
-  out.push("HOME OPTIONS (reHomeTo):");
+  out.push("HOME OPTIONS (reHomeTo · only homes with a FREE slot accept movers):");
   for (const l of world.locations.filter((l) => l.type === "home" && l.id !== joy.homeId)) {
-    out.push(`  ${l.id.padEnd(14)} ${l.name.padEnd(20)} ${money2(l.rent ?? 0)}/day`);
+    const occupants = world.residents.filter((r) => r.homeId === l.id).length;
+    const cap = l.capacity ?? Infinity;
+    const status = occupants < cap ? ` [${occupants}/${cap}]` : ` [FULL ${occupants}/${cap}]`;
+    out.push(`  ${l.id.padEnd(14)} ${l.name.padEnd(20)} ${money2(l.rent ?? 0)}/day${status}`);
   }
   out.push(
     `OTHER LEVERS: negotiateRaise (×${1 + L.raiseFraction}, cap ${L.maxWageMultiple}× base, cooldown ${L.raiseCooldownDays}d) · ` +
@@ -198,14 +243,33 @@ function main(): void {
 
   // City vitals + prices.
   const m = macro.latest();
+  const port = world.getBusiness("biz_port");
   out.push("");
   out.push("CITY VITALS (latest day):");
   if (m) {
     out.push(
-      `  GDP ${money(m.gdp)} · payroll ${money(m.payroll)} · rent ${money(m.rent)} · ` +
-        `unemployed ${m.unemployed}/${world.residents.length} · active biz ${m.activeBusinesses}/${world.businesses.length}`,
+      `  GDP ${money(m.gdp)} (C ${money(m.consumption)} + I ${money(m.investment)} + X ${money(m.exports)} − M ${money(m.imports)}) · ` +
+        `payroll ${money(m.payroll)} · rent ${money(m.rent)}`,
     );
-    out.push(`  total money ${money(m.totalMoney)} (conserved) · avg resource price ${money2(m.avgResourcePrice)}`);
+    out.push(
+      `  population ${world.residents.length} · unemployed ${m.unemployed} · active biz ${m.activeBusinesses}/${world.businesses.length}`,
+    );
+    out.push(
+      `  total money ${money(m.totalMoney)} (audit: minted ${money(world.mintedTotal())} − burned ${money(world.burnedTotal())}) · ` +
+        `avg resource price ${money2(m.avgResourcePrice)}`,
+    );
+    const wealth = world.residents.map((r) => r.money).sort((a, b) => a - b);
+    const median = wealth[Math.floor(wealth.length / 2)] ?? 0;
+    out.push(
+      `  resident wealth: median ${money(median)} · poorest ${money(wealth[0] ?? 0)} · richest ${money(wealth[wealth.length - 1] ?? 0)} · gini ${m.gini.toFixed(2)}`,
+    );
+    out.push(
+      `  port reserve ${port ? money(port.cash) : "—"} (foreign demand left) · press ${
+        press.rate > 0 && press.cap > 0
+          ? `ON (${(press.rate * 100).toFixed(2)}%/day, cap ${money(press.cap)} · today minted ${money(m.minted)})`
+          : "off"
+      }`,
+    );
   }
   const pb = market.priceBook();
   out.push(`  prices  grain ${money2(pb.grain)} · materials ${money2(pb.materials)} · food ${money2(pb.food)} · wares ${money2(pb.wares)}`);
@@ -213,9 +277,16 @@ function main(): void {
   out.push("");
   out.push("BUSINESSES:");
   for (const b of world.businesses) {
+    const exp = b.pnl.exportRevenue ?? 0;
+    const imp = b.pnl.importSpend ?? 0;
+    const share = b.exportShare;
+    const trade =
+      exp > 0 || imp > 0 || share !== undefined
+        ? ` · X ${money(exp)}${imp > 0 ? ` M ${money(imp)}` : ""}${share !== undefined ? ` (share ${share})` : ""}`
+        : "";
     out.push(
       `  ${b.name.padEnd(20)} cash ${money(b.cash).padStart(7)} · inv ${String(b.inventory).padStart(3)} · ` +
-        `price ${money2(b.price)} · emp ${b.employeeIds.length}${b.active ? "" : " · CLOSED"}`,
+        `price ${money2(b.price)} · emp ${b.employeeIds.length}${b.active ? "" : " · CLOSED"}${trade}`,
     );
   }
 
@@ -254,6 +325,11 @@ function main(): void {
       },
       vitals: m ?? null,
       prices: pb,
+      trade: {
+        portCash: port?.cash ?? null,
+        minted: world.mintedTotal(),
+        burned: world.burnedTotal(),
+      },
     }),
   );
 

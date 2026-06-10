@@ -173,7 +173,13 @@ const grant: DisasterDef = {
 
     let needy: typeof landlord | undefined;
     for (const b of world.businesses) {
-      if (!b.active || ARCHETYPES[b.kind].collectsRent) continue;
+      // Institutions are never "needy" (found via Phase 9 Boom Town play, where the grant handed
+      // relief to the $0-resting City Reserve and the lent-out First Bank): the bank's float lives
+      // in its loans, the port's cash is the rest of the world's, and the authority prints by
+      // policy — relief is for the town's TRADING firms. Skipped via role flags, so the default
+      // city (no institutions) is byte-identical.
+      const a = ARCHETYPES[b.kind];
+      if (!b.active || a.collectsRent || a.bank || a.port || a.monetaryAuthority) continue;
       if (!needy || b.cash < needy.cash) needy = b;
     }
     if (!needy) return null;

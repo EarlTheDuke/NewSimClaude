@@ -118,6 +118,29 @@ describe("EventSystem & disasters (Phase 6)", () => {
       const { world, market } = createCity({ seed: 4 }); // landlord starts at 4000 < reserve
       expect(grantDef.apply({ world, market, rng: new SeededRNG(1) })).toBeNull();
     });
+
+    it("grant: never bails out an institution — the $0 authority, the lent-out bank, the port (Boom Town P9 find)", () => {
+      // In the Boom Town playthrough the grant handed relief to the City Reserve (resting at $0,
+      // so always the "poorest") and later $1500 to the lent-out First Bank — accidental QE.
+      // Relief is for the town's trading firms; institutions have their own mechanisms.
+      const { world, market } = createCity({
+        seed: 4,
+        includeBank: true,
+        includePort: true,
+        includeAuthority: true,
+      });
+      const landlord = world.getBusiness("biz_landlord")!;
+      landlord.cash = 7000; // above LANDLORD_RESERVE so a grant is affordable
+      world.getBusiness("biz_bank")!.cash = 0; // float fully lent out — still not "needy"
+      const needy = world.getBusiness("biz_factory")!;
+      needy.cash = 10; // the poorest TRADING firm (authority sits at $0, bank at $0)
+
+      const out = grantDef.apply({ world, market, rng: new SeededRNG(1) });
+      expect(out!.targetId).toBe("biz_factory");
+      expect(needy.cash).toBe(10 + 1500);
+      expect(world.getBusiness("biz_authority")!.cash).toBe(0);
+      expect(world.getBusiness("biz_bank")!.cash).toBe(0);
+    });
   });
 
   describe("opt-in wiring", () => {

@@ -198,6 +198,55 @@ demo decays into a town with no producers, a $0 diner, and eight cash-hoarding N
 Logged as **P10-7**. (Caveat: a deterministic reproduction assuming a hands-off tab —
 not a read of the exact running tab; God-Mode meddling or a Load would diverge it.)
 
+### Arc 3 — Days 1–280 (seed 9): "Boom Town" (2026-06-09, the C4 stack)
+
+The harness config moved to the **full free-market program + the C4 money fork**: port +
+trade live, a **dormant City Reserve** seeded from day 1, credit, competition, population
+growth, disasters — and a per-turn `press` command so God can flip the printing press
+mid-run. Joy lives through the export boom from street level.
+
+- **Days 1–3** — Joy wakes a **farmhand at Greenfield Farm ($0.12)**, the very industry whose
+  grain ships from the new harbor. Exports already $198/day; firms borrow to invest (the bank's
+  float fully lent out day one); opportunity entry births a second mine immediately.
+- **Days 4–15, the wage war** — Joy jumps to the Ironworks ($0.12→$0.29). The abandoned farm
+  bids $0.12→$0.47 for her old seat and *still* can't fill it — twelve hands, zero unemployed.
+  Labour share 0.30→0.59; grain $4.00→$6.40 (her wage bill in the price — cost-push, live).
+- **Days 16–32, boom and whiplash** — she takes the farm's $0.47 (banks +$262/week), buys the
+  $800 vehicle… and is **laid off** days later when the farm's cash burns out paying war wages.
+  Then the half-staffed Ironworks **hires her off the street at dawn at the $0.12 floor** before
+  her own move can fire (the hiring round runs before the resident review — emergent, brutal,
+  fair). The job-change cooldown locks her in.
+- **Days 33–64, the lever works in the wild** — the report's new trade lines catch the a4 rule
+  choosing markets: farm + bakery `share 0` (food pricier at home — held back), mine + factory
+  `share 1` (metal cheap at home — shipped). **Comparative advantage emerged unscripted: food
+  stays, metal sails.** God's materials shock ($8 decree) flips the mine to `share 0` within a
+  day; the price decays past world parity and it quietly returns to the dock. Riverside Diner
+  becomes a genuinely **import-fed restaurant** ($2.1k of boat food) — and Joy waits its tables.
+- **Days 65–169, the colonial pattern** — the boom *never reaches the street*: non-agentic
+  residents can't renegotiate, so export income pools upward (Gini 0.10→**0.76**). Joy bleeds,
+  sells the car to make rent, is evicted **upward** (the only vacancies are the dear homes).
+  All four producers end `share 1` while locals thin out their own consumption. **The battery
+  dies on schedule (day ~169: port $166)** with the median resident at **$43** and Keystone
+  Housing holding **$35.5k — two-thirds of all money in the city**. The port's $20k became a
+  landlord annuity; the migration gate (median ≥ $600) never opened; **population never grew.**
+- **Days 170–280, the press redeems it** — God flips the City Reserve on (0.4%/day, cap $400,
+  citizen's dividend). Median $43→$591; Gini falls 0.76→0.65 (the first decline in town
+  history); GDP recovers to ~$1.1–1.3k fully domestic; the bank's float refills and investment
+  returns. **Day ~275: the median crosses $600 and the first migrant in the town's history
+  arrives (pop 12→13)** — promptly diluting the median, exactly as the dilution brake intends.
+  Audit line in the playthrough report: `total money $84,108 = genesis $54,000 + minted $30,108`.
+
+**Arc takeaways.** (1) **The structural growth channel runs through the street, not the dock**:
+the soaks' boom-grows-the-town result was carried by *agentic residents* lifting the median; with
+passive labour, outside demand pools at the top and the prosperity-gated migration never fires —
+inequality literally blocks growth, and the helicopter press is the in-model remedy (verified
+live). (2) The a2/a3/a4 trade stack behaved perfectly under play + God shocks: keep-floors,
+export pauses, the import relief valve, balanced-trade convergence under stress. (3) Conservation
+held to the cent through everything until the press deliberately, auditably relaxed it. Fixes
+shipped at this checkpoint: the grant disaster no longer bails out institutions (P11-1); the
+harness wage/home menus now show hiring seats + vacancies and the vitals show the wealth spread,
+trade lines, and the audit ledger (P11-2).
+
 ---
 
 ## Issues & ideas backlog
@@ -224,6 +273,10 @@ Status: `open` → `fixed (commit)` / `wontfix (reason)`.
 | P10-4 | soak | S2 | **Phase-10b aspirational arc is dead in a real run:** 0 vehicles, 0 luxuries, 0 savings-goals across all 3 seeds / 365d. | The rules provider gates luxury/savings on `thriving = employed && hasVehicle`; a vehicle costs $800 but residents sit at ~$100 (P10-1), so the gate never opens — the depth we built is unreachable. | Primarily a P10-1 fix (give residents disposable income). Secondarily revisit the $800 vehicle gate / `thriving` definition so the arc can start. | **resolved** (via P10-1) — re-soak shows the arc fully alive once income recovers: ~12/12 own a vehicle, ~12/12 set a savings goal, thousands of luxuries/year. No gate change needed; the P10-1 fix unlocked it for free, exactly as predicted. |
 | P10-5 | soak | S3 | **7–8/12 residents under chronic eviction pressure** (rentMissedDays > 0) at day 365. | Residents at ~$100 can't reliably cover rent ($50–70/day) plus meals/social. Symptom of P10-1; the safe-eviction backstop keeps them housed so no invariant breaks. | Follows P10-1. Until then, the re-home backstop is doing real work — worth confirming it never thrashes. | **resolved** (via P10-1) — re-soak: **0/12** under eviction pressure in both arms, every seed. With income restored the town pays its rent. |
 | P10-6 | soak | S3 | **Storefront rivalry consolidates over a full year.** Under pure rules / disasters-off, the original `biz_diner` ends at $0 and goes inactive in **all 5 seeds** by day 365; the newer `diner_2` + the goods store survive. The 90-day "truce, both survive" in `competition.test.ts` does not hold to 365 days. | Given long enough, geography + the rules pricer let one diner win the corner — a slow, deterministic shake-out, not a crash (money stays conserved; the town is *richer* for the rivalry while it lasts: resident min wealth +33% vs the no-rival arm). | **Design choice, not a bug.** Either accept realistic consolidation (one survivor) — likely fine — or, if a durable duopoly is wanted, tune the pricer/geography (e.g. a softer undercut response, or a loyalty/locality pull) so both hold. Add a long-horizon (365d) competition assertion either way. | open (decision) |
+| P11-1 | Arc 3 | S2 | **The grant disaster bails out institutions**: relief went to the $0-resting City Reserve (day 3, $19 stuck forever while the press is off — a circulation sink) and later $1500 to the lent-out First Bank (accidental QE). | `grant` picks the lowest-cash active non-rentier; institutions rest at/near $0 *by design*, so they always look "neediest". | Skip `bank`/`port`/`monetaryAuthority` role flags in the needy pick — relief is for trading firms. Test: events.test.ts grant-institutions. | **fixed** (this commit) |
+| P11-2 | Arc 3 | S3 | **Two harness menu traps**: the wage board hid which firms were actually HIRING (two of Joy's switches silently no-opped against full rosters) and the home menu hid occupancy (a re-home against a full house no-opped for 45 days). The report also couldn't show who trades or how wealth spreads. | The clamp validates `hiring`/`hasVacancy`, but the CLI menus didn't surface either; vitals lacked trade/wealth/audit reads. | CLI now shows `[HIRING n/m]`/`[full]` on jobs, `[n/cap]` on homes, per-business X/M + exportShare, the wealth spread (median/poorest/richest), the port reserve, and the mint audit line. | **fixed** (this commit) |
+| P11-3 | Arc 3 | S3 | **Entrant firms are mindless**: gen-spawned businesses (5 born this arc) never join `agenticBusinessIds`, so they never review — no pricing, no wage moves, no export lever; several sat at 0 staff with $500 forever. | The agentic id list is fixed at city construction; BusinessEntrySystem doesn't enroll its children. | Design item: auto-enroll entrants into the agentic set (or a "house rules" mind for unlisted firms). Touches bench determinism — needs care. | open |
+| P11-4 | Arc 3 | S2 | **A boom without labour agency becomes a landlord annuity**: with residents non-agentic, the port's $20k pooled to Keystone ($35.5k, Gini 0.76) while the median fell to $43 — below the $600 migration floor, so the structural growth channel (the soak's headline) never opened. The helicopter press reopened it (median $591 by day 249; first migrant ~day 275). | Non-agents never renegotiate or job-hop, so wages stay seeded while rents/prices flow up; `medianMoney ≥ MIGRATION_PROSPERITY_FLOOR` correctly gates growth on shared prosperity. | Not a bug — a finding worth designing around: the playthrough config should default residents agentic (like the soaks), and/or NPCs need baseline wage drift. Related: P10-7 (same pooling, pre-C4). | open (design insight) |
 | P10-7 | live | S2 | **The shipped in-browser config (4 of 12 residents agentic, disasters on) lets the entire B2B production base — farm, mine, bakery, factory — go bankrupt within a year.** A disasters-off control reproduces the same 4 closures, ruling out disasters and isolating the 4-agentic setup as the cause. The 12-agentic re-soak had **0** producer bankruptcies. | The 8 non-agentic NPCs hoard wages (one hits ~$9k) and never spend on vehicles/luxuries (0/8), draining money from the retail circuit. Storefront revenue falls → fewer B2B input purchases → producers (already floor-priced & 0-staff per P10-2/P10-3) have no cushion and fail. This is **P10-1 pooling relocated** from businesses to passive residents; the "resolved" P10-1 result was contingent on *all* residents being agentic. | Run the live demo with all (or most) residents agentic; or give NPCs baseline aspirational spending so they don't hoard; or make producers viable at low B2B demand (ties to labour-dependent production, P10-3). | open |
 
 ---
