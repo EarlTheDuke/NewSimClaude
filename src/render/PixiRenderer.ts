@@ -79,6 +79,8 @@ interface ResidentView {
   carBody: Graphics; // the tintable hull
   walker: Container; // R3-3: shown while travelling on foot (the footpath)
   walkerG: Graphics; // the tintable figure
+  ringGold: Graphics; // R3-9: thin gold ring — this resident is in the town's top wealth tier
+  ringGrey: Graphics; // R3-9: thin grey ring — the bottom tier
   selGlow: Graphics;
   offX: number; // last applied draw offset — fan-out OR lane/footpath (kept so pick() hits the drawn spot)
   offY: number;
@@ -150,6 +152,14 @@ export class PixiRenderer implements CityRenderer {
   private readonly cam: Camera = { tx: 0, ty: 0, scale: 1 };
   private follow = false;
   private lastSelId: string | undefined;
+
+  // R3-8 — hover name tag: the pointer's last canvas position (undefined when it left),
+  // hit-tested per frame so the tag tracks a moving resident under the cursor.
+  private hoverX: number | undefined;
+  private hoverY: number | undefined;
+  private hoverTag: Container | undefined;
+  private hoverTagBg: Graphics | undefined;
+  private hoverTagText: Text | undefined;
 
   private roadsBuilt = false;
   private readonly buildingViews = new Map<string, BuildingView>();
@@ -310,6 +320,14 @@ export class PixiRenderer implements CityRenderer {
       }
     }
     for (const g of standing.values()) g.ids.sort(); // stable order → stable ring spots
+    // R3-9 — wealth tiers, recomputed per frame (read-only): the top fifth of wallets
+    // wear a thin gold ring, the bottom fifth grey — inequality readable on the street.
+    // Only meaningful with a real spread; tiny towns or flat wealth show no rings.
+    const wealth = this.world.residents.map((r) => r.money).sort((x, y) => x - y);
+    const n = wealth.length;
+    const richAt = n >= 5 ? wealth[Math.min(n - 1, Math.floor(n * 0.8))]! : Infinity;
+    const poorAt = n >= 5 ? wealth[Math.floor(n * 0.2)]! : -Infinity;
+    const spread = n >= 5 && richAt > poorAt * 1.5;
     const seenR = new Set<string>();
     for (const r of this.world.residents) {
       seenR.add(r.id);
@@ -322,9 +340,11 @@ export class PixiRenderer implements CityRenderer {
           g.ids.length > 1 ? fanOutOffset(g.ids.indexOf(r.id), g.ids.length) : { dx: 0, dy: 0 };
         off = { dx: g.x + ring.dx - r.move.x, dy: g.y + ring.dy - r.move.y };
       }
-      this.updateResidentView(this.ensureResidentView(r.id), r, isSel, off);
+      const tier = !spread ? undefined : r.money >= richAt ? "rich" : r.money <= poorAt ? "poor" : undefined;
+      this.updateResidentView(this.ensureResidentView(r.id), r, isSel, off, tier);
     }
     this.reapResidents(seenR);
+    this.updateHover();
 
     this.updateSkyBadge(hourFloat);
     this.updateDisaster(disaster);
@@ -420,6 +440,58 @@ export class PixiRenderer implements CityRenderer {
     this.hudLayer.addChild(moon, sun);
     this.moonC = moon;
     this.sunC = sun;
+
+    // R3-8 — the hover name tag: a small pill following the cursor over any resident.
+    const tag = new Container();
+    const tagBg = new Graphics();
+    const tagText = new Text({
+      text: "",
+      style: { fontFamily: "system-ui, sans-serif", fontSize: 10, fontWeight: "bold", fill: 0xe6edf3 },
+    });
+    tagText.anchor.set(0, 0.5);
+    tag.addChild(tagBg, tagText);
+    tag.visible = false;
+    this.hudLayer.addChild(tag);
+    this.hoverTag = tag;
+    this.hoverTagBg = tagBg;
+    this.hoverTagText = tagText;
+  }
+
+  /** R3-8 — show name · activity for the resident under the cursor (no click needed). */
+  private updateHover(): void {
+    const tag = this.hoverTag;
+    if (!tag || !this.hoverTagBg || !this.hoverTagText) return;
+    if (this.hoverX === undefined || this.hoverY === undefined) {
+      tag.visible = false;
+      return;
+    }
+    const hit = this.pick(this.hoverX, this.hoverY);
+    if (!hit || hit.kind !== "resident") {
+      tag.visible = false;
+      return;
+    }
+    const r = this.world.getResident(hit.id);
+    if (!r) {
+      tag.visible = false;
+      return;
+    }
+    const label = `${r.name} · ${r.activity}`;
+    if (this.hoverTagText.text !== label) {
+      this.hoverTagText.text = label;
+      const w = this.hoverTagText.width + 12;
+      const h = 16;
+      this.hoverTagBg
+        .clear()
+        .roundRect(0, -h / 2, w, h, 4)
+        .fill({ color: 0x0e1116, alpha: 0.88 })
+        .stroke({ width: 1, color: 0x788296, alpha: 0.6 });
+      this.hoverTagText.position.set(6, 0);
+    }
+    tag.position.set(
+      Math.min(this.hoverX + 12, WIDTH - this.hoverTagText.width - 18),
+      Math.max(12, this.hoverY - 14),
+    );
+    tag.visible = true;
   }
 
   /** Crossfade sun↔moon by time of day (same `day = 1 - windowGlow` math as canvas). */
@@ -986,10 +1058,19 @@ export class PixiRenderer implements CityRenderer {
     walker.addChild(walkerOutline, walkerG);
     walker.visible = false;
 
+    // R3-9 — wealth-tier rings: a thin gold halo for the top tier, grey for the bottom,
+    // so the Gini card's inequality is readable person-by-person on the street.
+    const ringGold = new Graphics();
+    ringGold.circle(0, 0, DOT_RADIUS + 1.8).stroke({ width: 1.2, color: 0xf2c84b });
+    ringGold.visible = false;
+    const ringGrey = new Graphics();
+    ringGrey.circle(0, 0, DOT_RADIUS + 1.8).stroke({ width: 1.2, color: 0x8a8f98, alpha: 0.8 });
+    ringGrey.visible = false;
+
     const selGlow = new Graphics();
     selGlow.circle(0, 0, DOT_RADIUS + 3).stroke({ width: 2, color: 0xffffff });
     selGlow.visible = false;
-    container.addChild(shadow, tick, car, walker, dot, selGlow);
+    container.addChild(shadow, tick, car, walker, dot, ringGold, ringGrey, selGlow);
     this.residentsLayer?.addChild(container);
     const view: ResidentView = {
       container,
@@ -1000,6 +1081,8 @@ export class PixiRenderer implements CityRenderer {
       carBody,
       walker,
       walkerG,
+      ringGold,
+      ringGrey,
       selGlow,
       offX: 0,
       offY: 0,
@@ -1013,6 +1096,7 @@ export class PixiRenderer implements CityRenderer {
     r: Resident,
     isSelected: boolean,
     off: { dx: number; dy: number },
+    tier: "rich" | "poor" | undefined,
   ): void {
     v.selGlow.visible = isSelected;
     // Life-stage size/fade (HP3): a child grows from ~half size to full by adulthood;
@@ -1059,6 +1143,8 @@ export class PixiRenderer implements CityRenderer {
       }
       v.dot.visible = false;
       v.tick.visible = false;
+      v.ringGold.visible = false; // rings read on dots; traffic stays clean
+      v.ringGrey.visible = false;
     } else {
       // Standing: the classic activity dot (with the co-located fan-out ring).
       v.offX = off.dx;
@@ -1069,6 +1155,8 @@ export class PixiRenderer implements CityRenderer {
       v.car.visible = false;
       v.walker.visible = false;
       v.tick.visible = false;
+      v.ringGold.visible = tier === "rich";
+      v.ringGrey.visible = tier === "poor";
     }
   }
 
@@ -1172,14 +1260,21 @@ export class PixiRenderer implements CityRenderer {
       dragging = false;
     });
     c.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
       const p = toCanvas(e);
+      // R3-8 — track the cursor for the hover tag (read per frame in updateHover).
+      this.hoverX = p.x;
+      this.hoverY = p.y;
+      if (!dragging) return;
       this.cam.tx += p.x - lastX;
       this.cam.ty += p.y - lastY;
       lastX = p.x;
       lastY = p.y;
       this.clampCamera();
       this.applyCamera();
+    });
+    c.addEventListener("pointerleave", () => {
+      this.hoverX = undefined;
+      this.hoverY = undefined;
     });
     c.addEventListener(
       "wheel",
