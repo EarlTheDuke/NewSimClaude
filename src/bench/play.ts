@@ -25,6 +25,7 @@ import {
   BENCH_TURNS,
   BENCH_WEALTH_ELASTICITY,
   BENCH_OWNER_DIVIDEND_SHARE,
+  BENCH_BRAND_DEMAND_ELASTICITY,
   CAPITAL_BASELINE,
   BUSINESS_RESERVE,
 } from "../systems/constants";
@@ -63,6 +64,11 @@ function replay(actions: BusinessAction[], onDay?: DayHook) {
     disasters: false,
     wealthElasticity: BENCH_WEALTH_ELASTICITY,
     ownerDividendShare: BENCH_OWNER_DIVIDEND_SHARE,
+    // Parity with ceoBench's frozen scenario (found during the Pilot-A self-play): the
+    // bench freezes brand demand + the producer wage floor too — without these, the play
+    // harness scores aren't comparable to the printed baselines.
+    brandElasticity: BENCH_BRAND_DEMAND_ELASTICITY,
+    producerWageFloor: 0,
   });
   const ceo = world.getBusiness(TARGET)!;
   ceo.cash = BENCH_START_CAPITAL; // genesis recapitalization
