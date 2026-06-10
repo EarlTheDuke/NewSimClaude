@@ -236,6 +236,41 @@ mid-run. Joy lives through the export boom from street level.
   arrives (pop 12→13)** — promptly diluting the median, exactly as the dilution brake intends.
   Audit line in the playthrough report: `total money $84,108 = genesis $54,000 + minted $30,108`.
 
+### Arc 3b — "Boom Town, live" (2026-06-09): the watch-along re-run, all residents agentic
+
+Arc 3 re-run **in the browser** (`?scenario=boom`, 10x, the user watching in Chrome; Claude
+narrating from a deterministic twin via the dev handle and playing Joy through the new
+`JoyAndTheTown` provider) — with ONE config change that became the experiment: **every resident
+agentic** (the headless arc had only Joy). The P11-4 question — does labour agency carry a boom to
+the street? — answered on screen, ~80 days watched:
+
+- **Day 1: Joy's playbook fails** — Dot files for the foundry seat before Joy's review fires. The
+  awake town plays her own game against her; she never beats the crowd to a seat again. Instead
+  the farm **bids her up unasked** ($0.12→$0.278 by day 10) — in an agentic labour market you get
+  paid to be poachable, not to move.
+- **The median crosses the $600 migration line by day 5** (the passive town took 250 days and a
+  printing press). Agency IS the trickle-down mechanism — P11-4 confirmed by contrast.
+- **The town eats its own lunch**: by day ~9 all four producers flip `share 0` — locals outbid
+  the world (every local price above world parity) and exports hit $0 with the port still ~97%
+  full. Then prices settle and **the dock reopens by day ~20** ($240/day) — a price-driven trade
+  cycle nobody programmed. Corollary: *export booms require poor locals.*
+- **Growth came by stork, not suitcase**: 7 births by day 80, zero migrants — prosperity filled
+  every bed with newborns; **housing, not money, became the binding constraint** (the day-67/68
+  `housing full` → 🏠 build was the arc's structural beat).
+- **The press in a RICH town** (flipped day 44, 0.4%/day cap $400): median $788→$1,080, Gini flat
+  — an equality engine — while exports re-suffocated (printed money re-closed the dock in slow
+  motion; with B2B prices band-clamped and retail anchored, inflation expresses itself through
+  the TRADE BALANCE). And the wealth physics surfaced: wants-grow-with-wealth is a *soft* brake
+  (~$800–1,000) that **saturates at the 4× consumption cap** — past it, accumulation is uncapped.
+  Joy: $1,668 by day 79, ~+$20/day, ~$7–8k/yr pace; the ownership lane still compounds faster
+  (richest $3.8k).
+- **Live-watching found real render bugs tests never could**: the canvas fallback stacked
+  co-located residents into one dot (P11-5 — fixed: `fanOutOffset` ported to draw + pick), and
+  the user's "windows don't light up" report diagnosed as a triple defect (glow peaks at
+  midnight; Pixi lights by *tenancy* not presence; a night-alpha floor kills the contrast) — fix
+  specified in [PHASE-RENDER-R3-IDEAS.md](PHASE-RENDER-R3-IDEAS.md), the 43-idea visual backlog
+  this session commissioned.
+
 **Arc takeaways.** (1) **The structural growth channel runs through the street, not the dock**:
 the soaks' boom-grows-the-town result was carried by *agentic residents* lifting the median; with
 passive labour, outside demand pools at the top and the prosperity-gated migration never fires —
