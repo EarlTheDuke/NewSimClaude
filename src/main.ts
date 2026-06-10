@@ -63,6 +63,13 @@ class JoyAndTheTown implements ResidentDecisionProvider {
   }
 }
 const joyMind = boom ? new JoyAndTheTown("res_9") : undefined;
+// Joy's opening move ships with the scenario, so every Boom Town window starts the same story:
+// at the first dawn she walks from the farm to the foundry (the Arc 3 opener, now with the whole
+// town awake to fight back). Later moves are queued live through the dev handle.
+joyMind?.queue(
+  { switchJobTo: "biz_factory" },
+  "Day one in Boom Town, and I've read this story before: the foundry pays double the farm, and every growing firm will need its machines. This time the whole town is awake — so I'm getting there first.",
+);
 
 // The businesses run on the deterministic rule-based brain by default — fully
 // watchable, zero-config. To run them on Claude instead, swap in the provider:
@@ -204,6 +211,10 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
   ],
       },
 );
+
+// Boom Town opens at 10x — one sim-day ≈ 2.4 real minutes, the watch-along commentary pace.
+// (The speed buttons / 1–4 keys still work; this only sets the opening tempo.)
+if (boom) sim.time.setSpeed(10);
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
