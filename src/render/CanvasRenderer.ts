@@ -4,6 +4,7 @@ import type { DisasterKind } from "../systems/disasters";
 import { skyColor, ambient, windowGlow, windowGlowSharp, dim, hexToRgb, type Rgb } from "./daynight";
 import type { CityRenderer } from "./CityRenderer";
 import { fanOutOffset } from "./residentLayout";
+import { rightOf, dashes, ROAD_WIDTH, PATH_OFFSET } from "./roadGeometry";
 
 export const ACTIVITY_COLOR: Record<Activity, string> = {
   sleeping: "#5b6ee1",
@@ -119,18 +120,50 @@ export class CanvasRenderer implements CityRenderer {
     ctx.fillStyle = skyColor(hourFloat);
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Roads — dim toward black as ambient light falls.
-    ctx.strokeStyle = dim(ROAD_RGB, a);
-    ctx.lineWidth = 6;
+    // Roads (R3-2) — the two-lane street: footpaths on both sides, the asphalt bed, and
+    // a dashed centre line splitting it into lanes. All dimmed by ambient light.
     ctx.lineCap = "round";
+    ctx.strokeStyle = dim([104, 110, 122], a); // footpaths
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
     for (const road of world.roads) {
       const p = world.getNode(road.a);
       const q = world.getNode(road.b);
-      ctx.beginPath();
+      const r = rightOf(q.x - p.x, q.y - p.y);
+      for (const side of [1, -1]) {
+        const ox = r.x * PATH_OFFSET * side;
+        const oy = r.y * PATH_OFFSET * side;
+        for (const d of dashes(p.x + ox, p.y + oy, q.x + ox, q.y + oy, 9, 5)) {
+          ctx.moveTo(d.x1, d.y1);
+          ctx.lineTo(d.x2, d.y2);
+        }
+      }
+    }
+    ctx.stroke();
+    ctx.strokeStyle = dim(ROAD_RGB, a); // asphalt bed
+    ctx.lineWidth = ROAD_WIDTH;
+    ctx.beginPath();
+    for (const road of world.roads) {
+      const p = world.getNode(road.a);
+      const q = world.getNode(road.b);
       ctx.moveTo(p.x, p.y);
       ctx.lineTo(q.x, q.y);
-      ctx.stroke();
     }
+    ctx.stroke();
+    ctx.strokeStyle = dim([176, 162, 92], a); // dashed centre line — faded road paint
+    ctx.lineWidth = 1;
+    ctx.lineCap = "butt";
+    ctx.beginPath();
+    for (const road of world.roads) {
+      const p = world.getNode(road.a);
+      const q = world.getNode(road.b);
+      for (const d of dashes(p.x, p.y, q.x, q.y, 6, 8)) {
+        ctx.moveTo(d.x1, d.y1);
+        ctx.lineTo(d.x2, d.y2);
+      }
+    }
+    ctx.stroke();
+    ctx.lineCap = "round";
 
     // Buildings — dimmed by ambient, windows lit by night occupancy.
     // R3-1: home windows are presence-driven — one lit window per resident standing

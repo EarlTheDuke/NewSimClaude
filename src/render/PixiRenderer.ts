@@ -5,6 +5,7 @@ import { skyColor, ambient, windowGlow, windowGlowSharp, dimInt, type Rgb } from
 import { worldToScreen as toScreen, screenToWorld, type Camera } from "./camera";
 import { prosperityT, fillFraction, FILL_FULL_INVENTORY } from "./economyVisuals";
 import { fanOutOffset } from "./residentLayout";
+import { rightOf, dashes, ROAD_WIDTH, LANE_OFFSET, PATH_OFFSET } from "./roadGeometry";
 import { CAPITAL_BASELINE } from "../systems/constants";
 import {
   ROAD_RGB,
@@ -27,6 +28,9 @@ const WIN_SIZE = 6;
 const WIN_GAP = 4;
 const WIN_GOLD = 0xffd17a; // rgba(255, 209, 122) — the lit-window colour
 const PLANK_RGB: Rgb = [84, 84, 92]; // boarded-up plank colour, dimmed by ambient
+// R3-2 street furniture colours (white geometry, tinted per frame like the asphalt).
+const LANE_RGB: Rgb = [176, 162, 92]; // the dashed centre line — faded road paint
+const PATH_RGB: Rgb = [104, 110, 122]; // the footpaths flanking the asphalt
 
 /** Activity colours as packed ints, for tinting a white resident dot (parity with canvas). */
 const ACTIVITY_INT: Record<Activity, number> = Object.fromEntries(
@@ -59,8 +63,12 @@ interface ResidentView {
   shadow: Graphics;
   tick: Graphics;
   dot: Graphics;
+  car: Container; // R3-3: shown while travelling WITH a vehicle (right-hand lane)
+  carBody: Graphics; // the tintable hull
+  walker: Container; // R3-3: shown while travelling on foot (the footpath)
+  walkerG: Graphics; // the tintable figure
   selGlow: Graphics;
-  offX: number; // last applied fan-out offset (kept so pick() hits the drawn dot)
+  offX: number; // last applied draw offset — fan-out OR lane/footpath (kept so pick() hits the drawn spot)
   offY: number;
 }
 
@@ -98,6 +106,8 @@ export class PixiRenderer implements CityRenderer {
   private skyGfx: Graphics | undefined;
   private worldLayer: Container | undefined;
   private roadsGfx: Graphics | undefined;
+  private laneGfx: Graphics | undefined; // R3-2: dashed centre line, tinted separately
+  private pathGfx: Graphics | undefined; // R3-2: footpaths on both sides of the asphalt
   private buildingsLayer: Container | undefined;
   private residentsLayer: Container | undefined;
   private toastLayer: Container | undefined;
@@ -152,10 +162,19 @@ export class PixiRenderer implements CityRenderer {
     this.skyGfx = new Graphics();
     this.worldLayer = new Container();
     this.roadsGfx = new Graphics();
+    this.laneGfx = new Graphics();
+    this.pathGfx = new Graphics();
     this.buildingsLayer = new Container();
     this.residentsLayer = new Container();
     this.toastLayer = new Container(); // floating map toasts, above residents, in world space
-    this.worldLayer.addChild(this.roadsGfx, this.buildingsLayer, this.residentsLayer, this.toastLayer);
+    this.worldLayer.addChild(
+      this.pathGfx, // footpaths under the asphalt edge
+      this.roadsGfx,
+      this.laneGfx, // centre line painted on top of the asphalt
+      this.buildingsLayer,
+      this.residentsLayer,
+      this.toastLayer,
+    );
     this.app.stage.addChild(this.skyGfx, this.worldLayer);
     this.hudLayer = new Container();
     this.app.stage.addChild(this.hudLayer);
@@ -191,9 +210,12 @@ export class PixiRenderer implements CityRenderer {
       this.skyGfx.rect(0, 0, WIDTH, HEIGHT).fill(sky);
     }
 
-    // Roads — geometry built once (white), recoloured per frame via tint.
+    // Roads — geometry built once (white), recoloured per frame via tint. The street
+    // is three tinted layers (R3-2): footpaths, asphalt bed, dashed centre line.
     this.ensureRoads();
     this.roadsGfx.tint = dimInt(ROAD_RGB, a);
+    if (this.laneGfx) this.laneGfx.tint = dimInt(LANE_RGB, a);
+    if (this.pathGfx) this.pathGfx.tint = dimInt(PATH_RGB, a);
 
     // Buildings — one persistent view per location, created lazily, mutated here.
     // R3-1: a home's windows light by who is ACTUALLY inside — one golden window per
@@ -453,14 +475,35 @@ export class PixiRenderer implements CityRenderer {
     return undefined;
   }
 
+  /**
+   * R3-2 — the two-lane street, built once in white and tinted per frame: a wide asphalt
+   * bed, a dashed centre line splitting it into two lanes, and dashed footpaths flanking
+   * BOTH sides (sidewalks, so a walker keeping to their right is always on one). Pure
+   * one-time geometry from `world.roads` — zero per-frame cost.
+   */
   private ensureRoads(): void {
-    if (this.roadsBuilt || !this.roadsGfx) return;
+    if (this.roadsBuilt || !this.roadsGfx || !this.laneGfx || !this.pathGfx) return;
     for (const road of this.world.roads) {
       const p = this.world.getNode(road.a);
       const q = this.world.getNode(road.b);
       this.roadsGfx.moveTo(p.x, p.y).lineTo(q.x, q.y);
+      // Centre line: short paint dashes down the middle of the bed.
+      for (const d of dashes(p.x, p.y, q.x, q.y, 6, 8)) {
+        this.laneGfx.moveTo(d.x1, d.y1).lineTo(d.x2, d.y2);
+      }
+      // Footpaths: long stitched dashes offset to both sides of the asphalt.
+      const r = rightOf(q.x - p.x, q.y - p.y);
+      for (const side of [1, -1]) {
+        const ox = r.x * PATH_OFFSET * side;
+        const oy = r.y * PATH_OFFSET * side;
+        for (const d of dashes(p.x + ox, p.y + oy, q.x + ox, q.y + oy, 9, 5)) {
+          this.pathGfx.moveTo(d.x1, d.y1).lineTo(d.x2, d.y2);
+        }
+      }
     }
-    this.roadsGfx.stroke({ width: 6, color: 0xffffff, cap: "round" });
+    this.roadsGfx.stroke({ width: ROAD_WIDTH, color: 0xffffff, cap: "round" });
+    this.laneGfx.stroke({ width: 1, color: 0xffffff, cap: "butt" });
+    this.pathGfx.stroke({ width: 1.5, color: 0xffffff, cap: "round" });
     this.roadsBuilt = true;
   }
 
@@ -633,12 +676,50 @@ export class PixiRenderer implements CityRenderer {
     const dot = new Graphics();
     dot.circle(0, 0, DOT_RADIUS).fill(0xffffff);
     dot.stroke({ width: 1, color: 0x000000, alpha: 0.55 });
+
+    // R3-3 — the car: a small top-down hull (white, tinted by activity) with dark wheel
+    // nubs and a windshield band near the nose. Built nose-toward-+x; rotated to heading.
+    const car = new Container();
+    const carBody = new Graphics();
+    carBody.roundRect(-6, -3, 12, 6, 2).fill(0xffffff);
+    carBody.stroke({ width: 1, color: 0x000000, alpha: 0.5 });
+    const wheels = new Graphics();
+    for (const [wx, wy] of [[-3.5, -3.4], [3.5, -3.4], [-3.5, 3.4], [3.5, 3.4]] as const) {
+      wheels.rect(wx - 1.2, wy - 0.8, 2.4, 1.6).fill(0x14161c);
+    }
+    const windshield = new Graphics();
+    windshield.rect(1, -2.2, 2.2, 4.4).fill({ color: 0x0e1116, alpha: 0.5 });
+    car.addChild(wheels, carBody, windshield);
+    car.visible = false;
+
+    // R3-3 — the walker: a tiny figure (head + torso, tinted by activity) for the footpath.
+    const walker = new Container();
+    const walkerG = new Graphics();
+    walkerG.circle(0, -3.5, 1.9).fill(0xffffff);
+    walkerG.moveTo(0, -1.6).lineTo(0, 2.8).stroke({ width: 2.2, color: 0xffffff, cap: "round" });
+    const walkerOutline = new Graphics();
+    walkerOutline.circle(0, -3.5, 2.4).stroke({ width: 0.8, color: 0x000000, alpha: 0.4 });
+    walker.addChild(walkerOutline, walkerG);
+    walker.visible = false;
+
     const selGlow = new Graphics();
     selGlow.circle(0, 0, DOT_RADIUS + 3).stroke({ width: 2, color: 0xffffff });
     selGlow.visible = false;
-    container.addChild(shadow, tick, dot, selGlow);
+    container.addChild(shadow, tick, car, walker, dot, selGlow);
     this.residentsLayer?.addChild(container);
-    const view: ResidentView = { container, shadow, tick, dot, selGlow, offX: 0, offY: 0 };
+    const view: ResidentView = {
+      container,
+      shadow,
+      tick,
+      dot,
+      car,
+      carBody,
+      walker,
+      walkerG,
+      selGlow,
+      offX: 0,
+      offY: 0,
+    };
     this.residentViews.set(id, view);
     return view;
   }
@@ -649,10 +730,6 @@ export class PixiRenderer implements CityRenderer {
     isSelected: boolean,
     off: { dx: number; dy: number },
   ): void {
-    v.offX = off.dx;
-    v.offY = off.dy;
-    v.container.position.set(r.move.x + off.dx, r.move.y + off.dy);
-    v.dot.tint = ACTIVITY_INT[r.activity];
     v.selGlow.visible = isSelected;
     // Life-stage size/fade (HP3): a child grows from ~half size to full by adulthood;
     // an elder fades slightly. Keeps the activity tint intact. No-op when age is unset.
@@ -664,18 +741,49 @@ export class PixiRenderer implements CityRenderer {
       v.container.scale.set(age < CHILD_MAX_AGE ? 0.55 + 0.45 * (age / CHILD_MAX_AGE) : 1);
       v.container.alpha = age >= ELDER_AGE ? 0.7 : 1;
     }
-    if (r.move.path.length > 0) {
+
+    const moving = r.move.path.length > 0;
+    if (moving) {
+      // R3-3 — travellers show as traffic: a car in its right-hand lane, or a walker on
+      // the footpath to their right (both offsets from roadGeometry, so two residents
+      // passing each other keep to their own sides). The bob is wall-clock presentation
+      // (like the bubble fade) — it never touches sim state.
       const next = this.world.getNode(r.move.path[0]!);
       const dx = next.x - r.move.x;
       const dy = next.y - r.move.y;
-      const len = Math.hypot(dx, dy) || 1;
-      v.tick.clear();
-      v.tick
-        .moveTo(0, 0)
-        .lineTo((dx / len) * 9, (dy / len) * 9)
-        .stroke({ width: 2, color: 0xe1d65b, alpha: 0.55 });
-      v.tick.visible = true;
+      const right = rightOf(dx, dy);
+      if (r.hasVehicle) {
+        const ox = right.x * LANE_OFFSET;
+        const oy = right.y * LANE_OFFSET;
+        v.offX = ox;
+        v.offY = oy;
+        v.container.position.set(r.move.x + ox, r.move.y + oy);
+        v.car.rotation = Math.atan2(dy, dx);
+        v.carBody.tint = ACTIVITY_INT[r.activity];
+        v.car.visible = true;
+        v.walker.visible = false;
+      } else {
+        const bob = Math.sin(performance.now() / 130) * 0.7;
+        const ox = right.x * PATH_OFFSET;
+        const oy = right.y * PATH_OFFSET + bob;
+        v.offX = ox;
+        v.offY = oy;
+        v.container.position.set(r.move.x + ox, r.move.y + oy);
+        v.walkerG.tint = ACTIVITY_INT[r.activity];
+        v.walker.visible = true;
+        v.car.visible = false;
+      }
+      v.dot.visible = false;
+      v.tick.visible = false;
     } else {
+      // Standing: the classic activity dot (with the co-located fan-out ring).
+      v.offX = off.dx;
+      v.offY = off.dy;
+      v.container.position.set(r.move.x + off.dx, r.move.y + off.dy);
+      v.dot.tint = ACTIVITY_INT[r.activity];
+      v.dot.visible = true;
+      v.car.visible = false;
+      v.walker.visible = false;
       v.tick.visible = false;
     }
   }
