@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ambient, windowGlow, skyColor, dim, dimInt, hexToRgb, NIGHT_AMBIENT, type Rgb } from "./daynight";
+import { ambient, windowGlow, windowGlowSharp, skyColor, dim, dimInt, hexToRgb, NIGHT_AMBIENT, type Rgb } from "./daynight";
 
 const luminance = (hex: string): number => {
   const [r, g, b] = hexToRgb(hex);
@@ -115,6 +115,31 @@ describe("daynight palette (Phase 5)", () => {
     it("round-trips channel values", () => {
       expect(hexToRgb("#11131a")).toEqual([17, 19, 26]);
       expect(hexToRgb("#ffffff")).toEqual([255, 255, 255]);
+    });
+  });
+
+  describe("windowGlowSharp (R3-1 — the home-window evening curve)", () => {
+    it("is OFF through the working day and ON through the night", () => {
+      for (const h of [8, 10, 12, 14, 16, 17]) expect(windowGlowSharp(h)).toBe(0);
+      for (const h of [19.5, 20, 22, 0, 3, 5, 5.4]) expect(windowGlowSharp(h)).toBe(1);
+    });
+
+    it("ramps monotonically through the coming-home hours and is strong by 19:00", () => {
+      expect(windowGlowSharp(17)).toBe(0);
+      const seven = windowGlowSharp(19);
+      expect(seven).toBeGreaterThan(0.85); // the fix: near-full when families come home (old curve: ~0.55)
+      expect(windowGlowSharp(18)).toBeGreaterThan(windowGlowSharp(17.5));
+      expect(seven).toBeGreaterThan(windowGlowSharp(18));
+      expect(windowGlowSharp(19.5)).toBe(1);
+    });
+
+    it("fades across dawn and wraps any hour like its siblings", () => {
+      expect(windowGlowSharp(5.5)).toBeCloseTo(1, 6);
+      expect(windowGlowSharp(6.25)).toBeGreaterThan(0);
+      expect(windowGlowSharp(6.25)).toBeLessThan(1);
+      expect(windowGlowSharp(7)).toBe(0);
+      expect(windowGlowSharp(24 + 20)).toBe(1); // 20:00, wrapped
+      expect(windowGlowSharp(-2)).toBe(1); // 22:00, wrapped
     });
   });
 });

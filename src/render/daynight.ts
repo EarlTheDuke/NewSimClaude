@@ -47,6 +47,28 @@ export function windowGlow(hour: number): number {
   return 1 - daylight(hour);
 }
 
+/**
+ * The HOME-window curve (R3-1): how strongly a lit home window reads, as a sharp
+ * presentation-only function of the evening. Unlike {@link windowGlow} (a gentle cosine that is
+ * only at half power at 18:00 and peaks at midnight), this ramps from 17:00 to FULL by 19:30 —
+ * the hours families actually come home — holds all night, and fades out across dawn
+ * (05:30 → 07:00). Real-world: driving through a neighborhood at 8pm and seeing at a glance
+ * whose lights are on. Pure function of the clock; never sim state.
+ */
+export function windowGlowSharp(hour: number): number {
+  const h = wrap(hour);
+  if (h >= 19.5 || h < 5.5) return 1; // settled evening through deep night
+  if (h >= 17) return smooth((h - 17) / 2.5); // evening ramp: 17:00 → full at 19:30
+  if (h < 7) return smooth((7 - h) / 1.5); // dawn fade: full at 05:30 → off at 07:00
+  return 0; // daytime — lights off
+}
+
+/** Classic smoothstep easing on [0,1] — soft shoulders, no sudden snap. */
+function smooth(t: number): number {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+}
+
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }

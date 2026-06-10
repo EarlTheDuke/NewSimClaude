@@ -1,7 +1,7 @@
 import type { World } from "../world/World";
 import type { Activity, BusinessKind, Business, Resident, Location } from "../world/types";
 import type { DisasterKind } from "../systems/disasters";
-import { skyColor, ambient, windowGlow, dim, hexToRgb, type Rgb } from "./daynight";
+import { skyColor, ambient, windowGlow, windowGlowSharp, dim, hexToRgb, type Rgb } from "./daynight";
 import type { CityRenderer } from "./CityRenderer";
 import { fanOutOffset } from "./residentLayout";
 
@@ -133,12 +133,25 @@ export class CanvasRenderer implements CityRenderer {
     }
 
     // Buildings — dimmed by ambient, windows lit by night occupancy.
+    // R3-1: home windows are presence-driven — one lit window per resident standing
+    // at their own home (the Pixi rule, kept in parity here).
+    const glowHome = windowGlowSharp(hourFloat);
+    const peopleHome = new Map<string, number>();
+    for (const r of world.residents) {
+      if (r.move.path.length === 0 && r.move.atNodeId) {
+        const home = world.locations.find((l) => l.id === r.homeId);
+        if (home && home.nodeId === r.move.atNodeId) {
+          peopleHome.set(r.homeId, (peopleHome.get(r.homeId) ?? 0) + 1);
+        }
+      }
+    }
     ctx.font = "10px system-ui, sans-serif";
     ctx.textAlign = "center";
     for (const loc of world.locations) {
       const slot = this.buildingSlot(loc);
       const biz = world.businesses.find((b) => b.locationId === loc.id);
-      this.drawBuilding(slot.x, slot.y, biz, this.occupantsAt(loc.nodeId), a, glow);
+      const homeWindows = loc.type === "home" ? peopleHome.get(loc.id) ?? 0 : undefined;
+      this.drawBuilding(slot.x, slot.y, biz, this.occupantsAt(loc.nodeId), homeWindows, a, glow, glowHome);
       if (biz && selected?.kind === "business" && selected.id === biz.id) {
         this.outlineBuilding(slot.x, slot.y);
       }
@@ -411,8 +424,10 @@ export class CanvasRenderer implements CityRenderer {
     cy: number,
     biz: Business | undefined,
     occupants: number,
+    homeWindows: number | undefined,
     a: number,
     glow: number,
+    glowHome: number,
   ): void {
     const { ctx } = this;
     const half = BUILDING / 2;
@@ -443,14 +458,32 @@ export class CanvasRenderer implements CityRenderer {
     ctx.fillStyle = dim(base, a);
     ctx.fillRect(x, y, BUILDING, BUILDING);
 
-    // Lit windows: scaled by how dark it is and how many residents are here.
-    const lit = glow * (0.12 + 0.88 * (Math.min(occupants, 3) / 3));
-    if (lit <= 0.02) return;
     const wsize = 6;
     const gap = 4;
     const span = 2 * wsize + gap;
     const ox = x + (BUILDING - span) / 2;
     const oy = y + (BUILDING - span) / 2;
+
+    if (homeWindows !== undefined) {
+      // R3-1 — presence-driven home lights: one golden window per resident actually
+      // inside (capped at the 2×2 grid), full strength once dusk settles, dark when
+      // empty. No alpha floor — occupied vs empty reads as ON vs OFF.
+      const n = Math.min(homeWindows, 4);
+      if (glowHome <= 0.02 || n <= 0) return;
+      ctx.fillStyle = `rgba(255, 209, 122, ${glowHome.toFixed(3)})`;
+      let drawn = 0;
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 2; col++) {
+          if (drawn++ >= n) continue;
+          ctx.fillRect(ox + col * (wsize + gap), oy + row * (wsize + gap), wsize, wsize);
+        }
+      }
+      return;
+    }
+
+    // Workplaces: lit by how dark it is and how many residents are physically here.
+    const lit = glow * (0.12 + 0.88 * (Math.min(occupants, 3) / 3));
+    if (lit <= 0.02) return;
     ctx.fillStyle = `rgba(255, 209, 122, ${lit.toFixed(3)})`;
     for (let row = 0; row < 2; row++) {
       for (let col = 0; col < 2; col++) {

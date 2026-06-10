@@ -1,11 +1,10 @@
 import { Application, Container, Graphics, Text } from "pixi.js";
 import type { World } from "../world/World";
 import type { Business, Location, Resident, Activity } from "../world/types";
-import { skyColor, ambient, windowGlow, dimInt, type Rgb } from "./daynight";
+import { skyColor, ambient, windowGlow, windowGlowSharp, dimInt, type Rgb } from "./daynight";
 import { worldToScreen as toScreen, screenToWorld, type Camera } from "./camera";
 import { prosperityT, fillFraction, FILL_FULL_INVENTORY } from "./economyVisuals";
 import { fanOutOffset } from "./residentLayout";
-import { occupantsByHome } from "../world/housing";
 import { CAPITAL_BASELINE } from "../systems/constants";
 import {
   ROAD_RGB,
@@ -197,24 +196,30 @@ export class PixiRenderer implements CityRenderer {
     this.roadsGfx.tint = dimInt(ROAD_RGB, a);
 
     // Buildings — one persistent view per location, created lazily, mutated here.
-    // A home's windows now light by how full it is (residents who LIVE there ÷ its
-    // capacity), so the skyline shows occupancy at a glance — full homes glow, a fresh
-    // or empty home is dim. Workplaces keep lighting by who's physically on-site.
-    const homeOcc = occupantsByHome(this.world.residents);
+    // R3-1: a home's windows light by who is ACTUALLY inside — one golden window per
+    // resident standing at their own home — so lights come on as each person walks in
+    // the door after dark (and an empty house is dark, full stop). Workplaces keep
+    // lighting by who's physically on-site, on the gentle ambient curve.
+    const glowHome = windowGlowSharp(hourFloat);
+    const peopleHome = new Map<string, number>();
+    for (const r of this.world.residents) {
+      if (r.move.path.length === 0 && r.move.atNodeId) {
+        const home = this.world.locations.find((l) => l.id === r.homeId);
+        if (home && home.nodeId === r.move.atNodeId) {
+          peopleHome.set(r.homeId, (peopleHome.get(r.homeId) ?? 0) + 1);
+        }
+      }
+    }
     const seen = new Set<string>();
     for (const loc of this.world.locations) {
       seen.add(loc.id);
       const view = this.ensureBuildingView(loc);
       const biz = this.world.businesses.find((b) => b.locationId === loc.id);
       const isSel = selected?.kind === "business" && !!biz && selected.id === biz.id;
-      let litFraction: number;
-      if (loc.type === "home") {
-        const cap = loc.capacity ?? 3;
-        litFraction = cap > 0 ? Math.min(1, (homeOcc.get(loc.id) ?? 0) / cap) : 0;
-      } else {
-        litFraction = Math.min(1, this.occupantsAt(loc.nodeId) / 3);
-      }
-      this.updateBuildingView(view, biz, litFraction, a, glow, isSel);
+      const homeWindows = loc.type === "home" ? peopleHome.get(loc.id) ?? 0 : undefined;
+      const litFraction =
+        loc.type === "home" ? 0 : Math.min(1, this.occupantsAt(loc.nodeId) / 3);
+      this.updateBuildingView(view, biz, litFraction, homeWindows, a, glow, glowHome, isSel);
     }
     this.reapBuildings(seen);
 
@@ -547,8 +552,10 @@ export class PixiRenderer implements CityRenderer {
     v: BuildingView,
     biz: Business | undefined,
     litFraction: number,
+    homeWindows: number | undefined,
     a: number,
     glow: number,
+    glowHome: number,
     isSelected: boolean,
   ): void {
     if (biz && !biz.active) {
@@ -560,9 +567,24 @@ export class PixiRenderer implements CityRenderer {
       const baseRgb = biz ? BUSINESS_RGB[biz.kind] ?? BUSINESS_RGB_DEFAULT : HOME_RGB;
       v.base.tint = dimInt(baseRgb, a);
       v.planks.visible = false;
-      const lit = glow * (0.12 + 0.88 * Math.max(0, Math.min(1, litFraction)));
-      v.windows.visible = lit > 0.02;
-      v.windows.alpha = lit;
+      if (homeWindows !== undefined) {
+        // R3-1 — presence-driven home lights: one window per person inside (capped at
+        // the 2×2 grid), full gold once dusk settles, dark when the house is empty.
+        // No alpha floor — occupied vs empty reads as ON vs OFF.
+        const n = Math.min(homeWindows, v.windows.children.length);
+        v.windows.visible = glowHome > 0.02 && n > 0;
+        v.windows.alpha = glowHome;
+        v.windows.children.forEach((w, i) => {
+          w.visible = i < n;
+        });
+      } else {
+        const lit = glow * (0.12 + 0.88 * Math.max(0, Math.min(1, litFraction)));
+        v.windows.visible = lit > 0.02;
+        v.windows.alpha = lit;
+        v.windows.children.forEach((w) => {
+          w.visible = true; // workplaces keep the whole grid (ambient office light)
+        });
+      }
     }
     v.label.tint = dimInt(LABEL_RGB, Math.max(a, 0.7));
     v.selOutline.visible = isSelected;
