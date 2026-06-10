@@ -30,6 +30,9 @@ const PLANK_RGB: Rgb = [84, 84, 92]; // boarded-up plank colour, dimmed by ambie
 // R3-2 street furniture colours (white geometry, tinted per frame like the asphalt).
 const LANE_RGB: Rgb = [176, 162, 92]; // the dashed centre line — faded road paint
 const PATH_RGB: Rgb = [104, 110, 122]; // the footpaths flanking the asphalt
+const LAMP_POST_RGB: Rgb = [140, 146, 158]; // R3-5 lamp posts, dimmed with the daylight
+const LAMP_GLOW = 0xffd9a0; // R3-5 the warm light pool, alpha-driven by dusk
+const DOOR_GOLD = 0xffc46b; // R3-13 the staffed-storefront doorway glow
 
 /** Activity colours as packed ints, for tinting a white resident dot (parity with canvas). */
 const ACTIVITY_INT: Record<Activity, number> = Object.fromEntries(
@@ -54,6 +57,10 @@ interface BuildingView {
   /** R3-6 posted-wage placard, shown while the firm bids above its base wage. */
   wageTag: Text;
   lastWage: string;
+  /** R3-13 doorway glow — storefronts only; lit while staffed during opening hours. */
+  door?: Graphics;
+  /** R3-7 the Zzz wisp over a home whose occupants are asleep at night. */
+  zzz?: Text;
 }
 
 // Life-stage styling (HP3) — purely visual thresholds so the age structure reads at
@@ -113,6 +120,8 @@ export class PixiRenderer implements CityRenderer {
   private roadsGfx: Graphics | undefined;
   private laneGfx: Graphics | undefined; // R3-2: dashed centre line, tinted separately
   private pathGfx: Graphics | undefined; // R3-2: footpaths on both sides of the asphalt
+  private lampPosts: Graphics | undefined; // R3-5: lamp posts at every crossing
+  private lampGlow: Graphics | undefined; // R3-5: their warm pools, alpha = dusk curve
   private buildingsLayer: Container | undefined;
   private residentsLayer: Container | undefined;
   private toastLayer: Container | undefined;
@@ -169,6 +178,8 @@ export class PixiRenderer implements CityRenderer {
     this.roadsGfx = new Graphics();
     this.laneGfx = new Graphics();
     this.pathGfx = new Graphics();
+    this.lampGlow = new Graphics();
+    this.lampPosts = new Graphics();
     this.buildingsLayer = new Container();
     this.residentsLayer = new Container();
     this.toastLayer = new Container(); // floating map toasts, above residents, in world space
@@ -176,7 +187,9 @@ export class PixiRenderer implements CityRenderer {
       this.pathGfx, // footpaths under the asphalt edge
       this.roadsGfx,
       this.laneGfx, // centre line painted on top of the asphalt
+      this.lampGlow, // light pools wash the street, under the buildings
       this.buildingsLayer,
+      this.lampPosts, // the posts stand over the street furniture
       this.residentsLayer,
       this.toastLayer,
     );
@@ -221,6 +234,10 @@ export class PixiRenderer implements CityRenderer {
     this.roadsGfx.tint = dimInt(ROAD_RGB, a);
     if (this.laneGfx) this.laneGfx.tint = dimInt(LANE_RGB, a);
     if (this.pathGfx) this.pathGfx.tint = dimInt(PATH_RGB, a);
+    // R3-5 — street lamps: posts dim with the daylight; the warm pools pop on at dusk
+    // (the same sharp curve as the home windows) and wash the crossings all night.
+    if (this.lampPosts) this.lampPosts.tint = dimInt(LAMP_POST_RGB, a);
+    if (this.lampGlow) this.lampGlow.alpha = windowGlowSharp(hourFloat) * 0.28;
 
     // Buildings — one persistent view per location, created lazily, mutated here.
     // R3-1: a home's windows light by who is ACTUALLY inside — one golden window per
@@ -229,14 +246,21 @@ export class PixiRenderer implements CityRenderer {
     // lighting by who's physically on-site, on the gentle ambient curve.
     const glowHome = windowGlowSharp(hourFloat);
     const peopleHome = new Map<string, number>();
+    const sleepersHome = new Map<string, number>(); // R3-7 — who is home AND asleep
     for (const r of this.world.residents) {
       if (r.move.path.length === 0 && r.move.atNodeId) {
         const home = this.world.locations.find((l) => l.id === r.homeId);
         if (home && home.nodeId === r.move.atNodeId) {
           peopleHome.set(r.homeId, (peopleHome.get(r.homeId) ?? 0) + 1);
+          if (r.activity === "sleeping") {
+            sleepersHome.set(r.homeId, (sleepersHome.get(r.homeId) ?? 0) + 1);
+          }
         }
       }
     }
+    // R3-13 — storefront doorway light: lit while the shop is staffed during trading
+    // hours (the staffed-and-open signal, distinct from bankruptcy boards).
+    const openNow = hourFloat >= 7 && hourFloat < 22;
     const seen = new Set<string>();
     for (const loc of this.world.locations) {
       seen.add(loc.id);
@@ -244,9 +268,21 @@ export class PixiRenderer implements CityRenderer {
       const biz = this.world.businesses.find((b) => b.locationId === loc.id);
       const isSel = selected?.kind === "business" && !!biz && selected.id === biz.id;
       const homeWindows = loc.type === "home" ? peopleHome.get(loc.id) ?? 0 : undefined;
+      const sleepers = loc.type === "home" ? sleepersHome.get(loc.id) ?? 0 : 0;
       const litFraction =
         loc.type === "home" ? 0 : Math.min(1, this.occupantsAt(loc.nodeId) / 3);
-      this.updateBuildingView(view, biz, litFraction, homeWindows, a, glow, glowHome, isSel);
+      this.updateBuildingView(
+        view,
+        biz,
+        litFraction,
+        homeWindows,
+        sleepers,
+        a,
+        glow,
+        glowHome,
+        openNow,
+        isSel,
+      );
     }
     this.reapBuildings(seen);
 
@@ -525,6 +561,20 @@ export class PixiRenderer implements CityRenderer {
     this.roadsGfx.stroke({ width: ROAD_WIDTH, color: 0xffffff, cap: "round" });
     this.laneGfx.stroke({ width: 1, color: 0xffffff, cap: "butt" });
     this.pathGfx.stroke({ width: 1.5, color: 0xffffff, cap: "round" });
+
+    // R3-5 — a lamp at every crossing, built once: the post stands on the NW corner
+    // pavement (opposite the SE kerb where waiting residents gather), its warm pool
+    // pooling onto the junction. Pool alpha is driven per frame by the dusk curve.
+    if (this.lampPosts && this.lampGlow) {
+      for (const n of this.world.nodes) {
+        const lx = n.x - (ROAD_WIDTH / 2 + PATH_OFFSET + 1.5);
+        const ly = n.y - (ROAD_WIDTH / 2 + PATH_OFFSET + 1.5);
+        this.lampPosts.moveTo(lx, ly).lineTo(lx, ly - 11).stroke({ width: 1.5, color: 0xffffff });
+        this.lampPosts.circle(lx, ly - 12.5, 2).fill(0xffffff);
+        this.lampGlow.ellipse(lx, ly - 1, 11, 6).fill(LAMP_GLOW);
+        this.lampGlow.circle(lx, ly - 12.5, 3.5).fill(LAMP_GLOW);
+      }
+    }
     this.roadsBuilt = true;
   }
 
@@ -625,6 +675,28 @@ export class PixiRenderer implements CityRenderer {
       decoParts.push({ g: drive, rgb: [96, 100, 110] });
     }
 
+    // R3-13 — the doorway: storefronts get a warm door slab at the foot of the facade,
+    // lit while the shop is staffed during opening hours (built once, toggled per frame).
+    let door: Graphics | undefined;
+    if (bizHere && (bizHere.kind === "diner" || bizHere.kind === "goods")) {
+      door = new Graphics();
+      door.rect(-2.5, half - 7, 5, 7).fill(DOOR_GOLD);
+      door.visible = false;
+      deco.addChild(door);
+    }
+
+    // R3-7 — the Zzz wisp for homes, drifting above the roof while the household sleeps.
+    let zzz: Text | undefined;
+    if (loc.type === "home") {
+      zzz = new Text({
+        text: "z z",
+        style: { fontFamily: "system-ui, sans-serif", fontSize: 9, fontStyle: "italic", fill: 0xbcd0ff },
+      });
+      zzz.anchor.set(0.5, 1);
+      zzz.visible = false;
+      deco.addChild(zzz);
+    }
+
     // R3-6 — the posted-wage placard: visible while the firm bids above its base wage,
     // so the labour war is readable on the map instead of buried in the ticker.
     const wageTag = new Text({
@@ -659,6 +731,8 @@ export class PixiRenderer implements CityRenderer {
       deco,
       wageTag,
       lastWage: "",
+      door,
+      zzz,
     };
     this.buildingViews.set(loc.id, view);
     return view;
@@ -765,9 +839,11 @@ export class PixiRenderer implements CityRenderer {
     biz: Business | undefined,
     litFraction: number,
     homeWindows: number | undefined,
+    sleepers: number,
     a: number,
     glow: number,
     glowHome: number,
+    openNow: boolean,
     isSelected: boolean,
   ): void {
     if (biz && !biz.active) {
@@ -806,6 +882,17 @@ export class PixiRenderer implements CityRenderer {
       v.deco.visible = true;
       for (const p of v.decoParts) p.g.tint = dimInt(p.rgb, a);
     }
+    // R3-7 — the Zzz wisp: drifts and breathes over a home whose occupants are asleep
+    // after dark. Wall-clock motion (like the bubble fade) — presentation only.
+    if (v.zzz) {
+      const show = sleepers > 0 && glowHome > 0.3;
+      v.zzz.visible = show;
+      if (show) {
+        const now = performance.now();
+        v.zzz.position.set(5 + Math.sin(now / 900) * 1.5, -BUILDING / 2 - 4 - Math.sin(now / 700) * 2);
+        v.zzz.alpha = 0.55 + 0.25 * Math.sin(now / 850);
+      }
+    }
     // Visual economic state (R3): prosperity glow (capital), inventory bar, worker
     // figures (headcount) — active firms only; homes + shuttered show none.
     if (biz && biz.active) {
@@ -819,6 +906,14 @@ export class PixiRenderer implements CityRenderer {
       v.workers.children.forEach((c, i) => {
         c.visible = i < crew;
       });
+      // R3-13 — the doorway lamp: warm while the shop is staffed during trading hours,
+      // brighter as the evening darkens; dark when unstaffed (a different signal from
+      // bankruptcy boards: "nobody's serving" vs "gone for good").
+      if (v.door) {
+        const staffed = biz.employeeIds.length > 0;
+        v.door.visible = staffed && openNow;
+        v.door.alpha = 0.45 + 0.55 * glow;
+      }
       // R3-6 — the posted-wage placard: shown while the firm bids above its base wage,
       // so a labour war reads on the map (rival placards leapfrogging each other).
       const baseWage = biz.baseWagePerTick ?? biz.wagePerTick;
@@ -838,6 +933,7 @@ export class PixiRenderer implements CityRenderer {
         c.visible = false;
       });
       v.wageTag.visible = false;
+      if (v.door) v.door.visible = false;
     }
   }
 
