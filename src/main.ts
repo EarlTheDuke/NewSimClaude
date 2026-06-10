@@ -499,8 +499,35 @@ function sparkline(values: readonly number[], color: string): string {
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" /></svg>`;
 }
 
-function vitalCard(label: string, value: string, values: readonly number[], color: string): string {
-  return `<div class="card"><div class="card-top"><span>${label}</span><b>${value}</b></div>${sparkline(values, color)}</div>`;
+/**
+ * One vitals card (R3-10 upgrade): alongside the sparkline, each card now shows a 7-day
+ * trend arrow — green for improving, red for worsening (`goodWhenDown` flips the moral for
+ * metrics like Gini and unemployment) — and an optional amber alert outline when the metric
+ * is moving fast in the wrong direction. Pure presentation over `macro.history()`.
+ */
+function vitalCard(
+  label: string,
+  value: string,
+  values: readonly number[],
+  color: string,
+  opts?: { goodWhenDown?: boolean; alertWhen?: (delta7d: number) => boolean },
+): string {
+  let trend = "";
+  let alert = false;
+  if (values.length >= 8) {
+    const prev = values[values.length - 8]!;
+    const cur = values[values.length - 1]!;
+    const delta = cur - prev;
+    const rel = Math.abs(prev) > 1e-9 ? delta / Math.abs(prev) : delta;
+    if (Math.abs(rel) >= 0.02) {
+      const up = delta > 0;
+      const good = opts?.goodWhenDown ? !up : up;
+      trend = `<span style="color:${good ? "#3fb950" : "#f85149"};font-size:10px">${up ? "▲" : "▼"}</span> `;
+    }
+    alert = opts?.alertWhen?.(delta) ?? false;
+  }
+  const outline = alert ? ' style="outline:1px solid #d29922;border-radius:4px"' : "";
+  return `<div class="card"${outline}><div class="card-top"><span>${label}</span><b>${trend}${value}</b></div>${sparkline(values, color)}</div>`;
 }
 
 function renderInspector(): void {
@@ -797,11 +824,15 @@ function renderMacro(): void {
       vitalCard("Capital stock", latest.totalCapital.toFixed(0), history.map((s) => s.totalCapital), "#56d4dd"),
       vitalCard("Avg price", money2(latest.avgResourcePrice), history.map((s) => s.avgResourcePrice), "#e15bc8"),
       vitalCard("Total money", money(latest.totalMoney), history.map((s) => s.totalMoney), "#9aa0a6"),
-      vitalCard("Unemployed", String(latest.unemployed), history.map((s) => s.unemployed), "#e1a35b"),
+      vitalCard("Unemployed", String(latest.unemployed), history.map((s) => s.unemployed), "#e1a35b", { goodWhenDown: true }),
       // Observatory metrics (free-market study): the emergent labour/capital split,
       // inequality, and whether money is actually circulating.
       vitalCard("Labour share", `${Math.round(latest.labourShare * 100)}%`, history.map((s) => s.labourShare), "#f778ba"),
-      vitalCard("Inequality (Gini)", latest.gini.toFixed(2), history.map((s) => s.gini), "#db6d28"),
+      // R3-10 — the Gini card goes amber when inequality climbs fast (Δ7d > 0.05).
+      vitalCard("Inequality (Gini)", latest.gini.toFixed(2), history.map((s) => s.gini), "#db6d28", {
+        goodWhenDown: true,
+        alertWhen: (d) => d > 0.05,
+      }),
       vitalCard("Velocity", latest.velocity.toFixed(2), history.map((s) => s.velocity), "#3fb950"),
       vitalCard("Welfare / day", money(welfareHistory[welfareHistory.length - 1] ?? 0), welfareHistory, "#ffa657"),
       // C4 trade + money cards — live wherever a port/authority exists; 0-flat otherwise.
@@ -809,13 +840,26 @@ function renderMacro(): void {
         ? [
             vitalCard("Exports / day", money(latest.exports), history.map((s) => s.exports), "#58d6ff"),
             vitalCard("Imports / day", money(latest.imports), history.map((s) => s.imports), "#ff9e58"),
+            // R3-11 — the trade-balance gauge: green selling more than buying, red the reverse.
+            vitalCard(
+              "Trade balance",
+              `${latest.exports - latest.imports >= 0 ? "+" : "−"}${money(Math.abs(latest.exports - latest.imports))}`,
+              history.map((s) => s.exports - s.imports),
+              latest.exports - latest.imports >= 0 ? "#3fb950" : "#f85149",
+            ),
             vitalCard(
               "Port reserve",
               money(world.getBusiness("biz_port")?.cash ?? 0),
               history.map(() => world.getBusiness("biz_port")?.cash ?? 0),
               "#7ee787",
             ),
-            vitalCard("Minted / day", money(latest.minted), history.map((s) => s.minted), "#f778ba"),
+            // R3-12 — the press status light: green while money was minted today, dark when idle.
+            vitalCard(
+              `<span style="color:${latest.minted > 0 ? "#3fb950" : "#5a6069"}">●</span> Minted / day`,
+              money(latest.minted),
+              history.map((s) => s.minted),
+              "#f778ba",
+            ),
           ]
         : []),
     ].join("");
