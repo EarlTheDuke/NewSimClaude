@@ -20,6 +20,37 @@ export const LANE_OFFSET = 2.8;
 export const PATH_OFFSET = 8.5;
 
 /**
+ * Corner-lot setback (R3-44): how far a building's centre is pulled diagonally off its road
+ * node so it sits BESIDE the crossing like a real corner lot, not on it. Sized to clear half
+ * the asphalt + the footpath + half a building, with a sliver of verge.
+ */
+export const LOT_SETBACK = 28;
+
+/**
+ * The four corner lots around an intersection, in fill order — diagonal unit offsets a
+ * building takes by its (stable) sibling index at the node. A 5th+ sibling wraps; visual
+ * only, so a wrap merely shares a corner. NE first (up-right reads "front of lot" on the
+ * left-homes/right-shops grid), then SW, SE, NW for maximum separation between neighbours.
+ */
+const LOT_CORNERS: ReadonlyArray<{ x: number; y: number }> = [
+  { x: 1, y: -1 },
+  { x: -1, y: 1 },
+  { x: 1, y: 1 },
+  { x: -1, y: -1 },
+];
+
+/**
+ * R3-44 — where sibling `index` of the buildings sharing one node sits: a diagonal corner-lot
+ * offset from the node centre. Pure and stable (same index ⇒ same corner every frame, every
+ * save). The sim's geography is untouched — economically the building IS at its node; this is
+ * presentation setback only.
+ */
+export function lotOffset(index: number): { dx: number; dy: number } {
+  const c = LOT_CORNERS[((index % LOT_CORNERS.length) + LOT_CORNERS.length) % LOT_CORNERS.length]!;
+  return { dx: c.x * LOT_SETBACK, dy: c.y * LOT_SETBACK };
+}
+
+/**
  * The unit vector pointing to the RIGHT of a heading `(dx, dy)` in screen coordinates
  * (y grows downward, so "right of travel" is `(-dy, dx)` normalized). A zero heading
  * returns (0, 0) so a stationary entity never jumps sideways.

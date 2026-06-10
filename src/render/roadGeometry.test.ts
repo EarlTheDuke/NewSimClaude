@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rightOf, dashes, LANE_OFFSET, PATH_OFFSET, ROAD_WIDTH } from "./roadGeometry";
+import { rightOf, dashes, lotOffset, LANE_OFFSET, PATH_OFFSET, ROAD_WIDTH, LOT_SETBACK } from "./roadGeometry";
 
 describe("roadGeometry (R3-2/R3-3)", () => {
   describe("rightOf", () => {
@@ -56,5 +56,28 @@ describe("roadGeometry (R3-2/R3-3)", () => {
   it("the layout constants nest: lane inside the asphalt, footpath outside it", () => {
     expect(LANE_OFFSET).toBeLessThan(ROAD_WIDTH / 2);
     expect(PATH_OFFSET).toBeGreaterThan(ROAD_WIDTH / 2);
+  });
+
+  describe("lotOffset (R3-44 — corner lots)", () => {
+    it("pulls each building diagonally clear of both road axes", () => {
+      for (let i = 0; i < 4; i++) {
+        const o = lotOffset(i);
+        // Per-axis clearance: past half the asphalt AND the footpath on each crossing road.
+        expect(Math.abs(o.dx)).toBeGreaterThan(ROAD_WIDTH / 2 + PATH_OFFSET);
+        expect(Math.abs(o.dy)).toBeGreaterThan(ROAD_WIDTH / 2 + PATH_OFFSET);
+        expect(Math.abs(o.dx)).toBe(LOT_SETBACK);
+      }
+    });
+
+    it("gives the first four siblings four DISTINCT corners, then wraps", () => {
+      const corners = new Set([0, 1, 2, 3].map((i) => JSON.stringify(lotOffset(i))));
+      expect(corners.size).toBe(4);
+      expect(lotOffset(4)).toEqual(lotOffset(0));
+      expect(lotOffset(-1)).toEqual(lotOffset(3)); // defensive index wrap
+    });
+
+    it("is pure and stable — the same lot every call", () => {
+      expect(lotOffset(2)).toEqual(lotOffset(2));
+    });
   });
 });

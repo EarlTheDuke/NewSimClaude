@@ -4,7 +4,7 @@ import type { DisasterKind } from "../systems/disasters";
 import { skyColor, ambient, windowGlow, windowGlowSharp, dim, hexToRgb, type Rgb } from "./daynight";
 import type { CityRenderer } from "./CityRenderer";
 import { fanOutOffset } from "./residentLayout";
-import { rightOf, dashes, ROAD_WIDTH, PATH_OFFSET } from "./roadGeometry";
+import { rightOf, dashes, lotOffset, ROAD_WIDTH, PATH_OFFSET } from "./roadGeometry";
 
 export const ACTIVITY_COLOR: Record<Activity, string> = {
   sleeping: "#5b6ee1",
@@ -281,25 +281,39 @@ export class CanvasRenderer implements CityRenderer {
   }
 
   /**
-   * Fan-out offsets for every resident standing at a node (the PixiRenderer's
-   * co-located-crowd layout — shared geometry in residentLayout.ts). Movers and
-   * solo standers get no offset, exactly as before. Recomputed per frame from
-   * live positions — pure presentation, never sim state.
+   * Draw offsets for every standing resident (the PixiRenderer's layout, kept in
+   * parity): each gathers at the DOORSTEP of the place they're at — their
+   * destination's corner lot (R3-44) — with co-located groups fanned into a
+   * countable ring (residentLayout.ts). Recomputed per frame from live
+   * positions — pure presentation, never sim state.
    */
   private standingOffsets(): Map<string, { dx: number; dy: number }> {
-    const atNode = new Map<string, string[]>();
+    const anchorOf = (r: Resident): { key: string; x: number; y: number } => {
+      const dest = this.world.locations.find((l) => l.id === r.destinationId);
+      if (dest && dest.nodeId === r.move.atNodeId) {
+        const s = this.buildingSlot(dest);
+        return { key: dest.id, x: s.x, y: s.y + BUILDING / 2 + 5 }; // the doorstep
+      }
+      const n = this.world.getNode(r.move.atNodeId);
+      return { key: r.move.atNodeId, x: n.x, y: n.y }; // passing through — the kerb
+    };
+    const groups = new Map<string, { x: number; y: number; ids: string[] }>();
     for (const r of this.world.residents) {
       if (r.move.path.length === 0 && r.move.atNodeId) {
-        const arr = atNode.get(r.move.atNodeId);
-        if (arr) arr.push(r.id);
-        else atNode.set(r.move.atNodeId, [r.id]);
+        const a = anchorOf(r);
+        const g = groups.get(a.key);
+        if (g) g.ids.push(r.id);
+        else groups.set(a.key, { x: a.x, y: a.y, ids: [r.id] });
       }
     }
     const out = new Map<string, { dx: number; dy: number }>();
-    for (const arr of atNode.values()) {
-      if (arr.length <= 1) continue;
-      arr.sort(); // stable order → stable ring positions
-      arr.forEach((id, i) => out.set(id, fanOutOffset(i, arr.length)));
+    for (const g of groups.values()) {
+      g.ids.sort(); // stable order → stable ring positions
+      g.ids.forEach((id, i) => {
+        const r = this.world.getResident(id)!;
+        const ring = g.ids.length > 1 ? fanOutOffset(i, g.ids.length) : { dx: 0, dy: 0 };
+        out.set(id, { dx: g.x + ring.dx - r.move.x, dy: g.y + ring.dy - r.move.y });
+      });
     }
     return out;
   }
@@ -436,20 +450,19 @@ export class CanvasRenderer implements CityRenderer {
   }
 
   /**
-   * Where a building actually paints. Most nodes hold one building, which sits
-   * dead-centre on its node (dx = 0) exactly as before. When two businesses
-   * share a node — the strip mall (Maker Goods + Riverside Diner) or the
-   * factory/mine pair — they fan apart horizontally so both are visible and
-   * separately clickable, and the slot index stacks their labels so the names
-   * don't overprint. Render-only: the node itself is untouched, so every
-   * distance and all the economics are exactly as before.
+   * Where a building actually paints (R3-44 — corner lots). Buildings no longer sit ON
+   * their intersection: each is pulled diagonally into one of the four corner lots of its
+   * node (a real street corner), with co-located buildings — the strip mall, the
+   * factory/mine pair — taking DIFFERENT corners of the same crossing. The slot index
+   * still stacks labels so names never overprint. Render-only: the node itself is
+   * untouched, so every distance and all the economics are exactly as before.
    */
   private buildingSlot(loc: Location): { x: number; y: number; line: number } {
     const node = this.world.getNode(loc.nodeId);
     const siblings = this.world.locations.filter((l) => l.nodeId === loc.nodeId);
     const i = siblings.indexOf(loc);
-    const dx = (i - (siblings.length - 1) / 2) * COLOCATE_DX;
-    return { x: node.x + dx, y: node.y, line: i };
+    const o = lotOffset(i);
+    return { x: node.x + o.dx, y: node.y + o.dy, line: i };
   }
 
   private drawBuilding(

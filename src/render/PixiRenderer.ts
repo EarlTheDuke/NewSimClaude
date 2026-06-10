@@ -5,7 +5,7 @@ import { skyColor, ambient, windowGlow, windowGlowSharp, dimInt, type Rgb } from
 import { worldToScreen as toScreen, screenToWorld, type Camera } from "./camera";
 import { prosperityT, fillFraction, FILL_FULL_INVENTORY } from "./economyVisuals";
 import { fanOutOffset } from "./residentLayout";
-import { rightOf, dashes, ROAD_WIDTH, LANE_OFFSET, PATH_OFFSET } from "./roadGeometry";
+import { rightOf, dashes, lotOffset, ROAD_WIDTH, LANE_OFFSET, PATH_OFFSET } from "./roadGeometry";
 import { CAPITAL_BASELINE } from "../systems/constants";
 import {
   ROAD_RGB,
@@ -15,7 +15,6 @@ import {
   BUSINESS_RGB,
   BUSINESS_RGB_DEFAULT,
   BUILDING,
-  COLOCATE_DX,
   ACTIVITY_COLOR,
   DOT_RADIUS,
   DISASTER_STYLE,
@@ -251,25 +250,40 @@ export class PixiRenderer implements CityRenderer {
     }
     this.reapBuildings(seen);
 
-    // Residents — one persistent view per id. Co-located, stationary residents fan
-    // out into a ring (so the crowd is countable); movers keep their road position.
-    const atNode = new Map<string, string[]>();
+    // Residents — one persistent view per id. R3-44: a standing resident gathers at the
+    // DOORSTEP of the place they're at (their destination's corner lot, when it sits on
+    // this node) instead of mid-intersection; co-located groups still fan into a
+    // countable ring. Movers keep their road position (lane/footpath handled below).
+    const standing = new Map<string, { x: number; y: number; ids: string[] }>();
+    const anchorOf = (r: Resident): { key: string; x: number; y: number } => {
+      const dest = this.world.locations.find((l) => l.id === r.destinationId);
+      if (dest && dest.nodeId === r.move.atNodeId) {
+        const s = this.buildingSlot(dest);
+        return { key: dest.id, x: s.x, y: s.y + BUILDING / 2 + 5 }; // the doorstep
+      }
+      const n = this.world.getNode(r.move.atNodeId);
+      return { key: r.move.atNodeId, x: n.x, y: n.y }; // passing through — the kerb
+    };
     for (const r of this.world.residents) {
       if (r.move.path.length === 0 && r.move.atNodeId) {
-        const arr = atNode.get(r.move.atNodeId);
-        if (arr) arr.push(r.id);
-        else atNode.set(r.move.atNodeId, [r.id]);
+        const a = anchorOf(r);
+        const g = standing.get(a.key);
+        if (g) g.ids.push(r.id);
+        else standing.set(a.key, { x: a.x, y: a.y, ids: [r.id] });
       }
     }
-    for (const arr of atNode.values()) arr.sort(); // stable order → stable offsets
+    for (const g of standing.values()) g.ids.sort(); // stable order → stable ring spots
     const seenR = new Set<string>();
     for (const r of this.world.residents) {
       seenR.add(r.id);
       const isSel = selected?.kind === "resident" && selected.id === r.id;
       let off = { dx: 0, dy: 0 };
       if (r.move.path.length === 0 && r.move.atNodeId) {
-        const group = atNode.get(r.move.atNodeId);
-        if (group && group.length > 1) off = fanOutOffset(group.indexOf(r.id), group.length);
+        const a = anchorOf(r);
+        const g = standing.get(a.key)!;
+        const ring =
+          g.ids.length > 1 ? fanOutOffset(g.ids.indexOf(r.id), g.ids.length) : { dx: 0, dy: 0 };
+        off = { dx: g.x + ring.dx - r.move.x, dy: g.y + ring.dy - r.move.y };
       }
       this.updateResidentView(this.ensureResidentView(r.id), r, isSel, off);
     }
@@ -595,6 +609,20 @@ export class PixiRenderer implements CityRenderer {
     const deco = new Container();
     const bizHere = this.world.businesses.find((b) => b.locationId === loc.id);
     const decoParts = bizHere ? this.buildDeco(deco, bizHere.kind, half) : [];
+    // R3-44 — the driveway: a short stub from the lot back to its road crossing, so every
+    // set-back building visibly connects to the street. In container space the node sits
+    // at the negated lot offset; the stub runs from just outside the wall to the kerb.
+    {
+      const siblings = this.world.locations.filter((l) => l.nodeId === loc.nodeId);
+      const o = lotOffset(siblings.indexOf(loc));
+      const drive = new Graphics();
+      drive
+        .moveTo(-o.dx * 0.5, -o.dy * 0.5)
+        .lineTo(-o.dx * 0.82, -o.dy * 0.82)
+        .stroke({ width: 3, color: 0xffffff, cap: "round" });
+      deco.addChildAt(drive, 0);
+      decoParts.push({ g: drive, rgb: [96, 100, 110] });
+    }
 
     // R3-6 — the posted-wage placard: visible while the firm bids above its base wage,
     // so the labour war is readable on the map instead of buried in the ticker.
@@ -956,13 +984,17 @@ export class PixiRenderer implements CityRenderer {
     }
   }
 
-  /** Verbatim port of the canvas building slot (incl. colocated strip-mall fan-out). */
+  /**
+   * Verbatim port of the canvas building slot (R3-44 — corner lots): each building pulls
+   * diagonally into one of its intersection's four corner lots, co-located buildings to
+   * DIFFERENT corners. Render-only — the node, and all economics, are untouched.
+   */
   private buildingSlot(loc: Location): { x: number; y: number; line: number } {
     const node = this.world.getNode(loc.nodeId);
     const siblings = this.world.locations.filter((l) => l.nodeId === loc.nodeId);
     const i = siblings.indexOf(loc);
-    const dx = (i - (siblings.length - 1) / 2) * COLOCATE_DX;
-    return { x: node.x + dx, y: node.y, line: i };
+    const o = lotOffset(i);
+    return { x: node.x + o.dx, y: node.y + o.dy, line: i };
   }
 
   private occupantsAt(nodeId: string): number {

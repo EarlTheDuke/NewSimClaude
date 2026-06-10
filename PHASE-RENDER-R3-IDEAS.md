@@ -87,8 +87,12 @@ after dark — exactly like driving through a neighborhood at 8pm and seeing who
 > (both renderers, parity restored) · ✅ R3-2 two-lane roads + footpaths (both renderers) ·
 > ✅ R3-3 cars vs walkers (Pixi; canvas keeps dots per the parity-where-cheap waiver) ·
 > ✅ R3-4 per-kind silhouettes (civic trio + all seven seeded kinds + orchard) · ✅ R3-6
-> posted-wage placards (Pixi). Next up from the NOW tier: R3-5 street lamps, R3-7 Zzz,
-> R3-8 hover labels, R3-9 wealth rings, R3-10..13 HUD upgrades.
+> posted-wage placards (Pixi) · ✅ **R3-44 corner lots** (user request, added post-doc: buildings
+> sit BESIDE their intersection on one of four corner lots — co-located firms take different
+> corners — each with a driveway stub to the kerb, and standing residents gather at the
+> DOORSTEP of their destination instead of mid-crossing; both renderers; sim geometry untouched).
+> Next up from the NOW tier: R3-5 street lamps, R3-7 Zzz, R3-8 hover labels, R3-9 wealth rings,
+> R3-10..13 HUD upgrades.
 
 ### Easy wins at a glance
 ⭐ R3-1 window-glow fix · ⭐ R3-2 two-lane roads + footpath · ⭐ R3-5 street lamps ·
