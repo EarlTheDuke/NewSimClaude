@@ -3,6 +3,7 @@ import type { Activity, BusinessKind, Business, Resident, Location } from "../wo
 import type { DisasterKind } from "../systems/disasters";
 import { skyColor, ambient, windowGlow, dim, hexToRgb, type Rgb } from "./daynight";
 import type { CityRenderer } from "./CityRenderer";
+import { fanOutOffset } from "./residentLayout";
 
 export const ACTIVITY_COLOR: Record<Activity, string> = {
   sleeping: "#5b6ee1",
@@ -146,8 +147,15 @@ export class CanvasRenderer implements CityRenderer {
     }
 
     // Residents — colour by activity, with shadow, heading tick, selection glow.
+    // Co-located residents fan onto a ring (the PixiRenderer's layout, ported so the
+    // canvas fallback never stacks a crowd into one unreadable dot — P11-5).
+    const offsets = this.standingOffsets();
     for (const r of world.residents) {
-      this.drawResident(r, selected?.kind === "resident" && selected.id === r.id);
+      this.drawResident(
+        r,
+        selected?.kind === "resident" && selected.id === r.id,
+        offsets.get(r.id) ?? { dx: 0, dy: 0 },
+      );
     }
 
     this.drawLegend();
@@ -226,9 +234,34 @@ export class CanvasRenderer implements CityRenderer {
     return `${t}…`;
   }
 
-  private drawResident(r: Resident, isSelected: boolean): void {
+  /**
+   * Fan-out offsets for every resident standing at a node (the PixiRenderer's
+   * co-located-crowd layout — shared geometry in residentLayout.ts). Movers and
+   * solo standers get no offset, exactly as before. Recomputed per frame from
+   * live positions — pure presentation, never sim state.
+   */
+  private standingOffsets(): Map<string, { dx: number; dy: number }> {
+    const atNode = new Map<string, string[]>();
+    for (const r of this.world.residents) {
+      if (r.move.path.length === 0 && r.move.atNodeId) {
+        const arr = atNode.get(r.move.atNodeId);
+        if (arr) arr.push(r.id);
+        else atNode.set(r.move.atNodeId, [r.id]);
+      }
+    }
+    const out = new Map<string, { dx: number; dy: number }>();
+    for (const arr of atNode.values()) {
+      if (arr.length <= 1) continue;
+      arr.sort(); // stable order → stable ring positions
+      arr.forEach((id, i) => out.set(id, fanOutOffset(i, arr.length)));
+    }
+    return out;
+  }
+
+  private drawResident(r: Resident, isSelected: boolean, off: { dx: number; dy: number }): void {
     const { ctx } = this;
-    const { x, y } = r.move;
+    const x = r.move.x + off.dx;
+    const y = r.move.y + off.dy;
 
     // Soft contact shadow grounds the dot on the map.
     ctx.beginPath();
@@ -520,9 +553,13 @@ export class CanvasRenderer implements CityRenderer {
   /** Map a canvas-space click to a resident (preferred) or a building. */
   pick(x: number, y: number): Pick | undefined {
     const { world } = this;
+    // Match against the DRAWN positions (fan-out included), so a fanned dot is
+    // clickable where the eye sees it.
+    const offsets = this.standingOffsets();
     let best: { id: string; d: number } | undefined;
     for (const r of world.residents) {
-      const d = Math.hypot(r.move.x - x, r.move.y - y);
+      const off = offsets.get(r.id) ?? { dx: 0, dy: 0 };
+      const d = Math.hypot(r.move.x + off.dx - x, r.move.y + off.dy - y);
       if (d <= DOT_RADIUS + 4 && (!best || d < best.d)) best = { id: r.id, d };
     }
     if (best) return { kind: "resident", id: best.id };
