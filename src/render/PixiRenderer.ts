@@ -5,7 +5,7 @@ import { skyColor, ambient, windowGlow, windowGlowSharp, dimInt, type Rgb } from
 import { worldToScreen as toScreen, screenToWorld, type Camera } from "./camera";
 import { prosperityT, fillFraction, FILL_FULL_INVENTORY } from "./economyVisuals";
 import { fanOutOffset } from "./residentLayout";
-import { rightOf, dashes, lotOffset, ROAD_WIDTH, LANE_OFFSET, PATH_OFFSET } from "./roadGeometry";
+import { rightOf, dashes, lotOffset, ROAD_WIDTH, LANE_OFFSET, PATH_OFFSET, KERB_OFFSET } from "./roadGeometry";
 import { CAPITAL_BASELINE } from "../systems/constants";
 import {
   ROAD_RGB,
@@ -262,7 +262,8 @@ export class PixiRenderer implements CityRenderer {
         return { key: dest.id, x: s.x, y: s.y + BUILDING / 2 + 5 }; // the doorstep
       }
       const n = this.world.getNode(r.move.atNodeId);
-      return { key: r.move.atNodeId, x: n.x, y: n.y }; // passing through — the kerb
+      // No door of theirs here: wait on the corner PAVEMENT, never mid-junction.
+      return { key: r.move.atNodeId, x: n.x + KERB_OFFSET, y: n.y + KERB_OFFSET };
     };
     for (const r of this.world.residents) {
       if (r.move.path.length === 0 && r.move.atNodeId) {

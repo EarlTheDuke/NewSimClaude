@@ -4,7 +4,7 @@ import type { DisasterKind } from "../systems/disasters";
 import { skyColor, ambient, windowGlow, windowGlowSharp, dim, hexToRgb, type Rgb } from "./daynight";
 import type { CityRenderer } from "./CityRenderer";
 import { fanOutOffset } from "./residentLayout";
-import { rightOf, dashes, lotOffset, ROAD_WIDTH, PATH_OFFSET } from "./roadGeometry";
+import { rightOf, dashes, lotOffset, ROAD_WIDTH, PATH_OFFSET, KERB_OFFSET } from "./roadGeometry";
 
 export const ACTIVITY_COLOR: Record<Activity, string> = {
   sleeping: "#5b6ee1",
@@ -295,7 +295,8 @@ export class CanvasRenderer implements CityRenderer {
         return { key: dest.id, x: s.x, y: s.y + BUILDING / 2 + 5 }; // the doorstep
       }
       const n = this.world.getNode(r.move.atNodeId);
-      return { key: r.move.atNodeId, x: n.x, y: n.y }; // passing through — the kerb
+      // No door of theirs here: wait on the corner PAVEMENT, never mid-junction.
+      return { key: r.move.atNodeId, x: n.x + KERB_OFFSET, y: n.y + KERB_OFFSET };
     };
     const groups = new Map<string, { x: number; y: number; ids: string[] }>();
     for (const r of this.world.residents) {

@@ -51,6 +51,14 @@ export function lotOffset(index: number): { dx: number; dy: number } {
 }
 
 /**
+ * The corner-pavement spot (R3-44 follow-up): where a standing resident waits when the node
+ * they're at holds no door of theirs — diagonally clear of BOTH crossing roads (past half the
+ * asphalt + the footpath), i.e. on the street-corner pavement rather than mid-junction. So
+ * nobody, ever, stands on the asphalt.
+ */
+export const KERB_OFFSET = ROAD_WIDTH / 2 + PATH_OFFSET + 1.5;
+
+/**
  * The unit vector pointing to the RIGHT of a heading `(dx, dy)` in screen coordinates
  * (y grows downward, so "right of travel" is `(-dy, dx)` normalized). A zero heading
  * returns (0, 0) so a stationary entity never jumps sideways.
