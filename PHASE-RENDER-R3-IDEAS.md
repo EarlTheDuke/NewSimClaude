@@ -90,9 +90,18 @@ after dark — exactly like driving through a neighborhood at 8pm and seeing who
 > posted-wage placards (Pixi) · ✅ **R3-44 corner lots** (user request, added post-doc: buildings
 > sit BESIDE their intersection on one of four corner lots — co-located firms take different
 > corners — each with a driveway stub to the kerb, and standing residents gather at the
-> DOORSTEP of their destination instead of mid-crossing; both renderers; sim geometry untouched).
-> Next up from the NOW tier: R3-5 street lamps, R3-7 Zzz, R3-8 hover labels, R3-9 wealth rings,
-> R3-10..13 HUD upgrades.
+> DOORSTEP of their destination instead of mid-crossing; both renderers; sim geometry untouched;
+> follow-up: the kerb fallback moved to the corner pavement so nobody ever stands on asphalt).
+>
+> **Second wave shipped (2026-06-10, autonomous session):** ✅ R3-5 street lamps (dusk pools at
+> every crossing) · ✅ R3-7 Zzz wisps over sleeping homes · ✅ R3-13 staffed-storefront doorway
+> lights · ✅ R3-8 hover name tags · ✅ R3-9 wealth-tier rings (top fifth gold, bottom grey) ·
+> ✅ R3-10 HUD 7-day trend arrows + the amber Gini alert · ✅ R3-11 trade-balance gauge ·
+> ✅ R3-12 press status light · ✅ **R3-14 THE BOAT** (a sailing launches at the dock whenever
+> trade flows — glide in, bob at the pier, glide out; still water when the port is dead) ·
+> ✅ R3-26 arrival/departure puffs. All Pixi (the default renderer), pure presentation.
+> Remaining NOW/NEXT highlights: R3-15 coin particles, R3-16 mint-press animation, R3-17
+> walk/drive animation frames, R3-19 prosperity building growth, R3-22 cinematic disasters.
 
 ### Easy wins at a glance
 ⭐ R3-1 window-glow fix · ⭐ R3-2 two-lane roads + footpath · ⭐ R3-5 street lamps ·

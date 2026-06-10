@@ -165,6 +165,20 @@ export class PixiRenderer implements CityRenderer {
   private readonly buildingViews = new Map<string, BuildingView>();
   private readonly residentViews = new Map<string, ResidentView>();
 
+  // R3-14 — the trade boat: presentation-only state. We watch the city's cumulative
+  // trade tally (export revenue + import spend across all firms); every increase
+  // launches a sailing — glide in, sit at the pier, glide out — on the wall clock.
+  private boatC: Container | undefined;
+  private lastTradeTotal: number | undefined;
+  private sailStart = 0;
+
+  // R3-26 — arrival/departure puffs: a small expanding ring where someone sets off or
+  // arrives. Pooled; expired by wall-clock age. (prevMoving tracks the transitions.)
+  private puffLayer: Container | undefined;
+  private readonly puffPool: Graphics[] = [];
+  private readonly puffs: { x: number; y: number; born: number }[] = [];
+  private readonly prevMoving = new Map<string, boolean>();
+
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly world: World,
@@ -193,6 +207,7 @@ export class PixiRenderer implements CityRenderer {
     this.buildingsLayer = new Container();
     this.residentsLayer = new Container();
     this.toastLayer = new Container(); // floating map toasts, above residents, in world space
+    this.puffLayer = new Container();
     this.worldLayer.addChild(
       this.pathGfx, // footpaths under the asphalt edge
       this.roadsGfx,
@@ -200,9 +215,25 @@ export class PixiRenderer implements CityRenderer {
       this.lampGlow, // light pools wash the street, under the buildings
       this.buildingsLayer,
       this.lampPosts, // the posts stand over the street furniture
+      this.puffLayer, // arrival puffs under the people who made them
       this.residentsLayer,
       this.toastLayer,
     );
+    // R3-14 — the trade boat, built once and hidden until a sailing is due.
+    const boat = new Container();
+    const hull = new Graphics();
+    hull.poly([-9, 0, 9, 0, 5.5, 5, -5.5, 5]).fill(0x8a4a3c);
+    hull.stroke({ width: 1, color: 0x0e1116, alpha: 0.5 });
+    const mast = new Graphics();
+    mast.rect(-0.8, -10, 1.6, 10).fill(0xd9dde6);
+    const sail = new Graphics();
+    sail.poly([1, -10, 8.5, -3.5, 1, -3.5]).fill(0xe8ecf4);
+    const wake = new Graphics();
+    wake.ellipse(0, 5.5, 11, 2.5).fill({ color: 0x6fa8d8, alpha: 0.35 });
+    boat.addChild(wake, hull, mast, sail);
+    boat.visible = false;
+    this.worldLayer.addChild(boat);
+    this.boatC = boat;
     this.app.stage.addChild(this.skyGfx, this.worldLayer);
     this.hudLayer = new Container();
     this.app.stage.addChild(this.hudLayer);
@@ -341,10 +372,19 @@ export class PixiRenderer implements CityRenderer {
         off = { dx: g.x + ring.dx - r.move.x, dy: g.y + ring.dy - r.move.y };
       }
       const tier = !spread ? undefined : r.money >= richAt ? "rich" : r.money <= poorAt ? "poor" : undefined;
+      // R3-26 — a dust puff on every set-off and arrival (the moving-state edge).
+      const movingNow = r.move.path.length > 0;
+      const was = this.prevMoving.get(r.id);
+      if (was !== undefined && was !== movingNow && this.puffs.length < 24) {
+        this.puffs.push({ x: r.move.x, y: r.move.y, born: performance.now() });
+      }
+      this.prevMoving.set(r.id, movingNow);
       this.updateResidentView(this.ensureResidentView(r.id), r, isSel, off, tier);
     }
     this.reapResidents(seenR);
     this.updateHover();
+    this.updatePuffs();
+    this.updateBoat();
 
     this.updateSkyBadge(hourFloat);
     this.updateDisaster(disaster);
@@ -1007,6 +1047,92 @@ export class PixiRenderer implements CityRenderer {
       v.wageTag.visible = false;
       if (v.door) v.door.visible = false;
     }
+  }
+
+  /**
+   * R3-26 — draw/expire the arrival puffs: each is a ring that grows from 2 to 7 px and
+   * fades over 600ms of wall-clock. Pooled Graphics, redrawn per frame (≤ 24 alive).
+   */
+  private updatePuffs(): void {
+    if (!this.puffLayer) return;
+    const now = performance.now();
+    for (let i = this.puffs.length - 1; i >= 0; i--) {
+      if (now - this.puffs[i]!.born > 600) this.puffs.splice(i, 1);
+    }
+    for (let i = 0; i < this.puffs.length; i++) {
+      let g = this.puffPool[i];
+      if (!g) {
+        g = new Graphics();
+        this.puffLayer.addChild(g);
+        this.puffPool[i] = g;
+      }
+      const p = this.puffs[i]!;
+      const t = Math.min(1, (now - p.born) / 600);
+      g.clear();
+      g.circle(p.x, p.y, 2 + 5 * t).stroke({ width: 1.2, color: 0xc9d1d9, alpha: 0.5 * (1 - t) });
+      g.visible = true;
+    }
+    for (let i = this.puffs.length; i < this.puffPool.length; i++) this.puffPool[i]!.visible = false;
+  }
+
+  /**
+   * R3-14 — the trade boat: whenever the city's cumulative trade tally rises (an export
+   * sold or an import landed — read-only off every firm's P&L), a sailing launches at the
+   * port: glide in from open water, sit at the pier, glide out. Wall-clock animation, a
+   * fresh trade day re-launches it — so busy trade reads as a busy harbour, and a dead
+   * port means still water. Hidden entirely in portless cities.
+   */
+  private updateBoat(): void {
+    const boat = this.boatC;
+    if (!boat) return;
+    const portBiz = this.world.businesses.find((b) => b.id === "biz_port");
+    const portLoc = portBiz
+      ? this.world.locations.find((l) => l.id === portBiz.locationId)
+      : undefined;
+    if (!portBiz || !portLoc) {
+      boat.visible = false;
+      return;
+    }
+    let total = 0;
+    for (const b of this.world.businesses) {
+      total += (b.pnl.exportRevenue ?? 0) + (b.pnl.importSpend ?? 0);
+    }
+    if (this.lastTradeTotal === undefined) {
+      this.lastTradeTotal = total; // first observation (fresh build or a Load) — no sailing
+    } else if (total > this.lastTradeTotal + 1e-9) {
+      this.lastTradeTotal = total;
+      this.sailStart = performance.now(); // trade happened — (re)launch the sailing
+    }
+    const IN = 4000;
+    const DOCK = 3000;
+    const OUT = 4000;
+    const t = performance.now() - this.sailStart;
+    if (this.sailStart === 0 || t > IN + DOCK + OUT) {
+      boat.visible = false;
+      return;
+    }
+    const slot = this.buildingSlot(portLoc);
+    const farX = slot.x + 64;
+    const farY = slot.y + 22;
+    const pierX = slot.x + BUILDING / 2 + 14;
+    const pierY = slot.y + 9;
+    const ease = (k: number): number => k * k * (3 - 2 * k);
+    let x: number;
+    let y: number;
+    if (t < IN) {
+      const k = ease(t / IN);
+      x = farX + (pierX - farX) * k;
+      y = farY + (pierY - farY) * k;
+    } else if (t < IN + DOCK) {
+      x = pierX;
+      y = pierY + Math.sin(performance.now() / 400) * 0.8; // bobbing at the pier
+    } else {
+      const k = ease((t - IN - DOCK) / OUT);
+      x = pierX + (farX - pierX) * k;
+      y = pierY + (farY - pierY) * k;
+    }
+    boat.position.set(x, y);
+    boat.visible = true;
   }
 
   /** Remove views whose location is gone (e.g. after a Load swaps the world). */
