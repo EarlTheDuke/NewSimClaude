@@ -179,6 +179,12 @@ export class PixiRenderer implements CityRenderer {
   private readonly puffs: { x: number; y: number; born: number }[] = [];
   private readonly prevMoving = new Map<string, boolean>();
 
+  // R3-16 — the mint sparkle: fresh-coin sparks burst from the City Reserve whenever the
+  // audited ledger ticks up (world.mintedTotal() delta — read-only). Wall-clock burst.
+  private mintFx: Graphics | undefined;
+  private lastMinted: number | undefined;
+  private mintStart = 0;
+
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly world: World,
@@ -234,6 +240,10 @@ export class PixiRenderer implements CityRenderer {
     boat.visible = false;
     this.worldLayer.addChild(boat);
     this.boatC = boat;
+    // R3-16 — the mint sparkle burst, one pooled Graphics redrawn per frame while live.
+    this.mintFx = new Graphics();
+    this.mintFx.visible = false;
+    this.worldLayer.addChild(this.mintFx);
     this.app.stage.addChild(this.skyGfx, this.worldLayer);
     this.hudLayer = new Container();
     this.app.stage.addChild(this.hudLayer);
@@ -385,6 +395,7 @@ export class PixiRenderer implements CityRenderer {
     this.updateHover();
     this.updatePuffs();
     this.updateBoat();
+    this.updateMintFx();
 
     this.updateSkyBadge(hourFloat);
     this.updateDisaster(disaster);
@@ -1012,6 +1023,10 @@ export class PixiRenderer implements CityRenderer {
       v.glow.visible = t > 0.02;
       v.glow.alpha = t * 0.55;
       v.glow.scale.set(0.6 + 0.7 * t);
+      // R3-19 — prosperity in the architecture: a capital-rich firm's building grows up
+      // to ~18% larger; one sliding toward insolvency visibly dims before the boards.
+      v.base.scale.set(1 + 0.18 * t);
+      if ((biz.insolventDays ?? 0) > 0) v.base.tint = dimInt(BUSINESS_RGB[biz.kind] ?? BUSINESS_RGB_DEFAULT, a * 0.7);
       v.bar.visible = true;
       v.fill.scale.x = fillFraction(biz.inventory, FILL_FULL_INVENTORY);
       const crew = Math.min(biz.employeeIds.length, v.workers.children.length);
@@ -1133,6 +1148,48 @@ export class PixiRenderer implements CityRenderer {
     }
     boat.position.set(x, y);
     boat.visible = true;
+  }
+
+  /**
+   * R3-16 — fresh-coin sparks at the City Reserve: whenever the audited mint ledger rises,
+   * eight golden sparks burst from the building and drift outward/up over 1.4s — printed
+   * money visibly entering the world. Anchored to the authority's lot; absent in cities
+   * with no authority; a Load re-anchors the baseline without a phantom burst.
+   */
+  private updateMintFx(): void {
+    const fx = this.mintFx;
+    if (!fx) return;
+    const minted = this.world.mintedTotal();
+    if (this.lastMinted === undefined) {
+      this.lastMinted = minted;
+    } else if (minted > this.lastMinted + 1e-9) {
+      this.lastMinted = minted;
+      this.mintStart = performance.now();
+    }
+    const LIFE = 1400;
+    const t = this.mintStart === 0 ? 1 : (performance.now() - this.mintStart) / LIFE;
+    if (t >= 1) {
+      fx.visible = false;
+      return;
+    }
+    const authority = this.world.businesses.find((b) => b.id === "biz_authority");
+    const loc = authority
+      ? this.world.locations.find((l) => l.id === authority.locationId)
+      : undefined;
+    if (!loc) {
+      fx.visible = false;
+      return;
+    }
+    const slot = this.buildingSlot(loc);
+    fx.clear();
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2 + 0.4;
+      const r = 6 + 18 * t;
+      const x = slot.x + Math.cos(ang) * r;
+      const y = slot.y - 4 + Math.sin(ang) * r * 0.6 - 10 * t; // drifting upward
+      fx.circle(x, y, 1.6).fill({ color: 0xf2c84b, alpha: 0.9 * (1 - t) });
+    }
+    fx.visible = true;
   }
 
   /** Remove views whose location is gone (e.g. after a Load swaps the world). */
