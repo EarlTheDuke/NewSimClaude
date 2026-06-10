@@ -12,6 +12,8 @@ import {
   TRADE_EXPORT_STOCK_FLOOR,
   TRADE_IMPORT_PRICE_MULT,
   TRADE_IMPORT_MAX_PER_DAY,
+  TRADE_LUXURY_IMPORT_SHARE,
+  LUXURY_COST,
 } from "./constants";
 
 /**
@@ -41,12 +43,26 @@ import {
 export class TradeSystem implements System {
   readonly id = "trade";
 
+  /**
+   * Σ luxuriesOwned across all residents at the last day boundary (C4a-C) — the baseline the
+   * luxury-import charge diffs against. Serialized, so a save/reload never double-charges or
+   * skips a day; `undefined` (a fresh build, or a pre-C save) re-anchors on the next boundary
+   * without a phantom charge.
+   */
+  private lastLuxuries: number | undefined;
+
   constructor(
     private readonly world: World,
     /** Read-only access to the market's capacity/target arithmetic for the import-gap math (a3). */
     private readonly market: MarketSystem,
     /** Whether trade is live; defaults to {@link TRADE_ENABLED} (off ⇒ this system is inert). */
     private readonly enabled: boolean = TRADE_ENABLED,
+    /**
+     * Imported content of luxuries (C4a-C): the fraction of each day's luxury sales the goods
+     * store pays the port for restocking its fineries. Defaults to
+     * {@link TRADE_LUXURY_IMPORT_SHARE}; 0 ⇒ the pre-C one-shot battery model.
+     */
+    private readonly luxuryImportShare: number = TRADE_LUXURY_IMPORT_SHARE,
   ) {}
 
   update(ctx: SystemContext): void {
@@ -55,6 +71,43 @@ export class TradeSystem implements System {
     if (!port || !port.active) return; // trade needs a seeded port (strictly opt-in, like the bank)
     this.buyExports(port);
     this.sellImports(port);
+    this.importLuxuryContent(port);
+  }
+
+  /**
+   * C4a-C — the flow that turns trade from a one-shot battery into a CYCLE. The goods store's
+   * luxuries are imported fineries: each night the store pays the port
+   * `share × (luxuries sold today × LUXURY_COST)` to restock what came off the boat (a plain
+   * conserving `store→port` transfer, capped at the store's cash, booked into
+   * `pnl.importSpend` so GDP's −M nets the imported content out of the C it appears in). City
+   * money flowing out refills the port's reserve, which funds continuing export purchases — so
+   * the current account self-sustains and the port's balance oscillates around an equilibrium
+   * instead of draining to zero. Today's sales are the day-over-day delta of Σ luxuriesOwned
+   * (clamped at 0 — an estate passing on a death day merely undercounts, never refunds).
+   * Deterministic: pure arithmetic over the resident array, fixed seller id, no RNG.
+   */
+  private importLuxuryContent(port: Business): void {
+    let total = 0;
+    for (const r of this.world.residents) total += r.luxuriesOwned ?? 0;
+    const sold = this.lastLuxuries === undefined ? 0 : Math.max(0, total - this.lastLuxuries);
+    this.lastLuxuries = total;
+    if (sold <= 0 || this.luxuryImportShare <= 0) return;
+    // The luxury seller is the goods store (the same fixed id applyBuyLuxury charges).
+    const store = this.world.getBusiness("biz_goods");
+    if (!store || !store.active || store.id === port.id) return;
+    const owed = sold * LUXURY_COST * this.luxuryImportShare;
+    const paid = this.world.transfer(store.id, port.id, owed); // store → port; conserved, cash-capped
+    if (paid <= 0) return;
+    store.pnl.importSpend = (store.pnl.importSpend ?? 0) + paid;
+  }
+
+  serialize(): unknown {
+    return { lastLuxuries: this.lastLuxuries };
+  }
+
+  restore(state: unknown): void {
+    const s = state as { lastLuxuries?: number } | undefined;
+    this.lastLuxuries = typeof s?.lastLuxuries === "number" ? s.lastLuxuries : undefined;
   }
 
   /**

@@ -341,6 +341,18 @@ export const TRADE_IMPORT_PRICE_MULT = 1.5;
  */
 export const TRADE_IMPORT_MAX_PER_DAY = 8;
 /**
+ * Imported content of luxuries (C4a-C, the conserving trade CYCLE) — the fraction of each day's
+ * luxury sales the goods store pays the port to restock its fineries off the boat. This is what
+ * keeps foreign commerce ALIVE: city money flows out through luxury imports, refilling the port's
+ * reserve, which funds continuing export purchases — so trade settles into a self-sustaining
+ * current-account loop instead of draining the battery once and dying. Strictly conserving (a
+ * plain `store→port` transfer, booked as importSpend ⇒ GDP's −M nets the imported content out of
+ * the C it appears in). 0 ⇒ the pre-C one-shot battery model, byte-identical. Real-world: the
+ * jewellery on a small town's shelf wasn't made in town — a cut of every sale pays the importer.
+ */
+export const TRADE_LUXURY_IMPORT_SHARE = 0.3;
+
+/**
  * The CEO benchmark freezes trade OFF (slice a6, mirroring {@link BENCH_CREDIT_ENABLED}): no port,
  * no exports, no imports — so a live TRADE_ENABLED flip never moves the historical scorecards, the
  * bench world keeps exactly seven businesses, and skill scores never ride outside demand.

@@ -184,6 +184,15 @@ export interface CitySimOptions extends CityOptions {
    */
   tradeEnabled?: boolean;
   /**
+   * Imported content of luxuries (C4a-C — the conserving trade CYCLE). The fraction of each
+   * day's luxury sales the goods store pays the port for restocking its fineries off the boat,
+   * which keeps foreign commerce alive past the battery: city money flows out through luxuries,
+   * refilling the reserve that funds continuing exports. Defaults to the live
+   * {@link TRADE_LUXURY_IMPORT_SHARE}; pass 0 for the pre-C one-shot battery model (the a5 soak
+   * pins 0 to preserve its recorded battery-death finding as the control).
+   */
+  luxuryImportShare?: number;
+  /**
    * Monetary policy (Initiative C / C4b) — THE DELIBERATE RELAXATION of strict conservation
    * (user-greenlit 2026-06-09). When true (with `includeAuthority`, a rate, and a cap), the
    * {@link MonetarySystem} mints `min(rate × supply, cap)` daily through the audited
@@ -269,9 +278,10 @@ export function createCity(options: CitySimOptions = {}): {
 
   // External trade (Initiative C / C4a) runs right after the B2B market: stock is freshly
   // produced, and export revenue books before the CEO reviews the day, before profit distribution,
-  // and before Macro samples it. The market reference feeds the import-gap arithmetic (a3).
+  // and before Macro samples it. The market reference feeds the import-gap arithmetic (a3); the
+  // luxury-import share (C4a-C) keeps the current account cycling past the battery.
   // Inert at the default (TRADE_ENABLED off ⇒ no-op) ⇒ byte-identical.
-  sim.addSystem(new TradeSystem(world, market, options.tradeEnabled));
+  sim.addSystem(new TradeSystem(world, market, options.tradeEnabled, options.luxuryImportShare));
 
   let agent: BusinessAgentSystem | undefined;
   const brain = options.brain ?? "off";

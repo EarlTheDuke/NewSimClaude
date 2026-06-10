@@ -27,6 +27,19 @@
 > **The C5 question is thereby answered with evidence:** within strict conservation the ceiling
 > lifts *boundedly* (trade); lifting it *without bound* requires money creation, which is now
 > available as an explicit, audited, bounded policy — never an accidental leak.
+>
+> **C4a-C addendum (2026-06-10): trade is no longer terminal — the conserving trade CYCLE.**
+> The one-shot battery had an artifact: once the port was broke and the healthy chain needed no
+> imports, foreign commerce ended forever ("the world went broke" — the least realistic line in
+> the model). Fixed by giving the city an *import appetite*: luxuries carry **imported content**
+> (`TRADE_LUXURY_IMPORT_SHARE` = 0.3 — the goods store pays the port a share of each day's
+> luxury sales to restock its fineries off the boat, a plain conserving `store→port` transfer
+> booked as −M). City money flowing out refills the reserve that funds continuing exports, so
+> the current account self-sustains. **Measured (300 days, live):** the port bottoms out at its
+> working level and trade settles into *balanced* X ≈ M ≈ $37/day — the textbook transfer
+> problem (you can't run a permanent surplus against a broke partner), emergent. Strict
+> conservation untouched; the a5 soak pins `luxuryImportShare: 0` to keep the pre-cycle
+> battery-death finding reproducible as the control.
 
 ## The question, with evidence
 

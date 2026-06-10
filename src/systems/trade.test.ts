@@ -16,6 +16,8 @@ import {
   TRADE_EXPORT_STOCK_FLOOR,
   TRADE_IMPORT_PRICE_MULT,
   TRADE_IMPORT_MAX_PER_DAY,
+  TRADE_LUXURY_IMPORT_SHARE,
+  LUXURY_COST,
 } from "./constants";
 import { ARCHETYPES } from "../world/archetypes";
 import { RESOURCE_KINDS, BASE_RESOURCE_PRICE } from "../world/industries";
@@ -308,6 +310,76 @@ describe("TradeSystem — imports / current account (C4 slice a3)", () => {
       return c.world.serialize();
     };
     expect(run()).toEqual(run());
+  });
+});
+
+/**
+ * Slice C (C4a-C) — the conserving trade CYCLE. Luxuries carry imported content: each night the
+ * goods store pays the port a share of the day's luxury sales to restock its fineries, so city
+ * money flows back into the reserve that funds continuing exports — trade self-sustains instead
+ * of dying with the battery. Strictly conserving throughout.
+ */
+describe("TradeSystem — the trade cycle: imported luxury content (C4 slice C)", () => {
+  const engaged = (seed: number, share?: number) =>
+    createCity({ seed, includePort: true, tradeEnabled: true, luxuryImportShare: share });
+
+  it("charges the store the import share of the day's luxury sales, store → port, conserved", () => {
+    const { sim, world } = engaged(1); // live default share (0.3)
+    sim.run(TICKS_PER_DAY); // day 1 anchors the luxury baseline
+    const port = world.getBusiness("biz_port")!;
+    const store = world.getBusiness("biz_goods")!;
+    const portBefore = port.cash;
+    const start = world.totalMoney();
+    // Two luxuries sell during day 2 (the non-cash tally is the sim's own sale signal).
+    world.getResident("res_0")!.luxuriesOwned += 2;
+    sim.run(TICKS_PER_DAY);
+    const owed = 2 * LUXURY_COST * TRADE_LUXURY_IMPORT_SHARE;
+    expect(store.pnl.importSpend ?? 0).toBeCloseTo(owed, 6);
+    // The port's day-2 net: −exports +luxury restock. Isolate the restock via the X tally delta.
+    const x = world.businesses.reduce((s, b) => s + (b.pnl.exportRevenue ?? 0), 0);
+    expect(port.cash).toBeCloseTo(portBefore - (x - (PORT_SEED_CASH - portBefore)) + owed, 6);
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("share 0 is the pre-C battery model: luxuries sell, nothing flows back", () => {
+    const { sim, world } = engaged(1, 0);
+    sim.run(TICKS_PER_DAY);
+    world.getResident("res_0")!.luxuriesOwned += 3;
+    sim.run(TICKS_PER_DAY * 2);
+    expect(world.getBusiness("biz_goods")!.pnl.importSpend ?? 0).toBe(0);
+  });
+
+  it("a fresh build never back-charges history: the first boundary only anchors", () => {
+    const { sim, world } = engaged(1);
+    world.getResident("res_0")!.luxuriesOwned = 50; // pre-existing wealth of trinkets
+    sim.run(TICKS_PER_DAY); // anchor day — must charge nothing for the 50
+    expect(world.getBusiness("biz_goods")!.pnl.importSpend ?? 0).toBe(0);
+  });
+
+  it("the charge is capped at the store's cash — no negative balances, still conserved", () => {
+    const { sim, world } = engaged(1);
+    sim.run(TICKS_PER_DAY);
+    const store = world.getBusiness("biz_goods")!;
+    world.transfer(store.id, "biz_landlord", store.cash - 10); // drain the till to $10
+    world.getResident("res_0")!.luxuriesOwned += 5; // owes 5 × $150 × 0.3 = $225 > $10
+    const start = world.totalMoney();
+    sim.run(TICKS_PER_DAY);
+    expect(store.cash).toBeGreaterThanOrEqual(0);
+    expect(world.totalMoney()).toBeCloseTo(start, 6);
+  });
+
+  it("the luxury baseline survives save/load — no double-charge, no skipped day", () => {
+    const original = engaged(1);
+    original.sim.run(TICKS_PER_DAY * 5);
+    const json = snapshotToJSON(original.sim.serialize());
+    const loaded = engaged(99);
+    loaded.sim.restore(snapshotFromJSON(json));
+    // Lockstep with a luxury sale after the restore point in BOTH arms.
+    original.world.getResident("res_1")!.luxuriesOwned += 1;
+    loaded.world.getResident("res_1")!.luxuriesOwned += 1;
+    original.sim.run(TICKS_PER_DAY * 3);
+    loaded.sim.run(TICKS_PER_DAY * 3);
+    expect(loaded.world.serialize()).toEqual(original.world.serialize());
   });
 });
 

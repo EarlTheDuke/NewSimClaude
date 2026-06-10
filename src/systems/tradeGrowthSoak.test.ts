@@ -50,6 +50,11 @@ const STACK = (seed: number, port: boolean) =>
     // C4a — the only difference between the arms:
     includePort: port,
     tradeEnabled: port,
+    // C4a-C pinned OFF: this soak documents the PRE-CYCLE finding — the one-shot battery
+    // that dies and whose lift outlives it — as the recorded control. The conserving trade
+    // CYCLE (imported luxury content keeping commerce alive) has its own tests in
+    // trade.test.ts; freezing 0 here keeps this historical result reproducible verbatim.
+    luxuryImportShare: 0,
   });
 
 /** Mean GDP over the next `days` sim-days (smooths daily noise). */
