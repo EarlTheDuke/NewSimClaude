@@ -22,9 +22,24 @@ import {
 import { ARCHETYPES } from "./world/archetypes";
 import type { BusinessKind, ResourceKind } from "./world/types";
 import type { DisasterKind } from "./systems/disasters";
-import { CAPITAL_BASELINE, GRANT_AMOUNT, MOVE_SPEED, VEHICLE_SPEED_MULT } from "./systems/constants";
+import {
+  CAPITAL_BASELINE,
+  GRANT_AMOUNT,
+  MOVE_SPEED,
+  VEHICLE_SPEED_MULT,
+  BENCH_WEALTH_ELASTICITY,
+  BENCH_OWNER_DIVIDEND_SHARE,
+  BENCH_GROWTH_BRAND_ELASTICITY,
+  BENCH_CREDIT_ENABLED,
+  BENCH_TRADE_ENABLED,
+  BENCH_MONETARY_ENABLED,
+} from "./systems/constants";
 import { compareExperiments, formatComparison } from "./experiment/harness";
 import { summarizeCost } from "./ai/cost";
+import { PerBusinessProvider } from "./ai/PerBusinessProvider";
+import { OpenAICompatProvider } from "./ai/OpenAICompatProvider";
+import { RuleBasedProvider } from "./ai/RuleBasedProvider";
+import { firmProductiveWorth } from "./bench/ceoBench";
 
 const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -36,9 +51,17 @@ const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
 // is PLAYED rather than ruled — her moves are queued via window.cwlc.joy.queue, and she
 // stands pat between them. Every other resident lives on the rules mind, newcomers included.
 // No param ⇒ the default demo below, byte-for-byte as before.
-const boom = new URLSearchParams(location.search).get("scenario") === "boom";
+const scenarioParam = new URLSearchParams(location.search).get("scenario");
+const boom = scenarioParam === "boom";
+// ── "?scenario=duel" — the SPECTATOR DUEL (Pilot B, watchable) ──────────────────────────
+// The twin-diner benchmark match rendered live: biz_diner runs on the deterministic rules
+// mind, biz_diner_2 on the local LLM over the Open WebUI box (via the /tinybox dev proxy),
+// same frozen scenario as the headless duel harness. The decision ticker narrates the LLM's
+// actual reasons as they land. Spectator-grade, not score-grade: the headless duelCli with
+// home-and-away stays the instrument of record (this single game has the seat bias in it).
+const duel = scenarioParam === "duel";
 
-const SAVE_KEY = boom ? "cwlc.save.boom.v1" : "cwlc.save.v1"; // scenario-scoped, so saves never cross worlds
+const SAVE_KEY = boom ? "cwlc.save.boom.v1" : duel ? "cwlc.save.duel.v1" : "cwlc.save.v1"; // scenario-scoped, so saves never cross worlds
 const WIDTH = 640;
 const HEIGHT = 480;
 
@@ -75,7 +98,26 @@ joyMind?.queue(
 // watchable, zero-config. To run them on Claude instead, swap in the provider:
 //   import { ClaudeDecisionProvider } from "./ai/ClaudeDecisionProvider";
 //   const brain: BrainOption = new ClaudeDecisionProvider(); // needs VITE_ANTHROPIC_API_KEY
-const brain: BrainOption = "rules";
+// In the spectator duel, the router seats the local LLM at the rival diner (same adapter,
+// same shared briefing as the headless match; /no_think keeps a 36B reasoning model at
+// seconds-per-decision on a single-GPU box; rules cover any timeout, loudly logged).
+const duelEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+const duelModel = duelEnv.VITE_OPENWEBUI_MODEL ?? "qwen3.5:35b";
+const brain: BrainOption = duel
+  ? new PerBusinessProvider(
+      {
+        biz_diner_2: new OpenAICompatProvider({
+          baseUrl: "/tinybox/api", // the vite dev proxy → the Open WebUI box (no CORS)
+          model: duelModel,
+          apiKey: duelEnv.VITE_OPENWEBUI_API_KEY,
+          promptSuffix: " /no_think",
+          maxTokens: 512,
+          timeoutMs: 300_000,
+        }),
+      },
+      new RuleBasedProvider(), // the home diner — the deterministic incumbent
+    )
+  : "rules";
 
 // The residents likewise run on deterministic rules by default. To hand one (or
 // all) of them to Claude, swap in the provider:
@@ -100,7 +142,32 @@ const agenticResidentIds = "all" as const;
 // every move. (Set agenticBusinessIds back to just the storefronts for the calmer,
 // pre-Phase-15 view.)
 const { sim, world, market, macro, agent, residentAgent, events, god, population, welfare } = createCity(
-  boom
+  duel
+    ? {
+        // ── SPECTATOR DUEL (?scenario=duel) — the Pilot B match, rendered ───────────────
+        // The EXACT frozen scenario of src/bench/duel.ts (one shared contract: bench-frozen
+        // demand/dividends/credit/trade/monetary, brand at the growth elasticity, labour
+        // competition ON, no disasters) — so what you watch is what the instrument measures.
+        // Two agentic firms only; the rest of the town runs its deterministic life.
+        seed: 9,
+        brain,
+        residentBrain,
+        agenticBusinessIds: ["biz_diner", "biz_diner_2"],
+        secondDiner: true,
+        disasters: false,
+        wealthElasticity: BENCH_WEALTH_ELASTICITY,
+        ownerDividendShare: BENCH_OWNER_DIVIDEND_SHARE,
+        brandElasticity: BENCH_GROWTH_BRAND_ELASTICITY,
+        producerWageFloor: 0,
+        creditEnabled: BENCH_CREDIT_ENABLED,
+        includeBank: false,
+        tradeEnabled: BENCH_TRADE_ENABLED,
+        includePort: false,
+        monetaryEnabled: BENCH_MONETARY_ENABLED,
+        includeAuthority: false,
+        labourCompetition: true,
+      }
+    : boom
     ? {
         // ── BOOM TOWN (?scenario=boom) — Phase 9 Arc 3, live and watchable ──────────────
         // The whole verified free-market program + the C4 money fork: the Harbor Port trades
@@ -215,10 +282,18 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
 // Boom Town opens at 10x — one sim-day ≈ 2.4 real minutes, the watch-along commentary pace.
 // (The speed buttons / 1–4 keys still work; this only sets the opening tempo.)
 if (boom) sim.time.setSpeed(10);
+// The spectator duel opens at 10x too: a sim-day every ~2.4 real minutes leaves a /no_think
+// local model (seconds per decision) comfortable headroom; timeouts fall back to rules, logged.
+if (duel) sim.time.setSpeed(10);
+
+// Duel scoreboard baselines — the growth score is the productive-worth DELTA from the opening
+// bell. (Spectator-grade: a save/load resumes the world but re-anchors these at page load.)
+const duelStartA = duel ? firmProductiveWorth(world.getBusiness("biz_diner")!) : 0;
+const duelStartB = duel ? firmProductiveWorth(world.getBusiness("biz_diner_2")!) : 0;
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>NewSimClaude — ${boom ? "BOOM TOWN <span class=\"hint\">· Arc 3 live: the harbor trades, the City Reserve waits, and Joy is played (seed 9, port 5174)</span>" : "Free-Market Economy <span class=\"hint\">· free wage + welfare + business entry + new industry (port 5174)</span>"}</h1>
+  <h1>NewSimClaude — ${duel ? `THE DUEL <span class="hint">· Pilot B live: rules @ The Corner Diner vs ${duelModel} @ the rival diner (seed 9, growth-scored)</span>` : boom ? "BOOM TOWN <span class=\"hint\">· Arc 3 live: the harbor trades, the City Reserve waits, and Joy is played (seed 9, port 5174)</span>" : "Free-Market Economy <span class=\"hint\">· free wage + welfare + business entry + new industry (port 5174)</span>"}</h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
@@ -835,6 +910,23 @@ function renderMacro(): void {
       }),
       vitalCard("Velocity", latest.velocity.toFixed(2), history.map((s) => s.velocity), "#3fb950"),
       vitalCard("Welfare / day", money(welfareHistory[welfareHistory.length - 1] ?? 0), welfareHistory, "#ffa657"),
+      // The duel scoreboard — both growth scores (productive-worth delta since the opening
+      // bell), green when ahead. The same arithmetic as the headless instrument.
+      ...(duel
+        ? [
+            (() => {
+              const a = world.getBusiness("biz_diner");
+              const b = world.getBusiness("biz_diner_2");
+              const sa = a ? Math.round(firmProductiveWorth(a) - duelStartA) : 0;
+              const sb = b ? Math.round(firmProductiveWorth(b) - duelStartB) : 0;
+              const fmt = (n: number): string => `${n < 0 ? "−" : "+"}$${Math.abs(n).toLocaleString("en-US")}`;
+              return (
+                vitalCard(`rules — Corner Diner${a?.active ? "" : " 💀"}`, fmt(sa), [0, sa], sa >= sb ? "#3fb950" : "#f85149") +
+                vitalCard(`${duelModel} — rival diner${b?.active ? "" : " 💀"}`, fmt(sb), [0, sb], sb >= sa ? "#3fb950" : "#f85149")
+              );
+            })(),
+          ]
+        : []),
       // C4 trade + money cards — live wherever a port/authority exists; 0-flat otherwise.
       ...(boom
         ? [

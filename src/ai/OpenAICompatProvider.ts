@@ -78,7 +78,9 @@ export class OpenAICompatProvider implements DecisionProvider {
       temperature: options.temperature ?? DEFAULTS.temperature,
     };
     this.id = `openai-compat(${options.model})`;
-    this.fetchImpl = options.fetchImpl ?? (fetch as unknown as FetchLike);
+    // Wrapped, not referenced: a bare `fetch` reference loses its Window binding in browsers
+    // ("Illegal invocation") while working fine in Node — the spectator duel found this.
+    this.fetchImpl = options.fetchImpl ?? (((url, init) => fetch(url, init)) as FetchLike);
     this.briefing = options.briefing ?? defaultBriefing(options.objective ?? DEFAULT_OBJECTIVE);
     this.ledger = new CeoLedger(options.memoryTurns ?? DEFAULTS.memoryTurns);
     this.promptSuffix = options.promptSuffix ?? "";
