@@ -103,6 +103,10 @@ joyMind?.queue(
 // seconds-per-decision on a single-GPU box; rules cover any timeout, loudly logged).
 const duelEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 const duelModel = duelEnv.VITE_OPENWEBUI_MODEL ?? "qwen3.5:35b";
+// "&think=1" runs the local model in full REASONING mode (no /no_think): it deliberates out
+// loud before each decision — better play, but minutes per turn, so the duel opens slower and
+// the ticker shows the one-line conclusion of each deliberation. Default stays no-think (fast).
+const duelThink = duel && new URLSearchParams(location.search).get("think") === "1";
 const brain: BrainOption = duel
   ? new PerBusinessProvider(
       {
@@ -110,9 +114,8 @@ const brain: BrainOption = duel
           baseUrl: "/tinybox/api", // the vite dev proxy → the Open WebUI box (no CORS)
           model: duelModel,
           apiKey: duelEnv.VITE_OPENWEBUI_API_KEY,
-          promptSuffix: " /no_think",
-          maxTokens: 512,
-          timeoutMs: 300_000,
+          // thinking mode: drop the /no_think switch and give the reasoning room to breathe.
+          ...(duelThink ? { maxTokens: 4096, timeoutMs: 600_000 } : { promptSuffix: " /no_think", maxTokens: 512, timeoutMs: 300_000 }),
         }),
       },
       new RuleBasedProvider(), // the home diner — the deterministic incumbent
@@ -282,8 +285,11 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
 // Boom Town opens at 10x — one sim-day ≈ 2.4 real minutes, the watch-along commentary pace.
 // (The speed buttons / 1–4 keys still work; this only sets the opening tempo.)
 if (boom) sim.time.setSpeed(10);
-// The spectator duel opens at 10x too: a sim-day every ~2.4 real minutes leaves a /no_think
-// local model (seconds per decision) comfortable headroom; timeouts fall back to rules, logged.
+// The spectator duel opens at 10x: a sim-day every ~2.4 real minutes leaves a /no_think local
+// model (seconds per decision) comfortable headroom. In thinking mode each deliberation takes a
+// few minutes, so qwen acts roughly once per sim-day-or-two — its considered moves land in the
+// ticker as they arrive, and rules covers any review that times out (logged). Press 1 to drop
+// to 1x if you want to give each deliberation a fuller day to land.
 if (duel) sim.time.setSpeed(10);
 
 // Duel scoreboard baselines — the growth score is the productive-worth DELTA from the opening
