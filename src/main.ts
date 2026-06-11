@@ -40,7 +40,7 @@ import { PerBusinessProvider } from "./ai/PerBusinessProvider";
 import { OpenAICompatProvider } from "./ai/OpenAICompatProvider";
 import { RuleBasedProvider } from "./ai/RuleBasedProvider";
 import { firmProductiveWorth } from "./bench/ceoBench";
-import { BroadcastModel, ThoughtCam, towerHTML, thoughtCardHTML } from "./render/broadcast";
+import { BroadcastModel, ThoughtCam, DramaDetector, towerHTML, thoughtCardHTML, bannerHTML } from "./render/broadcast";
 
 const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -313,6 +313,7 @@ app.innerHTML = `
     <div class="stats" id="stats"></div>
     <div class="stats" id="popline" title="Live demography (HP3/HP4)"></div>
   </div>
+  <div id="banners"></div>
   <div class="stage">
     <div class="tower-wrap">
       <h2 class="tw-title">STANDINGS <span class="hint">· growth score</span></h2>
@@ -380,7 +381,28 @@ const townLifeEl = el<HTMLDivElement>("#townLife");
 // re-anchors the score baselines at the current world — the watch's opening bell.
 const towerEl = el<HTMLDivElement>("#tower");
 const thoughtCamEl = el<HTMLDivElement>("#thoughtcam");
+const bannersEl = el<HTMLDivElement>("#banners");
 const broadcastModel = new BroadcastModel(world, playerFirmIds);
+const dramaDetector = new DramaDetector(playerFirmIds);
+// The banner queue: one moment on screen at a time (7s), so drama never tramples drama.
+const bannerQueue: string[] = [];
+let bannerShowing = false;
+function pumpBanners(): void {
+  if (bannerShowing || bannerQueue.length === 0) return;
+  bannerShowing = true;
+  const node = document.createElement("div");
+  node.innerHTML = bannerQueue.shift()!;
+  const elBanner = node.firstElementChild as HTMLElement;
+  bannersEl.appendChild(elBanner);
+  setTimeout(() => {
+    elBanner.classList.add("bn-fade");
+    setTimeout(() => {
+      elBanner.remove();
+      bannerShowing = false;
+      pumpBanners();
+    }, 700);
+  }, 7000);
+}
 const thoughtCam = new ThoughtCam(
   new Set(duel ? ["biz_diner_2"] : []),
   duel ? `${duelModel}${duelThink ? " · thinking" : " · no-think"}` : "",
@@ -394,6 +416,12 @@ function renderBroadcast(day: number): void {
       broadcastModel.cards(world),
       selected?.kind === "business" ? selected.id : undefined,
     );
+    // R4 wave 3 — the drama booth: big moments become banners (queued, never trampling).
+    for (const ev of dramaDetector.sampleDay(world, day)) {
+      bannerQueue.push(bannerHTML(ev));
+      if (bannerQueue.length > 5) bannerQueue.splice(0, bannerQueue.length - 5);
+    }
+    pumpBanners();
   }
   for (const card of thoughtCam.poll(agent?.decisions() ?? [], world)) {
     const node = document.createElement("div");

@@ -272,6 +272,139 @@ export function thoughtCardHTML(c: ThoughtCard): string {
   );
 }
 
+// ── The Drama Booth (R4 wave 3) ───────────────────────────────────────────────────────────
+
+/** A broadcast-worthy moment. Severity 2 interrupts (kill-feed banner); 1 is a small banner. */
+export interface DramaEvent {
+  kind: "bankrupt" | "founded" | "poach" | "hire" | "press" | "trade" | "record";
+  severity: 1 | 2;
+  day: number;
+  headline: string;
+}
+
+/**
+ * Detects drama by diffing the world day-over-day — bankruptcies, new challengers, poaches
+ * between player firms, the press switching on, the first export sale, and revenue records.
+ * Renderer-side state only; reads the world, never writes it.
+ */
+export class DramaDetector {
+  private prevActive = new Map<string, boolean>();
+  private prevJobs = new Map<string, { jobId: string; name: string }>();
+  private prevRevenue = new Map<string, number>();
+  private knownBiz = new Set<string>();
+  private pressSeen = false;
+  private tradeSeen = false;
+  private revenueRecord = 0;
+  private primed = false;
+
+  constructor(private readonly playerIds: readonly string[]) {}
+
+  /** Call once per sim-day. The first call only anchors (no phantom drama on load). */
+  sampleDay(world: World, day: number): DramaEvent[] {
+    const out: DramaEvent[] = [];
+    const players = new Set(this.playerIds);
+
+    for (const b of world.businesses) {
+      const wasActive = this.prevActive.get(b.id);
+      const known = this.knownBiz.has(b.id);
+      if (this.primed && !known) {
+        out.push({
+          kind: "founded",
+          severity: 2,
+          day,
+          headline: `🏗 NEW CHALLENGER — ${b.name} opens its doors (${b.kind})`,
+        });
+      }
+      if (this.primed && known && wasActive === true && !b.active) {
+        out.push({
+          kind: "bankrupt",
+          severity: 2,
+          day,
+          headline: `💀 ${b.name.toUpperCase()} IS BANKRUPT — ${b.employeeIds.length} jobs gone, the niche is open`,
+        });
+      }
+      // Revenue record — players only, with a floor so day-2 doesn't "break" a $40 record.
+      if (players.has(b.id)) {
+        const prevRev = this.prevRevenue.get(b.id) ?? b.pnl.revenue;
+        const todays = b.pnl.revenue - prevRev;
+        if (this.primed && todays > Math.max(150, this.revenueRecord * 1.15)) {
+          this.revenueRecord = todays;
+          out.push({
+            kind: "record",
+            severity: 1,
+            day,
+            headline: `📈 RECORD DAY — ${b.name} books $${Math.round(todays)} in a single day`,
+          });
+        } else if (todays > this.revenueRecord) {
+          this.revenueRecord = todays; // quietly ratchet (no banner unless it SMASHES it)
+        }
+        this.prevRevenue.set(b.id, b.pnl.revenue);
+      }
+      this.prevActive.set(b.id, b.active);
+      this.knownBiz.add(b.id);
+    }
+
+    // Poaches: a resident who left one PLAYER firm for another overnight — the wage war on camera.
+    for (const r of world.residents) {
+      const prev = this.prevJobs.get(r.id);
+      if (
+        this.primed &&
+        prev &&
+        prev.jobId !== r.jobId &&
+        r.jobId !== "" &&
+        prev.jobId !== "" &&
+        players.has(r.jobId) &&
+        players.has(prev.jobId)
+      ) {
+        const from = world.getBusiness(prev.jobId);
+        const to = world.getBusiness(r.jobId);
+        out.push({
+          kind: "poach",
+          severity: 2,
+          day,
+          headline: `⚔️ POACHED — ${r.name} walks out of ${from?.name ?? prev.jobId} and into ${to?.name ?? r.jobId}`,
+        });
+      }
+      this.prevJobs.set(r.id, { jobId: r.jobId, name: r.name });
+    }
+
+    // One-time regime banners: the press's first dollar, the port's first export sale.
+    if (this.primed && !this.pressSeen && world.mintedTotal() > 0) {
+      this.pressSeen = true;
+      out.push({
+        kind: "press",
+        severity: 2,
+        day,
+        headline: `🖨 THE PRESS IS ON — the City Reserve mints its first dollars`,
+      });
+    }
+    if (!this.tradeSeen) {
+      let x = 0;
+      for (const b of world.businesses) x += b.pnl.exportRevenue ?? 0;
+      if (this.primed && x > 0) {
+        this.tradeSeen = true;
+        out.push({
+          kind: "trade",
+          severity: 1,
+          day,
+          headline: `⛵ FIRST SAIL — the Harbor Port starts buying local exports`,
+        });
+      } else if (x > 0) {
+        this.tradeSeen = true; // trade already flowing at anchor time — not news
+      }
+    }
+    if (world.mintedTotal() > 0) this.pressSeen = true;
+
+    this.primed = true;
+    return out;
+  }
+}
+
+/** One banner as HTML — severity 2 interrupts, severity 1 stays modest. */
+export function bannerHTML(e: DramaEvent): string {
+  return `<div class="bn bn-s${e.severity} bn-${e.kind}"><span class="bn-day">DAY ${e.day}</span>${escapeHtml(e.headline)}</div>`;
+}
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }

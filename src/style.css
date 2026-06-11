@@ -142,6 +142,44 @@ button.active {
 .tw-warn { color: #d29922; }
 .tw-dead { color: #f85149; letter-spacing: 0.08em; }
 
+/* ── R4 wave 3: the Drama Booth banners ───────────────────────────────────────── */
+#banners {
+  min-height: 0;
+}
+.bn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  animation: bn-in 0.3s ease-out;
+  transition: opacity 0.7s, transform 0.7s;
+  margin-bottom: 6px;
+}
+.bn-fade { opacity: 0; transform: translateY(-6px); }
+@keyframes bn-in {
+  from { transform: translateY(-10px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+.bn-day {
+  font-size: 10px;
+  color: var(--muted);
+  background: #0e1116;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex: 0 0 auto;
+}
+.bn-s2 { background: #2d1418; border: 1px solid #f8514966; box-shadow: 0 3px 16px rgba(248, 81, 73, 0.15); }
+.bn-s1 { background: #161b22; border: 1px solid var(--border); font-weight: 600; }
+.bn-founded { background: #10231a; border-color: #3fb95066; box-shadow: 0 3px 16px rgba(63, 185, 80, 0.12); }
+.bn-press { background: #241a2d; border-color: #b18ee866; }
+.bn-record { border-color: #d2992266; }
+.bn-trade { border-color: #58d6ff66; }
+
 /* ── R4 wave 2: the Thought Cam ───────────────────────────────────────────────── */
 #thoughtcam {
   position: absolute;
