@@ -1,0 +1,281 @@
+/**
+ * R4 — THE BROADCAST layer (wave 1+2): the Leaderboard Tower and the Thought Cam.
+ *
+ * Turns the dashboard into a show: a persistent F1-style rail ranking every PLAYER firm by the
+ * official growth score (with momentum and bankruptcy-countdown badges), and slide-in cards
+ * showing each LLM decision as it lands — the action as chips, the model's reason verbatim,
+ * the think time. See PHASE-RENDER-R4-BROADCAST.md.
+ *
+ * RENDERING ONLY READS: this module receives the world and the decision log as read-only
+ * inputs and returns plain data/HTML strings. No system, no serialization, no sim writes.
+ * Scores use the exported bench helpers — ONE valuation truth with the scored instrument.
+ */
+import type { Business } from "../world/types";
+import type { World } from "../world/World";
+import type { BusinessAction, DecisionLogEntry } from "../ai/types";
+import { firmProductiveWorth } from "../bench/ceoBench";
+import { RETAIL_REFERENCE_PRICE, BRAND_BASELINE } from "../systems/constants";
+
+/** One row of the tower — everything a glance needs. */
+export interface FirmCard {
+  id: string;
+  name: string;
+  kind: string;
+  active: boolean;
+  /** The official score: productive worth minus the baseline at watch start. */
+  score: number;
+  rank: number;
+  /** Positive = climbed since the last sample day (▲), negative = fell (▼). */
+  rankDelta: number;
+  /** Score change over the last ≤7 sampled days — the momentum arrow. */
+  momentum: number;
+  /** Days until $0 cash at the recent burn rate; Infinity when not burning. */
+  runwayDays: number;
+  staff: number;
+  /** Posted wage as a multiple of the role base (1 = base). */
+  wageMult: number;
+  /** Price vs the kind's reference anchor, as a fraction (−0.1 = undercutting 10%). */
+  pricePosture: number;
+  /** Brand equity above the common baseline. */
+  brandValue: number;
+}
+
+interface FirmTrack {
+  scores: number[]; // one per sampled day
+  cashes: number[];
+}
+
+/**
+ * The read-only scorecard model: baselines anchor at construction (the opening bell of the
+ * WATCH — a reload re-anchors; the headless duelCli remains the instrument of record), then
+ * one sample per sim-day feeds ranks, momentum, and runway.
+ */
+export class BroadcastModel {
+  private readonly baselines = new Map<string, number>();
+  private readonly tracks = new Map<string, FirmTrack>();
+  private prevRanks = new Map<string, number>();
+  private ranks = new Map<string, number>();
+
+  constructor(
+    world: World,
+    /** The PLAYER firms (the agentic list) — infrastructure (port, bank…) is staff, not cast. */
+    private readonly playerIds: readonly string[],
+  ) {
+    for (const id of playerIds) {
+      const b = world.getBusiness(id);
+      if (b) this.baselines.set(id, firmProductiveWorth(b));
+    }
+  }
+
+  /** Call once per sim-day (and once at start). Order of work: sample → re-rank. */
+  sampleDay(world: World): void {
+    for (const id of this.playerIds) {
+      const b = world.getBusiness(id);
+      if (!b) continue;
+      const t = this.tracks.get(id) ?? { scores: [], cashes: [] };
+      t.scores.push(this.scoreOf(b));
+      t.cashes.push(b.cash);
+      if (t.scores.length > 30) {
+        t.scores.shift();
+        t.cashes.shift();
+      }
+      this.tracks.set(id, t);
+    }
+    this.prevRanks = this.ranks;
+    this.ranks = new Map(
+      [...this.playerIds]
+        .map((id) => ({ id, b: world.getBusiness(id) }))
+        .filter((x): x is { id: string; b: Business } => !!x.b)
+        .sort((x, y) => this.scoreOf(y.b) - this.scoreOf(x.b) || (x.id < y.id ? -1 : 1))
+        .map((x, i) => [x.id, i + 1] as const),
+    );
+  }
+
+  /** Tower rows, ranked. */
+  cards(world: World): FirmCard[] {
+    const out: FirmCard[] = [];
+    for (const id of this.playerIds) {
+      const b = world.getBusiness(id);
+      if (!b) continue;
+      const t = this.tracks.get(id);
+      const score = this.scoreOf(b);
+      const rank = this.ranks.get(id) ?? 0;
+      const prev = this.prevRanks.get(id);
+      const momentum =
+        t && t.scores.length >= 2 ? score - t.scores[Math.max(0, t.scores.length - 8)]! : 0;
+      const ref = RETAIL_REFERENCE_PRICE[b.kind];
+      out.push({
+        id,
+        name: b.name,
+        kind: b.kind,
+        active: b.active,
+        score,
+        rank,
+        rankDelta: prev !== undefined && rank > 0 ? prev - rank : 0,
+        momentum,
+        runwayDays: runway(b.cash, t?.cashes ?? []),
+        staff: b.employeeIds.length,
+        wageMult: (b.baseWagePerTick ?? b.wagePerTick) > 0 ? b.wagePerTick / (b.baseWagePerTick ?? b.wagePerTick) : 1,
+        pricePosture: ref !== undefined && ref > 0 ? b.price / ref - 1 : 0,
+        brandValue: (b.brand ?? BRAND_BASELINE) - BRAND_BASELINE,
+      });
+    }
+    return out.sort((a, z) => (a.rank || 99) - (z.rank || 99));
+  }
+
+  private scoreOf(b: Business): number {
+    return firmProductiveWorth(b) - (this.baselines.get(b.id) ?? 0);
+  }
+}
+
+/** Days until $0 at the average burn over the last ≤7 sampled days; Infinity if not burning. */
+export function runway(cash: number, cashHistory: readonly number[]): number {
+  if (cashHistory.length < 3) return Infinity; // one day's dip isn't a trend — don't cry wolf
+  const window = cashHistory.slice(-8);
+  const burn = (window[window.length - 1]! - window[0]!) / (window.length - 1);
+  if (burn >= -1e-9) return Infinity;
+  return cash / -burn;
+}
+
+const money = (n: number): string =>
+  `${n < 0 ? "−" : "+"}$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+
+/** The Tower as an HTML string (main.ts owns mounting + the click-to-select wiring). */
+export function towerHTML(cards: readonly FirmCard[], selectedId?: string): string {
+  if (cards.length === 0) return `<p class="hint">No player firms in this scenario.</p>`;
+  const rows = cards.map((c) => {
+    const move =
+      c.rankDelta > 0
+        ? `<span class="tw-up">▲${c.rankDelta}</span>`
+        : c.rankDelta < 0
+          ? `<span class="tw-down">▼${-c.rankDelta}</span>`
+          : `<span class="tw-flat">·</span>`;
+    const mom = c.momentum > 1 ? "🔥" : c.momentum < -1 ? "🧊" : "";
+    const danger = !c.active
+      ? `<span class="tw-dead">BANKRUPT</span>`
+      : c.runwayDays < 7
+        ? `<span class="tw-danger">🔴 ${Math.max(1, Math.round(c.runwayDays))}d cash</span>`
+        : c.runwayDays < 15
+          ? `<span class="tw-warn">🟠 ${Math.round(c.runwayDays)}d cash</span>`
+          : "";
+    const posture = [
+      `${c.staff}👤`,
+      c.wageMult > 1.05 ? `wage ${c.wageMult.toFixed(1)}×` : "",
+      Math.abs(c.pricePosture) > 0.05
+        ? `${c.pricePosture > 0 ? "premium" : "undercut"} ${Math.round(Math.abs(c.pricePosture) * 100)}%`
+        : "",
+      c.brandValue > 1 ? `brand ${Math.round(c.brandValue)}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      `<div class="tw-row${c.id === selectedId ? " tw-sel" : ""}${c.active ? "" : " tw-out"}" data-biz="${c.id}">` +
+      `<span class="tw-rank">P${c.rank}</span>` +
+      `<span class="tw-chip tw-${c.kind}"></span>` +
+      `<span class="tw-name">${c.name}</span>${move}` +
+      `<span class="tw-score">${money(c.score)}${mom}</span>` +
+      `<span class="tw-posture">${posture}</span>${danger}` +
+      `</div>`
+    );
+  });
+  return rows.join("");
+}
+
+// ── The Thought Cam (R4-2) ────────────────────────────────────────────────────────────────
+
+/** A landed LLM decision, ready to render as a card. */
+export interface ThoughtCard {
+  businessId: string;
+  firmName: string;
+  day: number;
+  chips: string[];
+  reason: string;
+  /** Seconds of deliberation (undefined for instant minds). */
+  thinkSeconds?: number;
+  /** True when the model missed the turn and rules covered. */
+  missedTurn: boolean;
+  providerLabel: string;
+}
+
+/** `{setPrice: 14, hire: 1}` → `["PRICE → $14", "HIRE +1"]` — shared by cards and banners. */
+export function chipify(action: BusinessAction): string[] {
+  const chips: string[] = [];
+  if (action.setPrice !== undefined) chips.push(`PRICE → $${round2(action.setPrice)}`);
+  if (action.hire !== undefined && action.hire !== 0)
+    chips.push(action.hire > 0 ? `HIRE +${action.hire}` : `CUT ${-action.hire}`);
+  if (action.invest !== undefined && action.invest > 0) chips.push(`INVEST $${round2(action.invest)}`);
+  if (action.setWage !== undefined) chips.push(`WAGE → ${round2(action.setWage)}`);
+  if (action.brand !== undefined && action.brand > 0) chips.push(`MARKETING $${round2(action.brand)}`);
+  if (action.setPayout !== undefined) chips.push(`RETAIN ${Math.round((1 - action.setPayout) * 100)}%`);
+  if (action.setExportShare !== undefined) chips.push(`EXPORT ${Math.round(action.setExportShare * 100)}%`);
+  if (action.borrow !== undefined && action.borrow > 0) chips.push(`BORROW $${round2(action.borrow)}`);
+  if (action.repay !== undefined && action.repay > 0) chips.push(`REPAY $${round2(action.repay)}`);
+  if (chips.length === 0) chips.push("HOLD");
+  return chips;
+}
+
+/**
+ * Watches the decision log for NEW entries from the LLM seats and turns them into cards.
+ * Rules firms stay quiet (their moves live in the trace panel) — no card spam.
+ */
+export class ThoughtCam {
+  private seen = 0;
+
+  constructor(
+    /** The businessIds driven by an LLM (the duel: the rival diner). */
+    private readonly llmSeats: ReadonlySet<string>,
+    private readonly providerLabel: string,
+  ) {}
+
+  /** Returns cards for entries that landed since the last poll. */
+  poll(log: readonly DecisionLogEntry[], world: World): ThoughtCard[] {
+    const fresh = log.slice(this.seen);
+    this.seen = log.length;
+    const out: ThoughtCard[] = [];
+    for (const e of fresh) {
+      if (!this.llmSeats.has(e.businessId)) continue;
+      const firm = world.getBusiness(e.businessId);
+      out.push({
+        businessId: e.businessId,
+        firmName: firm?.name ?? e.businessId,
+        day: e.day,
+        chips: chipify(e.action),
+        reason: e.reason,
+        thinkSeconds: e.usage?.latencyMs !== undefined ? e.usage.latencyMs / 1000 : undefined,
+        missedTurn: e.fallback,
+        providerLabel: this.providerLabel,
+      });
+    }
+    return out;
+  }
+}
+
+/** One thought card as HTML (the big moment when a mind shows its work). */
+export function thoughtCardHTML(c: ThoughtCard): string {
+  if (c.missedTurn) {
+    return (
+      `<div class="tc-card tc-missed">` +
+      `<div class="tc-head"><b>${c.firmName}</b> · day ${c.day} · <span class="tc-miss">⏱ missed the turn — rules covered</span></div>` +
+      `</div>`
+    );
+  }
+  const think =
+    c.thinkSeconds !== undefined && c.thinkSeconds > 1
+      ? `<span class="tc-think">deliberated ${c.thinkSeconds >= 90 ? `${(c.thinkSeconds / 60).toFixed(1)}m` : `${Math.round(c.thinkSeconds)}s`}</span>`
+      : "";
+  return (
+    `<div class="tc-card">` +
+    `<div class="tc-head"><b>${c.firmName}</b> · day ${c.day} · <span class="tc-model">${c.providerLabel}</span> ${think}</div>` +
+    `<div class="tc-chips">${c.chips.map((ch) => `<span class="tc-chip">${ch}</span>`).join("")}</div>` +
+    `<div class="tc-reason">“${escapeHtml(c.reason)}”</div>` +
+    `</div>`
+  );
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}

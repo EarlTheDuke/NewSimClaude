@@ -27,7 +27,7 @@ body {
   flex-direction: column;
   gap: 16px;
   padding: 24px;
-  max-width: 1040px;
+  max-width: 1280px; /* R4: room for the Leaderboard Tower beside the map */
 }
 
 h1 {
@@ -92,7 +92,98 @@ button.active {
   display: flex;
   gap: 16px;
   align-items: flex-start;
+  position: relative; /* R4: the Thought Cam overlays the stage */
 }
+
+/* ── R4 wave 1: the Leaderboard Tower ─────────────────────────────────────────── */
+.tower-wrap {
+  width: 230px;
+  flex: 0 0 230px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 10px 6px;
+}
+.tw-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+}
+.tw-row {
+  display: grid;
+  grid-template-columns: 26px 10px 1fr auto;
+  grid-template-areas: "rank chip name move" "rank chip score score" "rank chip posture posture" "rank chip danger danger";
+  column-gap: 6px;
+  align-items: center;
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.tw-row:hover { background: #1c232d; }
+.tw-row.tw-sel { border-left-color: var(--accent); background: #1c232d; }
+.tw-row.tw-out { opacity: 0.45; }
+.tw-rank { grid-area: rank; font-weight: 700; font-size: 14px; color: var(--muted); }
+.tw-chip { grid-area: chip; width: 8px; height: 8px; border-radius: 2px; background: #5a6069; }
+.tw-chip.tw-diner { background: #e1a35b; }
+.tw-chip.tw-goods { background: #58a6ff; }
+.tw-chip.tw-farm { background: #7ee787; }
+.tw-chip.tw-mine { background: #b18ee8; }
+.tw-chip.tw-bakery { background: #f778ba; }
+.tw-chip.tw-factory { background: #ff9e58; }
+.tw-name { grid-area: name; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tw-up { grid-area: move; color: #3fb950; font-size: 11px; }
+.tw-down { grid-area: move; color: #f85149; font-size: 11px; }
+.tw-flat { grid-area: move; color: var(--muted); font-size: 11px; }
+.tw-score { grid-area: score; font-size: 13px; font-weight: 700; }
+.tw-posture { grid-area: posture; font-size: 10px; color: var(--muted); }
+.tw-danger, .tw-warn, .tw-dead { grid-area: danger; font-size: 10px; font-weight: 700; }
+.tw-danger { color: #f85149; }
+.tw-warn { color: #d29922; }
+.tw-dead { color: #f85149; letter-spacing: 0.08em; }
+
+/* ── R4 wave 2: the Thought Cam ───────────────────────────────────────────────── */
+#thoughtcam {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 5;
+}
+.tc-card {
+  background: rgba(14, 17, 22, 0.94);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 9px 11px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  animation: tc-in 0.25s ease-out;
+  transition: opacity 0.9s;
+}
+.tc-card.tc-missed { border-color: #d29922; }
+.tc-card.tc-fade { opacity: 0; }
+@keyframes tc-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.tc-head { font-size: 11px; color: var(--muted); }
+.tc-head b { color: var(--text); }
+.tc-model { color: var(--accent); }
+.tc-think { color: #d29922; }
+.tc-miss { color: #d29922; font-weight: 700; }
+.tc-chips { margin: 6px 0 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+.tc-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: #1f6feb33;
+  border: 1px solid #1f6feb88;
+}
+.tc-reason { font-size: 11px; line-height: 1.45; color: var(--text); font-style: italic; }
 
 canvas#city {
   background: #11131a;

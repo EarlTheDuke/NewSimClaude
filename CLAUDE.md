@@ -33,6 +33,9 @@ This file auto-loads every session in this repo. It is the operating manual; the
    visualization track: the "10× more watchable" vision and its phased, browser-gated plan
    (decision-narrative moat → Pixi foundation → sprites/vehicles/flow → charts/story → sound).
    Read these before any rendering/UX work. *Rendering only reads* — these never touch the sim.
+   **Current rendering direction: [PHASE-RENDER-R4-BROADCAST.md](PHASE-RENDER-R4-BROADCAST.md)**
+   — the six-wave "dashboard → broadcast" program (leaderboard tower, thought cam, drama booth,
+   juice pass, eval bar, director), user-greenlit 2026-06-10.
 
 ## Non-negotiable invariants (breaking one is a bug, not a tradeoff)
 - **Determinism is sacred.** Seeded RNG only; no `Math.random`, no wall-clock, no

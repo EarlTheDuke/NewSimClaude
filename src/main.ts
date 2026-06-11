@@ -40,6 +40,7 @@ import { PerBusinessProvider } from "./ai/PerBusinessProvider";
 import { OpenAICompatProvider } from "./ai/OpenAICompatProvider";
 import { RuleBasedProvider } from "./ai/RuleBasedProvider";
 import { firmProductiveWorth } from "./bench/ceoBench";
+import { BroadcastModel, ThoughtCam, towerHTML, thoughtCardHTML } from "./render/broadcast";
 
 const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -127,6 +128,12 @@ const brain: BrainOption = duel
 //   import { ClaudeResidentProvider } from "./ai/ClaudeResidentProvider";
 //   const residentBrain: ResidentBrainOption = new ClaudeResidentProvider();
 const residentBrain: ResidentBrainOption = "rules";
+// R4 — the broadcast's cast list: the PLAYER firms (ranked in the Leaderboard Tower).
+// Infrastructure (port, bank, authority, landlord) is stage crew, not cast.
+const playerFirmIds: string[] = duel
+  ? ["biz_diner", "biz_diner_2"]
+  : ["biz_diner", "biz_diner_2", "biz_goods", "biz_farm", "biz_mine", "biz_bakery", "biz_factory"];
+
 // The full living firm economy (Phase 15): EVERY resident is an agent, so the whole
 // labour market is live — workers chase better-paying jobs, firms that fall short
 // of staff bid wages up, and the supply chain reshuffles itself in front of you.
@@ -307,8 +314,13 @@ app.innerHTML = `
     <div class="stats" id="popline" title="Live demography (HP3/HP4)"></div>
   </div>
   <div class="stage">
+    <div class="tower-wrap">
+      <h2 class="tw-title">STANDINGS <span class="hint">· growth score</span></h2>
+      <div id="tower"><p class="hint">First standings post at day 1.</p></div>
+    </div>
     <canvas id="city" width="${WIDTH}" height="${HEIGHT}"></canvas>
     <div class="inspector" id="inspector"><p class="hint">Click a resident or building to inspect.</p></div>
+    <div id="thoughtcam"></div>
   </div>
   <div class="ticker" id="ticker"><span class="hint">The city's decisions will scroll here as days roll…</span></div>
   <div class="hud econ">
@@ -362,6 +374,45 @@ const resTraceLogEl = el<HTMLDivElement>("#resTraceLog");
 const eventsLogEl = el<HTMLDivElement>("#eventsLog");
 const eventsTagEl = el<HTMLSpanElement>("#eventsTag");
 const townLifeEl = el<HTMLDivElement>("#townLife");
+
+// R4 — the broadcast layer (rendering-only state): the Tower model samples once per sim-day;
+// the Thought Cam polls the decision log every frame for landed LLM moves. A reload (or Load)
+// re-anchors the score baselines at the current world — the watch's opening bell.
+const towerEl = el<HTMLDivElement>("#tower");
+const thoughtCamEl = el<HTMLDivElement>("#thoughtcam");
+const broadcastModel = new BroadcastModel(world, playerFirmIds);
+const thoughtCam = new ThoughtCam(
+  new Set(duel ? ["biz_diner_2"] : []),
+  duel ? `${duelModel}${duelThink ? " · thinking" : " · no-think"}` : "",
+);
+let lastTowerDay = -1;
+function renderBroadcast(day: number): void {
+  if (day !== lastTowerDay) {
+    lastTowerDay = day;
+    broadcastModel.sampleDay(world);
+    towerEl.innerHTML = towerHTML(
+      broadcastModel.cards(world),
+      selected?.kind === "business" ? selected.id : undefined,
+    );
+  }
+  for (const card of thoughtCam.poll(agent?.decisions() ?? [], world)) {
+    const node = document.createElement("div");
+    node.innerHTML = thoughtCardHTML(card);
+    const elCard = node.firstElementChild as HTMLElement;
+    thoughtCamEl.appendChild(elCard);
+    while (thoughtCamEl.children.length > 2) thoughtCamEl.removeChild(thoughtCamEl.firstChild!);
+    setTimeout(() => {
+      elCard.classList.add("tc-fade");
+      setTimeout(() => elCard.remove(), 900);
+    }, card.missedTurn ? 5000 : 14000);
+  }
+}
+towerEl.addEventListener("click", (e) => {
+  const row = (e.target as HTMLElement).closest<HTMLElement>(".tw-row");
+  if (!row?.dataset.biz) return;
+  selected = { kind: "business", id: row.dataset.biz };
+  lastTowerDay = -1; // re-render the tower highlight next frame
+});
 
 // Town-life feed + population history (HP3/HP4 watchability) — rendering-only state.
 // Sampled once per sim-day in renderFrame; the feed narrates demographic events as
@@ -1008,6 +1059,7 @@ function renderFrame(): void {
     alpha: Math.max(0, 1 - (nowMs - t.bornMs) / TOAST_TTL_MS),
   }));
   renderer.draw(t.hour + t.minute / 60, selected, marker, bubbleViews, toastViews);
+  renderBroadcast(t.day);
   sampleDemography(t.day);
   renderInspector();
   renderMacro();
