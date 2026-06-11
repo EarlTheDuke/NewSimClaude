@@ -94,6 +94,51 @@ describe("ClaudeDecisionProvider (modernized — the LM-as-CEO mind)", () => {
     expect(decision.action).toEqual({ setPrice: 28 });
   });
 
+  it("carries the CEO's own ledger across turns — and only their own (memory, Pilot-A fix)", async () => {
+    const { client, captured } = stub({ setPrice: 38, reason: "probe upward" });
+    const provider = new ClaudeDecisionProvider({ client });
+
+    // Turn 1: no history yet — the prompt is just today's books (amnesia-free baseline).
+    await provider.decide({ observation: obs({ day: 5 }), limits: DEFAULT_LIMITS });
+    expect(captured().messages[0].content as string).not.toMatch(/YOUR LEDGER/);
+
+    // Turn 2: the ledger appears, carrying day 5's figures AND the choice + reason made then.
+    await provider.decide({ observation: obs({ day: 6, price: 38 }), limits: DEFAULT_LIMITS });
+    const msg = captured().messages[0].content as string;
+    expect(msg).toMatch(/YOUR LEDGER/);
+    expect(msg).toMatch(/Day 5/);
+    expect(msg).toMatch(/setPrice":38/);
+    expect(msg).toMatch(/probe upward/);
+    expect(msg).toMatch(/TODAY:/);
+
+    // A different business shares the provider but never sees this firm's ledger.
+    await provider.decide({
+      observation: obs({ businessId: "biz_diner", name: "The Corner Diner", day: 6 }),
+      limits: DEFAULT_LIMITS,
+    });
+    expect(captured().messages[0].content as string).not.toMatch(/YOUR LEDGER/);
+  });
+
+  it("memoryTurns: 0 restores the stateless provider", async () => {
+    const { client, captured } = stub({ reason: "hold" });
+    const provider = new ClaudeDecisionProvider({ client, memoryTurns: 0 });
+    await provider.decide({ observation: obs({ day: 1 }), limits: DEFAULT_LIMITS });
+    await provider.decide({ observation: obs({ day: 2 }), limits: DEFAULT_LIMITS });
+    expect(captured().messages[0].content as string).not.toMatch(/YOUR LEDGER/);
+  });
+
+  it("the briefing is the system prompt: mechanics disclosed, no strategy coaching", async () => {
+    const { client, captured } = stub({ reason: "hold" });
+    const provider = new ClaudeDecisionProvider({ client });
+    await provider.decide({ observation: obs(), limits: DEFAULT_LIMITS });
+    const system = captured().system as string;
+    expect(system).toMatch(/YOUR OBJECTIVE/);
+    expect(system).toMatch(/STANDING POLICIES/i); // the firm's own bylaws — fair disclosure
+    expect(system).toMatch(/WHAT YOU DO NOT KNOW/i); // market behaviour withheld
+    expect(system).toMatch(/up to you/i); // no coaching
+    expect(system).not.toMatch(/capacity-bound .* pay off|price near the going/i); // the old coaching is gone
+  });
+
   it("rejects (so the agent falls back to rules) when the model returns no tool call", async () => {
     const client = {
       messages: {

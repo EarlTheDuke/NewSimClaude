@@ -28,6 +28,25 @@ export interface ClaudeProviderOptions {
    * call or a key. When set, the key requirement is skipped.
    */
   client?: MessagesClient;
+  /**
+   * The exact objective the CEO is graded on, injected by the benchmark per scoring mode
+   * (classic vs growth) — a real CEO knows their KPI, so disclosing it is fair. Defaults to
+   * the classic net-worth wording.
+   */
+  objective?: string;
+  /**
+   * Override the entire system briefing. The benchmark freezes this string per version so
+   * every model sees the identical contract. Default: {@link defaultBriefing} — a
+   * mechanics-only briefing (see its fairness note).
+   */
+  briefing?: string;
+  /**
+   * How many of the CEO's own past mornings ride in the prompt as their ledger (memory).
+   * Without it the model is stateless per call and cannot learn across turns (e.g. its own
+   * price probes are forgotten). Default 12; 0 disables. One provider instance = one run —
+   * construct a fresh provider per episode so ledgers never leak between games.
+   */
+  memoryTurns?: number;
 }
 
 const DEFAULTS = {
@@ -37,7 +56,51 @@ const DEFAULTS = {
   // Rough Haiku-class rates ($/token); adjust to live pricing.
   inputCostPerToken: 1 / 1_000_000,
   outputCostPerToken: 5 / 1_000_000,
+  memoryTurns: 12,
+  objective:
+    "Maximize your firm's net worth at the final day: cash + inventory (valued at the market " +
+    "reference price, not your own ask) + equipment above the common baseline.",
 };
+
+/**
+ * The default system briefing — the benchmark's information contract with the model.
+ *
+ * THE FAIRNESS LINE (set during the Pilot-A evaluation): the briefing discloses everything a
+ * real CEO would know — how time works, their grading objective, and their OWN firm's standing
+ * policies (the reserve sweep, payroll mechanics, restocking, depreciation) — and deliberately
+ * does NOT disclose market behaviour (demand curves, customers' reservation prices, rivals'
+ * tactics), which must be learned from the ledger. It also contains ZERO strategy advice: the
+ * old prompt coached ("invest only when capacity-bound…"), which contaminates a skill
+ * measurement. How to play is the thing being measured.
+ */
+export function defaultBriefing(objective: string): string {
+  return (
+    "You are the CEO of one firm in a small, fully simulated town economy.\n\n" +
+    "HOW TIME WORKS: you make ONE decision each morning through the tool; the day then runs " +
+    "without you — your staff sell and produce on their shifts, customers shop by their own " +
+    "tastes and budgets, suppliers and rent settle automatically. Levers apply from today; " +
+    "results show in tomorrow's books.\n\n" +
+    `YOUR OBJECTIVE: ${objective}\n\n` +
+    "YOUR FIRM'S STANDING POLICIES (your own bylaws — you know these exactly):\n" +
+    "- Working reserve: cash above about $3000 counts as surplus.\n" +
+    "- Dividends: each day the surplus (up to about $900/day) is paid out to the town, scaled " +
+    "by your payout fraction — the setPayout lever; 1.0 (the default) pays it all out, 0 " +
+    "retains everything as cash.\n" +
+    "- Payroll: each staffer on shift is automatically paid your posted wage per tick; staff " +
+    "have rotating days off, so the daily wage bill naturally swings.\n" +
+    "- Restocking: the shop automatically buys its input at the market price and restocks " +
+    "toward its warehouse target, limited by staffing and equipment capacity.\n" +
+    "- Equipment: invest converts cash into capacity 1:1; only the part above the common " +
+    "baseline counts toward your worth, and it wears out about 1%/day.\n" +
+    "- Marketing (brand): spending builds brand equity that raises what customers will pay, " +
+    "with diminishing returns and daily decay.\n\n" +
+    "WHAT YOU DO NOT KNOW (and must learn from your books): how many customers buy at a given " +
+    "price, what rivals will do, how the town's wages and prices will move. Your own recent " +
+    "mornings — observations, choices, and outcomes — are provided as YOUR LEDGER. Use it.\n\n" +
+    "RULES: out-of-range values are clamped to the stated limits; omitted levers stay as they " +
+    "are. Always give a one-sentence reason. How you play is entirely up to you."
+  );
+}
 
 /**
  * The Claude-backed business mind. Async, networked, and the *only* sanctioned
@@ -57,6 +120,15 @@ export class ClaudeDecisionProvider implements DecisionProvider {
   private readonly maxTokens: number;
   private readonly inputCostPerToken: number;
   private readonly outputCostPerToken: number;
+  private readonly briefing: string;
+  private readonly memoryTurns: number;
+  /**
+   * The CEO's ledger, per business: one compact line per past morning (what the books said,
+   * what was chosen, why). Rides in the prompt so the model can learn across turns — without
+   * it every call is amnesiac and a price probe teaches nothing. Provider-local presentation
+   * of its OWN past requests/replies (never privileged world state), capped to bound growth.
+   */
+  private readonly ledgers = new Map<string, string[]>();
 
   constructor(opts: ClaudeProviderOptions = {}) {
     if (opts.client) {
@@ -76,6 +148,8 @@ export class ClaudeDecisionProvider implements DecisionProvider {
     this.maxTokens = opts.maxTokens ?? DEFAULTS.maxTokens;
     this.inputCostPerToken = opts.inputCostPerToken ?? DEFAULTS.inputCostPerToken;
     this.outputCostPerToken = opts.outputCostPerToken ?? DEFAULTS.outputCostPerToken;
+    this.briefing = opts.briefing ?? defaultBriefing(opts.objective ?? DEFAULTS.objective);
+    this.memoryTurns = opts.memoryTurns ?? DEFAULTS.memoryTurns;
   }
 
   async decide(req: DecisionRequest): Promise<BusinessDecision> {
@@ -90,24 +164,9 @@ export class ClaudeDecisionProvider implements DecisionProvider {
     const response = await this.client.messages.create({
       model: this.model,
       max_tokens: this.maxTokens,
-      system:
-        "You are the CEO of one firm in a small, closed city economy, maximizing " +
-        "your firm's net worth (cash + inventory + equipment) over many days. Each " +
-        "day you set a plan with the `set_business_plan` tool — adjust price, " +
-        "hire/lay off staff, invest cash in equipment, set the wage, and spend on " +
-        "marketing to grow demand. Play it " +
-        "well: price near the going market rate and never below your unit cost; " +
-        "invest in equipment only when you are capacity-bound (utilization near " +
-        "100%) and still hold a cash cushion; spend on marketing to lift customers' " +
-        "willingness-to-pay and grow your demand when you have room to sell more; " +
-        "raise the wage to attract or keep " +
-        "staff when short-handed, and ease it back when fully crewed and cash is " +
-        "tight; hire when you are profitable and short-handed. Decide how much of " +
-        "your profit to pay out versus retain: set the payout fraction below 1 to " +
-        "keep cash as working capital to reinvest and grow (lower it when you have a " +
-        "growth opportunity to fund; keep it near 1 to pay out when you don't). " +
-        "Values outside the " +
-        "limits are clamped, so stay within them. Always give a one-sentence reason.",
+      // The frozen information contract (see defaultBriefing's fairness note): mechanics
+      // disclosed, market behaviour withheld, zero strategy coaching.
+      system: this.briefing,
       tool_choice: { type: "tool", name: "set_business_plan" },
       tools: [
         {
@@ -146,7 +205,7 @@ export class ClaudeDecisionProvider implements DecisionProvider {
           },
         },
       ],
-      messages: [{ role: "user", content: this.observationText(o) }],
+      messages: [{ role: "user", content: this.promptFor(o) }],
     });
 
     const block = response.content.find((c) => c.type === "tool_use");
@@ -171,11 +230,43 @@ export class ClaudeDecisionProvider implements DecisionProvider {
         response.usage.output_tokens * this.outputCostPerToken,
     };
 
-    return {
-      action,
-      reason: typeof input.reason === "string" ? input.reason : "(no reason given)",
-      usage,
-    };
+    const reason = typeof input.reason === "string" ? input.reason : "(no reason given)";
+    this.recordLedger(o, action, reason);
+    return { action, reason, usage };
+  }
+
+  /** The user message: the CEO's own ledger (when any), then today's books. */
+  private promptFor(o: DecisionRequest["observation"]): string {
+    const today = this.observationText(o);
+    if (this.memoryTurns <= 0) return today;
+    const ledger = (this.ledgers.get(o.businessId) ?? []).slice(-this.memoryTurns);
+    if (ledger.length === 0) return today;
+    return `YOUR LEDGER (your last ${ledger.length} mornings — observation → your choice):\n${ledger.join("\n")}\n\nTODAY:\n${today}`;
+  }
+
+  /**
+   * Append one compact ledger line: the morning's key figures and what this provider chose.
+   * Strictly the provider's own request/reply history — nothing the model didn't already see —
+   * so memory adds continuity, never information.
+   */
+  private recordLedger(
+    o: DecisionRequest["observation"],
+    action: BusinessAction,
+    reason: string,
+  ): void {
+    if (this.memoryTurns <= 0) return;
+    const chose = Object.keys(action).length > 0 ? JSON.stringify(action) : "held steady";
+    const line =
+      `Day ${o.day}: cash ${round(o.cash)}, price ${round(o.price)}, inv ${o.inventory}, ` +
+      `rev ${round(o.dayRevenue)}, netCash ${round(o.dayProfit)}` +
+      (o.dayDistributed !== undefined && o.dayDistributed > 0
+        ? `, paidOut ${round(o.dayDistributed)}`
+        : "") +
+      ` → ${chose} ("${reason}")`;
+    const ledger = this.ledgers.get(o.businessId) ?? [];
+    ledger.push(line);
+    if (ledger.length > 60) ledger.shift(); // bound growth; far beyond any prompt window we use
+    this.ledgers.set(o.businessId, ledger);
   }
 
   private observationText(o: DecisionRequest["observation"]): string {

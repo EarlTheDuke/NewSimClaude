@@ -34,6 +34,7 @@ import {
   BENCH_GROWTH_START_CAPITAL,
   BENCH_GROWTH_BRAND_ELASTICITY,
   CAPITAL_BASELINE,
+  RETAIL_REFERENCE_PRICE,
   BRAND_BASELINE,
   BUSINESS_RESERVE,
 } from "../systems/constants";
@@ -94,7 +95,10 @@ export interface CeoBenchResult {
   startNetWorth: number;
   finalCash: number;
   finalInventory: number;
-  /** Inventory marked to the storefront's ask price. */
+  /**
+   * Inventory marked at the kind's reference (anchor) price — mark-to-market, so an endgame
+   * ask-pump cannot inflate the score (a Pilot-A self-play find; was mark-to-ask before).
+   */
   finalInventoryValue: number;
   /** Productive capital above baseline at depreciated book (Phase 15 F1) — counts toward the score. */
   finalCapitalValue: number;
@@ -199,7 +203,12 @@ function setupScenario(config: CeoBenchConfig): {
   // endowment every firm starts with, so only what the CEO built above it counts.
   const capitalValue = (): number => (ceo.capital ?? CAPITAL_BASELINE) - CAPITAL_BASELINE;
   const brandValue = (): number => (ceo.brand ?? BRAND_BASELINE) - BRAND_BASELINE;
-  const inventoryValue = (): number => ceo.inventory * ceo.price;
+  // Inventory is marked at the kind's REFERENCE price (mark-to-market), not the firm's own ask
+  // (mark-to-ask): the Pilot-A self-play showed an endgame exploit — pump the ask +25% on the
+  // final turns and the closing stock inflates the score with no economic substance. Valuing at
+  // the stable market anchor closes it; a kind with no anchor falls back to the ask.
+  const anchor = (): number => RETAIL_REFERENCE_PRICE[ceo.kind] ?? ceo.price;
+  const inventoryValue = (): number => ceo.inventory * anchor();
   const netWorth = (): number => ceo.cash + inventoryValue() + capitalValue();
   // Phase 16 slice 4 — the GROWTH score: productive value built (capital + brand +
   // inventory) plus cash *capped at working capital* (BUSINESS_RESERVE). Parked cash
@@ -227,7 +236,7 @@ function setupScenario(config: CeoBenchConfig): {
       startNetWorth,
       finalCash: ceo.cash,
       finalInventory: ceo.inventory,
-      finalInventoryValue: ceo.inventory * ceo.price,
+      finalInventoryValue: inventoryValue(),
       finalCapitalValue: capitalValue(),
       finalBrandValue: brandValue(),
       finalNetWorth,

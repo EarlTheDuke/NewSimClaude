@@ -28,6 +28,7 @@ import {
   BENCH_BRAND_DEMAND_ELASTICITY,
   CAPITAL_BASELINE,
   BUSINESS_RESERVE,
+  RETAIL_REFERENCE_PRICE,
 } from "../systems/constants";
 import type { BusinessAction } from "../ai/types";
 
@@ -46,8 +47,11 @@ function saveActions(a: BusinessAction[]): void {
   fs.writeFileSync(ACTIONS_FILE, JSON.stringify(a));
 }
 
-function netWorth(ceo: { cash: number; inventory: number; price: number; capital?: number }): number {
-  return ceo.cash + ceo.inventory * ceo.price + Math.max(0, (ceo.capital ?? CAPITAL_BASELINE) - CAPITAL_BASELINE);
+function netWorth(ceo: { cash: number; inventory: number; price: number; kind: string; capital?: number }): number {
+  // Inventory marked at the REFERENCE price (parity with ceoBench's mark-to-market fix —
+  // the Pilot-A endgame ask-pump exploit no longer moves the score).
+  const anchor = (RETAIL_REFERENCE_PRICE as Record<string, number | undefined>)[ceo.kind] ?? ceo.price;
+  return ceo.cash + ceo.inventory * anchor + Math.max(0, (ceo.capital ?? CAPITAL_BASELINE) - CAPITAL_BASELINE);
 }
 
 type DayHook = (day: number, ceo: any, market: any, prevCash: number, prevPnl: any) => void;
@@ -139,7 +143,7 @@ function main(): void {
 
   if (cmd === "log") {
     const a = loadActions();
-    console.log("day | price | inv | util | dayRev | dayWage* | cash | netWorth   (*wage tally incl. distribution — see PLAYTHROUGH.md bug #1)");
+    console.log("day | price | inv | util | dayRev | dayWage* | cash | netWorth   (*the wage bill swings day to day with staff days-off schedules — not a bug)");
     replay(a, (day, ceo, market, _prevCash, prevPnl) => {
       const util = market.capacityUtilizationFor(ceo.id);
       const dayRev = ceo.pnl.revenue - prevPnl.revenue;
