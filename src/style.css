@@ -27,7 +27,7 @@ body {
   flex-direction: column;
   gap: 16px;
   padding: 24px;
-  max-width: 1280px; /* R4: room for the Leaderboard Tower beside the map */
+  max-width: 1500px; /* R4 4b: the map earns ~70% more screen beside the Tower */
 }
 
 h1 {
@@ -228,6 +228,11 @@ canvas#city {
   border: 1px solid var(--border);
   border-radius: 8px;
   cursor: crosshair;
+  /* R4 4b — the map's bigger share: displayed at 800px wide (logical space stays 640×480;
+     the Pixi backing store renders at 1.5× so the upscale is crisp; all pointer math
+     normalizes through the CSS size, so picking is unaffected). */
+  width: 800px;
+  height: auto;
 }
 
 .inspector {

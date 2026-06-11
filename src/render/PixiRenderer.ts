@@ -6,6 +6,7 @@ import { worldToScreen as toScreen, screenToWorld, type Camera } from "./camera"
 import { prosperityT, fillFraction, FILL_FULL_INVENTORY } from "./economyVisuals";
 import { fanOutOffset } from "./residentLayout";
 import { rightOf, dashes, lotOffset, ROAD_WIDTH, LANE_OFFSET, PATH_OFFSET, KERB_OFFSET } from "./roadGeometry";
+import { INDUSTRY_REGISTRY } from "../world/industries";
 import { CAPITAL_BASELINE } from "../systems/constants";
 import {
   ROAD_RGB,
@@ -188,12 +189,15 @@ export class PixiRenderer implements CityRenderer {
   private mintStart = 0;
 
   // R4 wave 4 (juice) — coin particles on REAL sales: every firm's pnl.revenue accrues
-  // tick-by-tick, so a delta between frames is an actual dollar landing. A small gold coin
-  // floats off the storefront at that moment — the economy's circulation made visible.
+  // tick-by-tick, so a delta between frames is an actual dollar landing. Retail sales float
+  // a coin off the storefront; B2B settlements (wave 4b) GLIDE a coin from the consumer firm
+  // to its producer along the supply chain — the circulation of money, visible end to end.
   private coinLayer: Container | undefined;
   private readonly coinPool: Graphics[] = [];
-  private readonly coins: { x: number; y: number; born: number }[] = [];
+  private readonly coins: { x: number; y: number; born: number; tx?: number; ty?: number }[] = [];
   private readonly lastRevenue = new Map<string, number>();
+  /** resource → the business kinds that consume it (built once from the industry registry). */
+  private consumersOf: Map<string, string[]> | undefined;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -208,11 +212,15 @@ export class PixiRenderer implements CityRenderer {
       canvas: this.canvas,
       width: WIDTH,
       height: HEIGHT,
-      resolution: 1,
+      // R4 wave 4b — the map earns a bigger share of the screen: the backing store renders
+      // at 1.5× the logical 640×480 so the CSS upscale (style.css canvas#city) stays crisp.
+      // All world coordinates, picking, and HUD math stay in 640×480 logical space.
+      resolution: 1.5,
       autoDensity: false,
       antialias: true,
       background: "#0e1116",
     });
+    this.canvas.style.width = ""; // let style.css own the display size
     this.skyGfx = new Graphics();
     this.worldLayer = new Container();
     this.roadsGfx = new Graphics();
@@ -1238,6 +1246,16 @@ export class PixiRenderer implements CityRenderer {
   private updateCoins(): void {
     if (!this.coinLayer) return;
     const now = performance.now();
+    if (!this.consumersOf) {
+      // Built once from the industry registry (static data): resource → consumer kinds.
+      this.consumersOf = new Map();
+      for (const def of INDUSTRY_REGISTRY) {
+        if (!def.consumes) continue;
+        const list = this.consumersOf.get(def.consumes) ?? [];
+        list.push(def.kind);
+        this.consumersOf.set(def.consumes, list);
+      }
+    }
     let spawned = 0;
     for (const b of this.world.businesses) {
       const prev = this.lastRevenue.get(b.id);
@@ -1245,20 +1263,39 @@ export class PixiRenderer implements CityRenderer {
         this.lastRevenue.set(b.id, b.pnl.revenue);
         continue;
       }
-      if (b.pnl.revenue > prev + 0.5 && b.active && spawned < 4 && this.coins.length < 24) {
+      if (b.pnl.revenue > prev + 0.5 && b.active && spawned < 4 && this.coins.length < 28) {
         const loc = this.world.locations.find((l) => l.id === b.locationId);
         if (loc) {
           const slot = this.buildingSlot(loc);
-          // a deterministic-enough scatter from the spawn count (presentation only)
-          const j = (this.coins.length * 7) % 10;
-          this.coins.push({ x: slot.x - 5 + j, y: slot.y - BUILDING / 2, born: now });
-          spawned++;
+          const def = INDUSTRY_REGISTRY.find((d) => d.kind === b.kind);
+          if (def && !def.sellsToResidents && def.produces) {
+            // B2B settlement (the nightly market clear): the money came FROM the firms that
+            // consume this producer's output — glide a coin from each buyer to the producer.
+            const buyers = this.consumersOf.get(def.produces) ?? [];
+            for (const kind of buyers) {
+              const buyer = this.world.businesses.find((x) => x.kind === kind && x.active);
+              const bLoc = buyer
+                ? this.world.locations.find((l) => l.id === buyer.locationId)
+                : undefined;
+              if (bLoc && this.coins.length < 28) {
+                const from = this.buildingSlot(bLoc);
+                this.coins.push({ x: from.x, y: from.y - BUILDING / 2, tx: slot.x, ty: slot.y - BUILDING / 2, born: now });
+                spawned++;
+              }
+            }
+          } else {
+            // Retail sale: a coin floats off the storefront the moment the dollar lands.
+            const j = (this.coins.length * 7) % 10;
+            this.coins.push({ x: slot.x - 5 + j, y: slot.y - BUILDING / 2, born: now });
+            spawned++;
+          }
         }
       }
       this.lastRevenue.set(b.id, b.pnl.revenue);
     }
     for (let i = this.coins.length - 1; i >= 0; i--) {
-      if (now - this.coins[i]!.born > 900) this.coins.splice(i, 1);
+      const life = this.coins[i]!.tx !== undefined ? 1300 : 900;
+      if (now - this.coins[i]!.born > life) this.coins.splice(i, 1);
     }
     for (let i = 0; i < this.coins.length; i++) {
       let g = this.coinPool[i];
@@ -1270,9 +1307,17 @@ export class PixiRenderer implements CityRenderer {
         this.coinPool[i] = g;
       }
       const c = this.coins[i]!;
-      const t = (now - c.born) / 900;
-      g.position.set(c.x, c.y - 16 * t);
-      g.alpha = 1 - t;
+      if (c.tx !== undefined && c.ty !== undefined) {
+        // Glide: ease across town from buyer to producer, a gentle arc, fading at the end.
+        const t = Math.min(1, (now - c.born) / 1300);
+        const k = t * t * (3 - 2 * t);
+        g.position.set(c.x + (c.tx - c.x) * k, c.y + (c.ty - c.y) * k - Math.sin(t * Math.PI) * 9);
+        g.alpha = t > 0.8 ? (1 - t) / 0.2 : 1;
+      } else {
+        const t = (now - c.born) / 900;
+        g.position.set(c.x, c.y - 16 * t);
+        g.alpha = 1 - t;
+      }
       g.visible = true;
     }
     for (let i = this.coins.length; i < this.coinPool.length; i++) this.coinPool[i]!.visible = false;

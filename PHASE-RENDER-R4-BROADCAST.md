@@ -1,5 +1,14 @@
 # PHASE-RENDER-R4 — THE BROADCAST (from dashboard to show)
 
+> **BUILD STATUS (2026-06-10):** ✅ Wave 1 (Leaderboard Tower) · ✅ Wave 2 (Thought Cam —
+> witnessed live: qwen's 3.1-min wage-war deliberation on camera) · ✅ Wave 3 (Drama Booth
+> banners + records) · ✅ Wave 4a (coins on real sales, pennants, drop shadows) · ✅ Wave 4b
+> (the map at 800px CSS / 1.5× backing store — picking unaffected, all pointer math
+> normalizes; supply-chain COIN GLIDES: the nightly B2B settlement sends coins from each
+> consumer firm to its producer via the industry registry's consumes/produces chain) ·
+> 🔨 Wave 5 next (eval bar + match framing) · Wave 6 queued. *(Deferred to follow-ups: a full
+> palette/ground-texture art pass; canvas-renderer parity for juice — R2 waiver applies.)*
+
 *Created 2026-06-10, user-greenlit ("let's do all 1–6 over time… jump directly into this build").
 The R4 program follows R3 (street-level visuals) and shares its constitution:*
 **rendering only reads — the view layer never mutates simulation state; everything here is
