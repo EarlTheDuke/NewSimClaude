@@ -22,6 +22,7 @@
  */
 import { createCity, type BrainOption, type ResidentBrainOption } from "../createCity";
 import { TICKS_PER_DAY } from "../core/TimeSystem";
+import type { Business } from "../world/types";
 import {
   BENCH_START_CAPITAL,
   BENCH_TURNS,
@@ -135,6 +136,46 @@ export interface CeoBenchResult {
 
 const DEFAULT_TARGET = "biz_goods";
 
+// ── Shared firm-scoring helpers (the single source of valuation truth) ─────────────────
+// Exported so every runner — the classic/growth bench, the play harness, the duel, the
+// future melee — scores a firm with the IDENTICAL arithmetic (the Pilot-A lesson: duplicated
+// scenario/scoring code drifts silently).
+
+/** Productive capital above the common baseline, at depreciated book (Phase 15 F1). */
+export function firmCapitalValue(b: Business): number {
+  return (b.capital ?? CAPITAL_BASELINE) - CAPITAL_BASELINE;
+}
+
+/** Brand equity above the common baseline (Phase 17) — the demand-side productive asset. */
+export function firmBrandValue(b: Business): number {
+  return (b.brand ?? BRAND_BASELINE) - BRAND_BASELINE;
+}
+
+/**
+ * Inventory marked at the kind's REFERENCE price (mark-to-market), not the firm's own ask:
+ * the Pilot-A self-play showed an endgame exploit — pump the ask +25% on the final turns and
+ * the closing stock inflates the score with no economic substance. A kind with no anchor
+ * falls back to the ask.
+ */
+export function firmInventoryValue(b: Business): number {
+  return b.inventory * (RETAIL_REFERENCE_PRICE[b.kind] ?? b.price);
+}
+
+/** The classic score basis: cash + inventory (at anchor) + capital above baseline. */
+export function firmNetWorth(b: Business): number {
+  return b.cash + firmInventoryValue(b) + firmCapitalValue(b);
+}
+
+/**
+ * The GROWTH score basis (Phase 16 slice 4): productive value built (capital + brand +
+ * inventory) plus cash *capped at working capital* (BUSINESS_RESERVE). Parked cash above what
+ * the firm needs to operate does not count, so a CEO cannot win by hoarding — only by growing
+ * a bigger, more productive firm.
+ */
+export function firmProductiveWorth(b: Business): number {
+  return Math.min(b.cash, BUSINESS_RESERVE) + firmInventoryValue(b) + firmCapitalValue(b) + firmBrandValue(b);
+}
+
 /**
  * Build the scenario and capture its opening state. Returns the levers the two
  * runners share: how to advance, how to drain async decisions, and how to read
@@ -201,23 +242,11 @@ function setupScenario(config: CeoBenchConfig): {
   // With it, a capitalized firm is scored as the value it is, and invest-*timing*
   // (capital wears out) becomes a real decision. Baseline capital is the common
   // endowment every firm starts with, so only what the CEO built above it counts.
-  const capitalValue = (): number => (ceo.capital ?? CAPITAL_BASELINE) - CAPITAL_BASELINE;
-  const brandValue = (): number => (ceo.brand ?? BRAND_BASELINE) - BRAND_BASELINE;
-  // Inventory is marked at the kind's REFERENCE price (mark-to-market), not the firm's own ask
-  // (mark-to-ask): the Pilot-A self-play showed an endgame exploit — pump the ask +25% on the
-  // final turns and the closing stock inflates the score with no economic substance. Valuing at
-  // the stable market anchor closes it; a kind with no anchor falls back to the ask.
-  const anchor = (): number => RETAIL_REFERENCE_PRICE[ceo.kind] ?? ceo.price;
-  const inventoryValue = (): number => ceo.inventory * anchor();
-  const netWorth = (): number => ceo.cash + inventoryValue() + capitalValue();
-  // Phase 16 slice 4 — the GROWTH score: productive value built (capital + brand +
-  // inventory) plus cash *capped at working capital* (BUSINESS_RESERVE). Parked cash
-  // above what the firm needs to operate does not count, so a CEO cannot win by
-  // hoarding — only by growing a bigger, more productive firm. (A live cost-of-carry
-  // on idle cash — savings interest — is the cleaner long-run fix; that lives in the
-  // shelved Phase 18 credit work, so until then the score discounts hoarded cash.)
-  const productiveWorth = (): number =>
-    Math.min(ceo.cash, BUSINESS_RESERVE) + inventoryValue() + capitalValue() + brandValue();
+  const capitalValue = (): number => firmCapitalValue(ceo);
+  const brandValue = (): number => firmBrandValue(ceo);
+  const inventoryValue = (): number => firmInventoryValue(ceo);
+  const netWorth = (): number => firmNetWorth(ceo);
+  const productiveWorth = (): number => firmProductiveWorth(ceo);
   const startNetWorth = netWorth();
   const startProductiveWorth = productiveWorth();
   const startMoney = world.totalMoney();
