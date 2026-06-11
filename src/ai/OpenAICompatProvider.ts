@@ -40,6 +40,13 @@ export interface OpenAICompatOptions {
   objective?: string;
   briefing?: string;
   memoryTurns?: number;
+  /**
+   * Appended to every user message — for model-level switches like qwen's `/no_think`
+   * (local reasoning models can take MINUTES per decision thinking out loud; the switch
+   * trades deliberation for tractable match wall-clock). Changes the contestant's mode, so
+   * label the match accordingly (e.g. `qwen3.5:35b-nothink`).
+   */
+  promptSuffix?: string;
   /** Inject a fetch stub for tests. */
   fetchImpl?: FetchLike;
 }
@@ -74,7 +81,10 @@ export class OpenAICompatProvider implements DecisionProvider {
     this.fetchImpl = options.fetchImpl ?? (fetch as unknown as FetchLike);
     this.briefing = options.briefing ?? defaultBriefing(options.objective ?? DEFAULT_OBJECTIVE);
     this.ledger = new CeoLedger(options.memoryTurns ?? DEFAULTS.memoryTurns);
+    this.promptSuffix = options.promptSuffix ?? "";
   }
+
+  private readonly promptSuffix: string;
 
   async decide(req: DecisionRequest): Promise<BusinessDecision> {
     const started = Date.now();
@@ -116,7 +126,7 @@ export class OpenAICompatProvider implements DecisionProvider {
         temperature: this.opts.temperature,
         messages: [
           { role: "system", content: this.briefing },
-          { role: "user", content: this.ledger.promptFor(o) + spec },
+          { role: "user", content: this.ledger.promptFor(o) + spec + this.promptSuffix },
         ],
       }),
       signal,

@@ -46,6 +46,8 @@ export interface DuelConfig {
   days?: number;
   a: { label: string; make: ProviderFactory };
   b: { label: string; make: ProviderFactory };
+  /** Print per-day progress (the CLI sets this; slow local models make silent runs unnerving). */
+  verbose?: boolean;
 }
 
 export interface DuelSide {
@@ -123,6 +125,11 @@ export async function runDuel(config: DuelConfig): Promise<DuelResult> {
   for (let t = 0; t < days; t++) {
     sim.run(TICKS_PER_DAY);
     await agent!.settle(); // drain both minds' decisions before the next day
+    if (config.verbose && ((t + 1) % 5 === 0 || t + 1 === days)) {
+      console.log(
+        `    day ${t + 1}/${days} · ${config.a.label} worth ${Math.round(firmProductiveWorth(home) - startHome)} · ${config.b.label} worth ${Math.round(firmProductiveWorth(away) - startAway)}`,
+      );
+    }
   }
 
   const log = agent!.decisions();

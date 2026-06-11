@@ -40,7 +40,21 @@ function factoryFor(spec: string): { label: string; make: ProviderFactory } {
     const model = spec.includes(":") ? spec.slice("openwebui:".length) : env("OPENWEBUI_MODEL");
     if (!model) throw new Error("duelCli: pass openwebui:<model> or set VITE_OPENWEBUI_MODEL in .env.");
     const apiKey = env("OPENWEBUI_API_KEY");
-    return { label: model, make: () => new OpenAICompatProvider({ baseUrl, model, apiKey }) };
+    // --nothink: local reasoning models can take minutes per decision thinking out loud;
+    // qwen's /no_think switch trades deliberation for tractable wall-clock. A different
+    // contestant mode — the label says so.
+    const noThink = process.argv.includes("--nothink");
+    return {
+      label: noThink ? `${model}-nothink` : model,
+      make: () =>
+        new OpenAICompatProvider({
+          baseUrl,
+          model,
+          apiKey,
+          timeoutMs: 300_000, // a busy single-GPU box queues requests; be patient
+          ...(noThink ? { promptSuffix: " /no_think", maxTokens: 512 } : {}),
+        }),
+    };
   }
   throw new Error(`duelCli: unknown brain spec "${spec}" (use "rules", "claude[:model]", or "openwebui[:model]")`);
 }
@@ -57,7 +71,7 @@ async function main(): Promise<void> {
   const seed = parseInt(arg("seed", "9"), 10);
   const days = parseInt(arg("days", String(DUEL_DAYS)), 10);
   console.log(`Duel: ${a.label} vs ${b.label} · seed ${seed} · ${days} days/game · home-and-away…`);
-  const match = await runHomeAndAway({ seed, days, a, b });
+  const match = await runHomeAndAway({ seed, days, a, b, verbose: true });
   console.log(formatHomeAndAway(match));
 }
 
