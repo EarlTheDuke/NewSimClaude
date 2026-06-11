@@ -9,8 +9,17 @@
 > ✅ Wave 5 (the EVAL BAR — logistic win probability over score gap + momentum, bankruptcy
 > decisive, symmetric by construction; tale-of-the-tape at the opening bell; day-end tower
 > pulse beat; the FULL-TIME report card at the 90-day match length, dismissible, town plays
-> on) · 🔨 Wave 6 next (the director). *(Deferred to follow-ups: a full palette/ground-texture
-> art pass; canvas-renderer parity for juice — R2 waiver applies.)*
+> on) · ✅ Wave 6 (THE DIRECTOR — the camera finds the story: glides to a firm when its mind
+> makes a move or a severity-2 moment hits, holds, eases home; the viewer always outranks the
+> director — drag/zoom suspends it 8s, double-click dismisses; plus the HIGHLIGHT TIMELINE —
+> one dot per drama moment under the map, click to re-surface the headline and send the
+> camera to the subject).
+>
+> **🏁 ALL SIX WAVES SHIPPED (2026-06-10).** Recorded follow-ups, in suggested order:
+> 1. Palette/ground-texture art pass + canvas-renderer juice parity (R2 waiver applies).
+> 2. Snapshot REPLAY from highlight dots (determinism makes it cheap; needs a snapshot ring).
+> 3. Viewer-as-God audience participation (vote the storm / the press / the grant).
+> 4. Season ladder of models + persistent match records across watches.
 
 *Created 2026-06-10, user-greenlit ("let's do all 1–6 over time… jump directly into this build").
 The R4 program follows R3 (street-level visuals) and shares its constitution:*

@@ -156,6 +156,13 @@ export class PixiRenderer implements CityRenderer {
   private follow = false;
   private lastSelId: string | undefined;
 
+  // R4 wave 6 — THE DIRECTOR: an auto-camera that finds the story. directToBusiness()
+  // glides toward a firm at a gentle zoom, holds, then eases home to the full view. A
+  // human hand on the camera (drag/zoom) suspends direction for a few seconds — the
+  // viewer always outranks the director. View-only, wall-clock eased.
+  private directTarget: { x: number; y: number; zoom: number; until: number } | undefined;
+  private lastUserCamMs = 0;
+
   // R3-8 — hover name tag: the pointer's last canvas position (undefined when it left),
   // hit-tested per frame so the tag tracks a moving resident under the cursor.
   private hoverX: number | undefined;
@@ -418,6 +425,7 @@ export class PixiRenderer implements CityRenderer {
     this.updateBoat();
     this.updateMintFx();
     this.updateCoins();
+    this.updateDirector();
 
     this.updateSkyBadge(hourFloat);
     this.updateDisaster(disaster);
@@ -1543,6 +1551,42 @@ export class PixiRenderer implements CityRenderer {
     this.worldLayer?.scale.set(this.cam.scale);
   }
 
+  /** R4 wave 6 — point the director's camera at a firm for `holdMs` (default 5s). */
+  directToBusiness(bizId: string, holdMs = 5000, zoom = 1.55): void {
+    const biz = this.world.getBusiness(bizId);
+    const loc = biz ? this.world.locations.find((l) => l.id === biz.locationId) : undefined;
+    if (!loc) return;
+    const slot = this.buildingSlot(loc);
+    this.directTarget = { x: slot.x, y: slot.y, zoom, until: performance.now() + holdMs };
+  }
+
+  /**
+   * Per-frame director easing: glide toward the target (or home to the full view once the
+   * hold expires). Suspended while the viewer drove the camera in the last 8s, or while
+   * follow-selected mode owns it.
+   */
+  private updateDirector(): void {
+    const now = performance.now();
+    if (this.follow || now - this.lastUserCamMs < 8000) return;
+    let wantScale = 1;
+    let wantTx = 0;
+    let wantTy = 0;
+    if (this.directTarget && now < this.directTarget.until) {
+      wantScale = this.directTarget.zoom;
+      // centre the target in the 640×480 logical viewport at that zoom
+      wantTx = WIDTH / 2 - this.directTarget.x * wantScale;
+      wantTy = HEIGHT / 2 - this.directTarget.y * wantScale;
+    } else if (this.directTarget && now >= this.directTarget.until + 600) {
+      this.directTarget = undefined; // brief grace, then the home glide below owns it
+    }
+    const k = 0.06; // ease factor per frame — cinematic, not snappy
+    this.cam.scale += (wantScale - this.cam.scale) * k;
+    this.cam.tx += (wantTx - this.cam.tx) * k;
+    this.cam.ty += (wantTy - this.cam.ty) * k;
+    this.clampCamera();
+    this.applyCamera();
+  }
+
   /** Keep the 640×480 world from being panned entirely out of view. */
   private clampCamera(): void {
     const s = this.cam.scale;
@@ -1579,6 +1623,7 @@ export class PixiRenderer implements CityRenderer {
       this.hoverX = p.x;
       this.hoverY = p.y;
       if (!dragging) return;
+      this.lastUserCamMs = performance.now(); // the viewer outranks the director (R4 w6)
       this.cam.tx += p.x - lastX;
       this.cam.ty += p.y - lastY;
       lastX = p.x;
@@ -1597,6 +1642,7 @@ export class PixiRenderer implements CityRenderer {
         const p = toCanvas(e);
         const w = screenToWorld(p.x, p.y, this.cam);
         const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        this.lastUserCamMs = performance.now(); // the viewer outranks the director (R4 w6)
         this.cam.scale = Math.max(0.5, Math.min(4, this.cam.scale * factor));
         this.cam.tx = p.x - w.x * this.cam.scale; // keep the world point under the cursor fixed
         this.cam.ty = p.y - w.y * this.cam.scale;
@@ -1611,6 +1657,8 @@ export class PixiRenderer implements CityRenderer {
       this.cam.ty = 0;
       this.cam.scale = 1;
       this.follow = false;
+      this.directTarget = undefined; // double-click also dismisses the director's shot
+      this.lastUserCamMs = performance.now();
       this.applyCamera();
     });
   }

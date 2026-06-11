@@ -50,6 +50,8 @@ import {
   evalBarHTML,
   taleOfTheTapeHTML,
   reportCardHTML,
+  highlightStripHTML,
+  type DramaEvent,
 } from "./render/broadcast";
 import { DUEL_DAYS } from "./bench/duel";
 
@@ -336,6 +338,7 @@ app.innerHTML = `
     <div class="inspector" id="inspector"><p class="hint">Click a resident or building to inspect.</p></div>
     <div id="thoughtcam"></div>
   </div>
+  <div id="highlights"></div>
   <div class="ticker" id="ticker"><span class="hint">The city's decisions will scroll here as days roll…</span></div>
   <div class="hud econ">
     <h2>Economy <span class="hint" id="econTag"></span></h2>
@@ -444,10 +447,16 @@ function renderBroadcast(day: number): void {
       selected?.kind === "business" ? selected.id : undefined,
     );
     // R4 wave 3 — the drama booth: big moments become banners (queued, never trampling).
+    // Wave 6 — each moment also joins the highlight timeline, and the big ones get the
+    // director's camera.
     for (const ev of dramaDetector.sampleDay(world, day)) {
       bannerQueue.push(bannerHTML(ev));
       if (bannerQueue.length > 5) bannerQueue.splice(0, bannerQueue.length - 5);
+      highlights.push(ev);
+      if (highlights.length > 40) highlights.shift();
+      if (ev.severity === 2 && ev.subjectId) renderer.directToBusiness?.(ev.subjectId, 6000);
     }
+    highlightsEl.innerHTML = highlightStripHTML(highlights);
     pumpBanners();
     // R4 wave 5 — the day-end beat: the tower pulses, and in the duel the eval bar moves.
     towerEl.parentElement?.classList.add("tw-pulse");
@@ -476,6 +485,8 @@ function renderBroadcast(day: number): void {
     }
   }
   for (const card of thoughtCam.poll(agent?.decisions() ?? [], world)) {
+    // Wave 6 — the director cuts to the firm whose mind just made a move.
+    if (!card.missedTurn) renderer.directToBusiness?.(card.businessId, 5000);
     const node = document.createElement("div");
     node.innerHTML = thoughtCardHTML(card);
     const elCard = node.firstElementChild as HTMLElement;
@@ -492,6 +503,21 @@ towerEl.addEventListener("click", (e) => {
   if (!row?.dataset.biz) return;
   selected = { kind: "business", id: row.dataset.biz };
   lastTowerDay = -1; // re-render the tower highlight next frame
+});
+
+// R4 wave 6 — the highlight timeline: every drama moment is a dot; clicking one re-surfaces
+// the headline and sends the director's camera to the subject. (No snapshot replay — that's
+// a recorded doc follow-up.)
+const highlightsEl = el<HTMLDivElement>("#highlights");
+const highlights: DramaEvent[] = [];
+highlightsEl.addEventListener("click", (e) => {
+  const dot = (e.target as HTMLElement).closest<HTMLElement>(".hl-dot");
+  if (!dot?.dataset.hl) return;
+  const h = highlights[Number(dot.dataset.hl)];
+  if (!h) return;
+  if (h.subjectId) renderer.directToBusiness?.(h.subjectId, 5000);
+  bannerQueue.push(bannerHTML(h)); // re-surface the headline
+  pumpBanners();
 });
 
 // Town-life feed + population history (HP3/HP4 watchability) — rendering-only state.

@@ -18,6 +18,12 @@ export interface CityRenderer {
   ): void;
   /** Map a canvas-space click to the resident or building under it. */
   pick(x: number, y: number): Pick | undefined;
+  /**
+   * R4 wave 6 — THE DIRECTOR: glide the camera to a firm's building for `holdMs`, then ease
+   * home. Optional — Pixi implements it; the canvas fallback has no camera (R2 waiver), so
+   * callers use `renderer.directToBusiness?.(…)`.
+   */
+  directToBusiness?(bizId: string, holdMs?: number, zoom?: number): void;
   /** Tear down GPU/DOM resources (Pixi). Optional — the canvas renderer needs none. */
   destroy?(): void;
 }

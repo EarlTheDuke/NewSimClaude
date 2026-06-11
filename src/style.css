@@ -235,6 +235,26 @@ button.active {
   cursor: pointer;
 }
 
+/* ── R4 wave 6: the highlight timeline ────────────────────────────────────────── */
+#highlights {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-height: 0;
+}
+#highlights:empty { display: none; }
+.hl-label { font-size: 9px; letter-spacing: 0.18em; color: var(--muted); margin-right: 4px; }
+.hl-dot { cursor: pointer; font-size: 11px; line-height: 1; transition: transform 0.15s; color: #5a6069; }
+.hl-dot:hover { transform: scale(1.5); }
+.hl-dot.hl-s2 { font-size: 13px; }
+.hl-dot.hl-bankrupt { color: #f85149; }
+.hl-dot.hl-founded { color: #3fb950; }
+.hl-dot.hl-poach { color: #e1a35b; }
+.hl-dot.hl-press { color: #b18ee8; }
+.hl-dot.hl-trade { color: #58d6ff; }
+.hl-dot.hl-record { color: #d29922; }
+
 /* ── R4 wave 3: the Drama Booth banners ───────────────────────────────────────── */
 #banners {
   min-height: 0;

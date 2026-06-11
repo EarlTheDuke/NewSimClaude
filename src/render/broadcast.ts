@@ -280,6 +280,8 @@ export interface DramaEvent {
   severity: 1 | 2;
   day: number;
   headline: string;
+  /** The firm at the centre of the moment, when one exists — the director's shot (wave 6). */
+  subjectId?: string;
 }
 
 /**
@@ -313,6 +315,7 @@ export class DramaDetector {
           severity: 2,
           day,
           headline: `🏗 NEW CHALLENGER — ${b.name} opens its doors (${b.kind})`,
+          subjectId: b.id,
         });
       }
       if (this.primed && known && wasActive === true && !b.active) {
@@ -321,6 +324,7 @@ export class DramaDetector {
           severity: 2,
           day,
           headline: `💀 ${b.name.toUpperCase()} IS BANKRUPT — ${b.employeeIds.length} jobs gone, the niche is open`,
+          subjectId: b.id,
         });
       }
       // Revenue record — players only, with a floor so day-2 doesn't "break" a $40 record.
@@ -334,6 +338,7 @@ export class DramaDetector {
             severity: 1,
             day,
             headline: `📈 RECORD DAY — ${b.name} books $${Math.round(todays)} in a single day`,
+            subjectId: b.id,
           });
         } else if (todays > this.revenueRecord) {
           this.revenueRecord = todays; // quietly ratchet (no banner unless it SMASHES it)
@@ -363,6 +368,7 @@ export class DramaDetector {
           severity: 2,
           day,
           headline: `⚔️ POACHED — ${r.name} walks out of ${from?.name ?? prev.jobId} and into ${to?.name ?? r.jobId}`,
+          subjectId: r.jobId,
         });
       }
       this.prevJobs.set(r.id, { jobId: r.jobId, name: r.name });
@@ -376,6 +382,7 @@ export class DramaDetector {
         severity: 2,
         day,
         headline: `🖨 THE PRESS IS ON — the City Reserve mints its first dollars`,
+        subjectId: "biz_authority",
       });
     }
     if (!this.tradeSeen) {
@@ -388,6 +395,7 @@ export class DramaDetector {
           severity: 1,
           day,
           headline: `⛵ FIRST SAIL — the Harbor Port starts buying local exports`,
+          subjectId: "biz_port",
         });
       } else if (x > 0) {
         this.tradeSeen = true; // trade already flowing at anchor time — not news
@@ -403,6 +411,22 @@ export class DramaDetector {
 /** One banner as HTML — severity 2 interrupts, severity 1 stays modest. */
 export function bannerHTML(e: DramaEvent): string {
   return `<div class="bn bn-s${e.severity} bn-${e.kind}"><span class="bn-day">DAY ${e.day}</span>${escapeHtml(e.headline)}</div>`;
+}
+
+/**
+ * The highlight timeline (R4 wave 6): one dot per drama moment under the map. Clicking a dot
+ * sends the director's camera to the subject and re-surfaces the headline (main.ts wires the
+ * clicks; this renders the strip). Newest last; the title carries the story for hover.
+ */
+export function highlightStripHTML(highlights: readonly DramaEvent[]): string {
+  if (highlights.length === 0) return "";
+  const dots = highlights
+    .map(
+      (h, i) =>
+        `<span class="hl-dot hl-${h.kind} hl-s${h.severity}" data-hl="${i}" title="Day ${h.day}: ${escapeHtml(h.headline)}">●</span>`,
+    )
+    .join("");
+  return `<span class="hl-label">HIGHLIGHTS</span>${dots}`;
 }
 
 // ── The Eval Bar + match framing (R4 wave 5) ─────────────────────────────────────────────
