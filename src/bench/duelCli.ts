@@ -3,16 +3,29 @@
  *
  *   npx vite-node src/bench/duelCli.ts                                  # rules vs rules (offline)
  *   npx vite-node src/bench/duelCli.ts -- --b claude                    # rules vs Claude (default model)
- *   npx vite-node src/bench/duelCli.ts -- --a claude:claude-sonnet-4-6 --b claude:claude-haiku-4-5-20251001
+ *   npx vite-node src/bench/duelCli.ts -- --b openwebui                 # rules vs the local model (.env)
+ *   npx vite-node src/bench/duelCli.ts -- --a claude --b openwebui:nemotron-3
  *   npx vite-node src/bench/duelCli.ts -- --days 90 --seed 9
  *
- * A "claude[:model]" spec needs ANTHROPIC_API_KEY; each game constructs FRESH provider
- * instances (the memory ledgers never leak between games). Sync-vs-sync matches are fully
- * deterministic and replayable.
+ * Brain specs: "rules" · "claude[:model]" (needs VITE_ANTHROPIC_API_KEY) ·
+ * "openwebui[:model]" — any OpenAI-compatible server (Open WebUI, Ollama, LM Studio…),
+ * configured in the gitignored .env:
+ *   VITE_OPENWEBUI_BASE_URL=http://localhost:3000/api   (Ollama native: http://localhost:11434/v1)
+ *   VITE_OPENWEBUI_API_KEY=sk-…                          (omit if the server runs open)
+ *   VITE_OPENWEBUI_MODEL=nemotron-3:latest               (default when the spec has no :model)
+ *
+ * Each game constructs FRESH provider instances (the memory ledgers never leak between
+ * games). Sync-vs-sync matches are fully deterministic and replayable.
  */
 import { runHomeAndAway, formatHomeAndAway, DUEL_DAYS, type ProviderFactory } from "./duel";
 import { ClaudeDecisionProvider } from "../ai/ClaudeDecisionProvider";
+import { OpenAICompatProvider } from "../ai/OpenAICompatProvider";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
+
+function env(name: string): string | undefined {
+  const viteEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+  return viteEnv?.[`VITE_${name}`] ?? process.env[`VITE_${name}`] ?? process.env[name];
+}
 
 function factoryFor(spec: string): { label: string; make: ProviderFactory } {
   if (spec === "rules") return { label: "rules", make: () => new RuleBasedProvider() };
@@ -21,7 +34,15 @@ function factoryFor(spec: string): { label: string; make: ProviderFactory } {
     const label = model ?? "claude";
     return { label, make: () => new ClaudeDecisionProvider(model ? { model } : {}) };
   }
-  throw new Error(`duelCli: unknown brain spec "${spec}" (use "rules" or "claude[:model]")`);
+  if (spec === "openwebui" || spec.startsWith("openwebui:")) {
+    const baseUrl = env("OPENWEBUI_BASE_URL");
+    if (!baseUrl) throw new Error("duelCli: set VITE_OPENWEBUI_BASE_URL in .env for the openwebui spec.");
+    const model = spec.includes(":") ? spec.slice("openwebui:".length) : env("OPENWEBUI_MODEL");
+    if (!model) throw new Error("duelCli: pass openwebui:<model> or set VITE_OPENWEBUI_MODEL in .env.");
+    const apiKey = env("OPENWEBUI_API_KEY");
+    return { label: model, make: () => new OpenAICompatProvider({ baseUrl, model, apiKey }) };
+  }
+  throw new Error(`duelCli: unknown brain spec "${spec}" (use "rules", "claude[:model]", or "openwebui[:model]")`);
 }
 
 function arg(name: string, fallback: string): string {
