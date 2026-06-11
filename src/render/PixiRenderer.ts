@@ -61,6 +61,8 @@ interface BuildingView {
   door?: Graphics;
   /** R3-7 the Zzz wisp over a home whose occupants are asleep at night. */
   zzz?: Text;
+  /** R4 juice — the firm's pennant, waving on the wall-clock breeze. */
+  pennant?: Graphics;
 }
 
 // Life-stage styling (HP3) — purely visual thresholds so the age structure reads at
@@ -185,6 +187,14 @@ export class PixiRenderer implements CityRenderer {
   private lastMinted: number | undefined;
   private mintStart = 0;
 
+  // R4 wave 4 (juice) — coin particles on REAL sales: every firm's pnl.revenue accrues
+  // tick-by-tick, so a delta between frames is an actual dollar landing. A small gold coin
+  // floats off the storefront at that moment — the economy's circulation made visible.
+  private coinLayer: Container | undefined;
+  private readonly coinPool: Graphics[] = [];
+  private readonly coins: { x: number; y: number; born: number }[] = [];
+  private readonly lastRevenue = new Map<string, number>();
+
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly world: World,
@@ -244,6 +254,9 @@ export class PixiRenderer implements CityRenderer {
     this.mintFx = new Graphics();
     this.mintFx.visible = false;
     this.worldLayer.addChild(this.mintFx);
+    // R4 juice — the coin layer floats over the buildings.
+    this.coinLayer = new Container();
+    this.worldLayer.addChild(this.coinLayer);
     this.app.stage.addChild(this.skyGfx, this.worldLayer);
     this.hudLayer = new Container();
     this.app.stage.addChild(this.hudLayer);
@@ -396,6 +409,7 @@ export class PixiRenderer implements CityRenderer {
     this.updatePuffs();
     this.updateBoat();
     this.updateMintFx();
+    this.updateCoins();
 
     this.updateSkyBadge(hourFloat);
     this.updateDisaster(disaster);
@@ -716,6 +730,10 @@ export class PixiRenderer implements CityRenderer {
     glow.circle(0, 0, BUILDING).fill(0xffd27a);
     glow.visible = false;
 
+    // R4 juice — a soft drop shadow grounds the building on its lot.
+    const drop = new Graphics();
+    drop.ellipse(2, half + 1, half + 4, 4).fill({ color: 0x000000, alpha: 0.26 });
+
     // White base rect (centred) — tinted per frame to the dimmed building colour.
     const base = new Graphics();
     base.rect(-half, -half, BUILDING, BUILDING).fill(0xffffff);
@@ -836,7 +854,21 @@ export class PixiRenderer implements CityRenderer {
     wageTag.position.set(0, -half - 9);
     wageTag.visible = false;
 
-    container.addChild(glow, base, windows, mask, planks, deco, bar, workers, label, wageTag, selOutline);
+    // R4 juice — the firm's pennant: a small flag in the building's own colour on a corner
+    // pole, waving gently per frame (wall-clock). Businesses only; homes stay flagless.
+    let pennant: Graphics | undefined;
+    if (bizHere) {
+      pennant = new Graphics();
+      pennant.poly([0, 0, 9, 2.5, 0, 5]).fill(0xffffff); // white; day-tinted via decoParts
+      pennant.position.set(-half - 1, -half - 12);
+      const pole = new Graphics();
+      pole.rect(-half - 2, -half - 13, 1.2, 13).fill(0xffffff);
+      deco.addChild(pole, pennant);
+      decoParts.push({ g: pole, rgb: [150, 156, 168] });
+      decoParts.push({ g: pennant, rgb: BUSINESS_RGB[bizHere.kind] ?? [120, 130, 150] });
+    }
+
+    container.addChild(drop, glow, base, windows, mask, planks, deco, bar, workers, label, wageTag, selOutline);
     this.buildingsLayer?.addChild(container);
 
     const view: BuildingView = {
@@ -856,6 +888,7 @@ export class PixiRenderer implements CityRenderer {
       lastWage: "",
       door,
       zzz,
+      pennant,
     };
     this.buildingViews.set(loc.id, view);
     return view;
@@ -1004,6 +1037,10 @@ export class PixiRenderer implements CityRenderer {
     if (!(biz && !biz.active)) {
       v.deco.visible = true;
       for (const p of v.decoParts) p.g.tint = dimInt(p.rgb, a);
+    }
+    // R4 juice — the pennant waves on the wall-clock breeze.
+    if (v.pennant) {
+      v.pennant.rotation = Math.sin(performance.now() / 600 + v.pennant.position.x) * 0.16;
     }
     // R3-7 — the Zzz wisp: drifts and breathes over a home whose occupants are asleep
     // after dark. Wall-clock motion (like the bubble fade) — presentation only.
@@ -1190,6 +1227,55 @@ export class PixiRenderer implements CityRenderer {
       fx.circle(x, y, 1.6).fill({ color: 0xf2c84b, alpha: 0.9 * (1 - t) });
     }
     fx.visible = true;
+  }
+
+  /**
+   * R4 juice — coin particles on real sales: diff every active firm's revenue tally between
+   * frames; each increase floats a gold coin off its storefront (spawn-capped per frame so a
+   * 1000x fast-forward doesn't bury the map; alive-capped via the pool). First observation
+   * anchors silently, so a Load never showers phantom coins.
+   */
+  private updateCoins(): void {
+    if (!this.coinLayer) return;
+    const now = performance.now();
+    let spawned = 0;
+    for (const b of this.world.businesses) {
+      const prev = this.lastRevenue.get(b.id);
+      if (prev === undefined) {
+        this.lastRevenue.set(b.id, b.pnl.revenue);
+        continue;
+      }
+      if (b.pnl.revenue > prev + 0.5 && b.active && spawned < 4 && this.coins.length < 24) {
+        const loc = this.world.locations.find((l) => l.id === b.locationId);
+        if (loc) {
+          const slot = this.buildingSlot(loc);
+          // a deterministic-enough scatter from the spawn count (presentation only)
+          const j = (this.coins.length * 7) % 10;
+          this.coins.push({ x: slot.x - 5 + j, y: slot.y - BUILDING / 2, born: now });
+          spawned++;
+        }
+      }
+      this.lastRevenue.set(b.id, b.pnl.revenue);
+    }
+    for (let i = this.coins.length - 1; i >= 0; i--) {
+      if (now - this.coins[i]!.born > 900) this.coins.splice(i, 1);
+    }
+    for (let i = 0; i < this.coins.length; i++) {
+      let g = this.coinPool[i];
+      if (!g) {
+        g = new Graphics();
+        g.circle(0, 0, 2.2).fill(0xf2c84b);
+        g.circle(0, 0, 2.2).stroke({ width: 0.7, color: 0xa87b1d });
+        this.coinLayer.addChild(g);
+        this.coinPool[i] = g;
+      }
+      const c = this.coins[i]!;
+      const t = (now - c.born) / 900;
+      g.position.set(c.x, c.y - 16 * t);
+      g.alpha = 1 - t;
+      g.visible = true;
+    }
+    for (let i = this.coins.length; i < this.coinPool.length; i++) this.coinPool[i]!.visible = false;
   }
 
   /** Remove views whose location is gone (e.g. after a Load swaps the world). */
