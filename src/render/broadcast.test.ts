@@ -155,7 +155,7 @@ describe("broadcast (R4 wave 1+2) — read-only presentation over the world", ()
 
   it("the thought cam shows only the LLM seats, with think time and missed turns", () => {
     const { world } = createCity({ seed: 9, secondDiner: true });
-    const cam = new ThoughtCam(new Set(["biz_diner_2"]), "test-model");
+    const cam = new ThoughtCam(new Map([["biz_diner_2", "test-model"]]));
     const log: DecisionLogEntry[] = [
       { day: 1, businessId: "biz_diner", providerId: "rules", fallback: false, action: { setPrice: 11 }, reason: "rules move" },
       { day: 1, businessId: "biz_diner_2", providerId: "router", fallback: false, action: { hire: 1, setPayout: 0 }, reason: "retain and staff up", usage: { latencyMs: 157000 } },

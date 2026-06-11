@@ -222,9 +222,8 @@ export class ThoughtCam {
   private seen = 0;
 
   constructor(
-    /** The businessIds driven by an LLM (the duel: the rival diner). */
-    private readonly llmSeats: ReadonlySet<string>,
-    private readonly providerLabel: string,
+    /** The LLM seats and their on-screen model labels (multi-model matches: one label each). */
+    private readonly seatLabels: ReadonlyMap<string, string>,
   ) {}
 
   /** Returns cards for entries that landed since the last poll. */
@@ -233,7 +232,8 @@ export class ThoughtCam {
     this.seen = log.length;
     const out: ThoughtCard[] = [];
     for (const e of fresh) {
-      if (!this.llmSeats.has(e.businessId)) continue;
+      const label = this.seatLabels.get(e.businessId);
+      if (label === undefined) continue;
       const firm = world.getBusiness(e.businessId);
       out.push({
         businessId: e.businessId,
@@ -243,7 +243,7 @@ export class ThoughtCam {
         reason: e.reason,
         thinkSeconds: e.usage?.latencyMs !== undefined ? e.usage.latencyMs / 1000 : undefined,
         missedTurn: e.fallback,
-        providerLabel: this.providerLabel,
+        providerLabel: label,
       });
     }
     return out;

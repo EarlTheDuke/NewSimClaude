@@ -39,6 +39,7 @@ import { summarizeCost } from "./ai/cost";
 import { PerBusinessProvider } from "./ai/PerBusinessProvider";
 import { OpenAICompatProvider } from "./ai/OpenAICompatProvider";
 import { RuleBasedProvider } from "./ai/RuleBasedProvider";
+import type { DecisionProvider } from "./ai/types";
 import { firmProductiveWorth } from "./bench/ceoBench";
 import {
   BroadcastModel,
@@ -112,28 +113,39 @@ joyMind?.queue(
 // watchable, zero-config. To run them on Claude instead, swap in the provider:
 //   import { ClaudeDecisionProvider } from "./ai/ClaudeDecisionProvider";
 //   const brain: BrainOption = new ClaudeDecisionProvider(); // needs VITE_ANTHROPIC_API_KEY
-// In the spectator duel, the router seats the local LLM at the rival diner (same adapter,
-// same shared briefing as the headless match; /no_think keeps a 36B reasoning model at
-// seconds-per-decision on a single-GPU box; rules cover any timeout, loudly logged).
+//
+// In the spectator duel BOTH seats are URL-selectable — model-vs-model is watchable:
+//   ?scenario=duel                                        → rules vs the .env default model
+//   ?scenario=duel&a=openwebui:nemotron-3-ultra&b=openwebui:qwen3.5:35b   → the title fight
+//   ?scenario=duel&b=openwebui:qwen3.5:122b&think=1       → thinking mode (minutes/turn)
+// Seat specs: "rules" or "openwebui[:model]" (the Open WebUI box via the /tinybox proxy).
+// Same adapter + shared briefing as the headless instrument; rules cover timeouts, logged.
 const duelEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
-const duelModel = duelEnv.VITE_OPENWEBUI_MODEL ?? "qwen3.5:35b";
-// "&think=1" runs the local model in full REASONING mode (no /no_think): it deliberates out
-// loud before each decision — better play, but minutes per turn, so the duel opens slower and
-// the ticker shows the one-line conclusion of each deliberation. Default stays no-think (fast).
-const duelThink = duel && new URLSearchParams(location.search).get("think") === "1";
+const duelParams = new URLSearchParams(location.search);
+// "&think=1" runs LLM seats in full REASONING mode (no /no_think): better play, minutes per
+// turn; the ticker and Thought Cam carry each deliberation's conclusion as it lands.
+const duelThink = duel && duelParams.get("think") === "1";
+/** A client-side seat spec → a mind + its broadcast label. */
+function duelSeat(spec: string): { label: string; provider: DecisionProvider; llm: boolean } {
+  if (spec === "rules") return { label: "rules", provider: new RuleBasedProvider(), llm: false };
+  const model = spec.startsWith("openwebui:")
+    ? spec.slice("openwebui:".length)
+    : duelEnv.VITE_OPENWEBUI_MODEL ?? "qwen3.5:35b";
+  return {
+    label: `${model}${duelThink ? " (thinking)" : ""}`,
+    llm: true,
+    provider: new OpenAICompatProvider({
+      baseUrl: "/tinybox/api", // the vite dev proxy → the Open WebUI box (no CORS)
+      model,
+      apiKey: duelEnv.VITE_OPENWEBUI_API_KEY,
+      ...(duelThink ? { maxTokens: 4096, timeoutMs: 600_000 } : { promptSuffix: " /no_think", maxTokens: 512, timeoutMs: 300_000 }),
+    }),
+  };
+}
+const seatA = duel ? duelSeat(duelParams.get("a") ?? "rules") : undefined;
+const seatB = duel ? duelSeat(duelParams.get("b") ?? "openwebui") : undefined;
 const brain: BrainOption = duel
-  ? new PerBusinessProvider(
-      {
-        biz_diner_2: new OpenAICompatProvider({
-          baseUrl: "/tinybox/api", // the vite dev proxy → the Open WebUI box (no CORS)
-          model: duelModel,
-          apiKey: duelEnv.VITE_OPENWEBUI_API_KEY,
-          // thinking mode: drop the /no_think switch and give the reasoning room to breathe.
-          ...(duelThink ? { maxTokens: 4096, timeoutMs: 600_000 } : { promptSuffix: " /no_think", maxTokens: 512, timeoutMs: 300_000 }),
-        }),
-      },
-      new RuleBasedProvider(), // the home diner — the deterministic incumbent
-    )
+  ? new PerBusinessProvider({ biz_diner: seatA!.provider, biz_diner_2: seatB!.provider })
   : "rules";
 
 // The residents likewise run on deterministic rules by default. To hand one (or
@@ -319,7 +331,7 @@ const duelStartB = duel ? firmProductiveWorth(world.getBusiness("biz_diner_2")!)
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
-  <h1>NewSimClaude — ${duel ? `THE DUEL <span class="hint">· Pilot B live: rules @ The Corner Diner vs ${duelModel} @ the rival diner (seed 9, growth-scored)</span>` : boom ? "BOOM TOWN <span class=\"hint\">· Arc 3 live: the harbor trades, the City Reserve waits, and Joy is played (seed 9, port 5174)</span>" : "Free-Market Economy <span class=\"hint\">· free wage + welfare + business entry + new industry (port 5174)</span>"}</h1>
+  <h1>NewSimClaude — ${duel ? `THE DUEL <span class="hint">· live: ${seatA!.label} @ The Corner Diner vs ${seatB!.label} @ Riverside (seed 9, growth-scored)</span>` : boom ? "BOOM TOWN <span class=\"hint\">· Arc 3 live: the harbor trades, the City Reserve waits, and Joy is played (seed 9, port 5174)</span>" : "Free-Market Economy <span class=\"hint\">· free wage + welfare + business entry + new industry (port 5174)</span>"}</h1>
   <div class="hud">
     <div class="clock"><span id="clock">00:00</span><span class="day" id="day">Day 0</span></div>
     <div class="controls" id="controls"></div>
@@ -405,8 +417,8 @@ const evalBarEl = el<HTMLDivElement>("#evalbar");
 const DUEL_SEATS: [string, string] = ["biz_diner", "biz_diner_2"];
 if (duel) {
   tapeEl.innerHTML = taleOfTheTapeHTML(
-    { label: "rules", seat: "The Corner Diner" },
-    { label: `${duelModel}${duelThink ? " (thinking)" : " (no-think)"}`, seat: "Riverside Diner" },
+    { label: seatA!.label, seat: "The Corner Diner" },
+    { label: seatB!.label, seat: "Riverside Diner" },
     9,
     DUEL_DAYS,
   );
@@ -433,9 +445,16 @@ function pumpBanners(): void {
     }, 700);
   }, 7000);
 }
+// Every LLM-driven seat gets Thought Cam cards under its own model label.
 const thoughtCam = new ThoughtCam(
-  new Set(duel ? ["biz_diner_2"] : []),
-  duel ? `${duelModel}${duelThink ? " · thinking" : " · no-think"}` : "",
+  new Map(
+    duel
+      ? ([
+          ...(seatA!.llm ? [["biz_diner", seatA!.label] as const] : []),
+          ...(seatB!.llm ? [["biz_diner_2", seatB!.label] as const] : []),
+        ] as const)
+      : [],
+  ),
 );
 let lastTowerDay = -1;
 function renderBroadcast(day: number): void {
@@ -1084,8 +1103,8 @@ function renderMacro(): void {
               const sb = b ? Math.round(firmProductiveWorth(b) - duelStartB) : 0;
               const fmt = (n: number): string => `${n < 0 ? "−" : "+"}$${Math.abs(n).toLocaleString("en-US")}`;
               return (
-                vitalCard(`rules — Corner Diner${a?.active ? "" : " 💀"}`, fmt(sa), [0, sa], sa >= sb ? "#3fb950" : "#f85149") +
-                vitalCard(`${duelModel} — rival diner${b?.active ? "" : " 💀"}`, fmt(sb), [0, sb], sb >= sa ? "#3fb950" : "#f85149")
+                vitalCard(`${seatA!.label} — Corner Diner${a?.active ? "" : " 💀"}`, fmt(sa), [0, sa], sa >= sb ? "#3fb950" : "#f85149") +
+                vitalCard(`${seatB!.label} — Riverside${b?.active ? "" : " 💀"}`, fmt(sb), [0, sb], sb >= sa ? "#3fb950" : "#f85149")
               );
             })(),
           ]
