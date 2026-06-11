@@ -10,8 +10,31 @@ import {
   towerHTML,
   thoughtCardHTML,
   bannerHTML,
+  winProbability,
+  evalBarHTML,
+  reportCardHTML,
+  type FirmCard,
 } from "./broadcast";
 import type { DecisionLogEntry } from "../ai/types";
+
+function card(over: Partial<FirmCard> = {}): FirmCard {
+  return {
+    id: "biz_a",
+    name: "A Diner",
+    kind: "diner",
+    active: true,
+    score: 0,
+    rank: 1,
+    rankDelta: 0,
+    momentum: 0,
+    runwayDays: Infinity,
+    staff: 2,
+    wageMult: 1,
+    pricePosture: 0,
+    brandValue: 0,
+    ...over,
+  };
+}
 
 describe("broadcast (R4 wave 1+2) — read-only presentation over the world", () => {
   it("runway: needs a trend, reads burn, Infinity when not burning", () => {
@@ -83,6 +106,33 @@ describe("broadcast (R4 wave 1+2) — read-only presentation over the world", ()
     const farmhand = world.residents.find((r) => r.jobId === "biz_farm")!;
     farmhand.jobId = "biz_diner";
     expect(drama.sampleDay(world, 3)).toEqual([]);
+  });
+
+  it("the eval bar: symmetric, score- and momentum-sensitive, decisive on bankruptcy", () => {
+    const even = winProbability(card(), card({ id: "biz_b" }));
+    expect(even).toBeCloseTo(0.5, 5);
+    const ahead = winProbability(card({ score: 300 }), card({ id: "biz_b" }));
+    expect(ahead).toBeGreaterThan(0.7);
+    // symmetry: P(A beats B) + P(B beats A) = 1
+    expect(ahead + winProbability(card({ id: "biz_b" }), card({ score: 300 }))).toBeCloseTo(1, 9);
+    // momentum matters: same gap, but B is climbing fast → B's chances improve
+    const calm = winProbability(card({ score: 100 }), card({ id: "biz_b" }));
+    const charging = winProbability(card({ score: 100 }), card({ id: "biz_b", momentum: 200 }));
+    expect(charging).toBeLessThan(calm);
+    // a bankrupt contestant has lost
+    expect(winProbability(card({ active: false }), card({ id: "biz_b" }))).toBeLessThan(0.05);
+    expect(evalBarHTML(card({ score: 300 }), card({ id: "biz_b" }))).toContain("ev-fill");
+  });
+
+  it("the report card declares the right winner and survives a bankruptcy verdict", () => {
+    const a = { ...card({ score: 500 }), decisions: 30, missed: 0 };
+    const b = { ...card({ id: "biz_b", name: "B Diner", score: 200 }), decisions: 28, missed: 2 };
+    const html = reportCardHTML(a, b, 90);
+    expect(html).toContain("A Diner WINS");
+    expect(html).toContain("2 missed");
+    // bankruptcy overrides score: the survivor wins even from behind
+    const broke = { ...card({ score: 900, active: false }), decisions: 30, missed: 0 };
+    expect(reportCardHTML(broke, b, 90)).toContain("B Diner WINS");
   });
 
   it("the drama booth: regime banners fire once (press on, first sail)", () => {

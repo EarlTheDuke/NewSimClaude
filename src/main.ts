@@ -40,7 +40,18 @@ import { PerBusinessProvider } from "./ai/PerBusinessProvider";
 import { OpenAICompatProvider } from "./ai/OpenAICompatProvider";
 import { RuleBasedProvider } from "./ai/RuleBasedProvider";
 import { firmProductiveWorth } from "./bench/ceoBench";
-import { BroadcastModel, ThoughtCam, DramaDetector, towerHTML, thoughtCardHTML, bannerHTML } from "./render/broadcast";
+import {
+  BroadcastModel,
+  ThoughtCam,
+  DramaDetector,
+  towerHTML,
+  thoughtCardHTML,
+  bannerHTML,
+  evalBarHTML,
+  taleOfTheTapeHTML,
+  reportCardHTML,
+} from "./render/broadcast";
+import { DUEL_DAYS } from "./bench/duel";
 
 const RESOURCES: ResourceKind[] = ["grain", "materials", "food", "wares"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -313,6 +324,8 @@ app.innerHTML = `
     <div class="stats" id="stats"></div>
     <div class="stats" id="popline" title="Live demography (HP3/HP4)"></div>
   </div>
+  <div id="tape"></div>
+  <div id="evalbar"></div>
   <div id="banners"></div>
   <div class="stage">
     <div class="tower-wrap">
@@ -382,6 +395,20 @@ const townLifeEl = el<HTMLDivElement>("#townLife");
 const towerEl = el<HTMLDivElement>("#tower");
 const thoughtCamEl = el<HTMLDivElement>("#thoughtcam");
 const bannersEl = el<HTMLDivElement>("#banners");
+const tapeEl = el<HTMLDivElement>("#tape");
+const evalBarEl = el<HTMLDivElement>("#evalbar");
+// R4 wave 5 — the match framing (duel only): tale of the tape at the opening bell, the live
+// eval bar between the contestants, and the full-time report card at the match length.
+const DUEL_SEATS: [string, string] = ["biz_diner", "biz_diner_2"];
+if (duel) {
+  tapeEl.innerHTML = taleOfTheTapeHTML(
+    { label: "rules", seat: "The Corner Diner" },
+    { label: `${duelModel}${duelThink ? " (thinking)" : " (no-think)"}`, seat: "Riverside Diner" },
+    9,
+    DUEL_DAYS,
+  );
+}
+let reportShown = false;
 const broadcastModel = new BroadcastModel(world, playerFirmIds);
 const dramaDetector = new DramaDetector(playerFirmIds);
 // The banner queue: one moment on screen at a time (7s), so drama never tramples drama.
@@ -422,6 +449,31 @@ function renderBroadcast(day: number): void {
       if (bannerQueue.length > 5) bannerQueue.splice(0, bannerQueue.length - 5);
     }
     pumpBanners();
+    // R4 wave 5 — the day-end beat: the tower pulses, and in the duel the eval bar moves.
+    towerEl.parentElement?.classList.add("tw-pulse");
+    setTimeout(() => towerEl.parentElement?.classList.remove("tw-pulse"), 1100);
+    if (duel) {
+      const cards = broadcastModel.cards(world);
+      const a = cards.find((c) => c.id === DUEL_SEATS[0]);
+      const b = cards.find((c) => c.id === DUEL_SEATS[1]);
+      if (a && b) {
+        evalBarEl.innerHTML = evalBarHTML(a, b);
+        // Full time: the broadcast declares a result at the match length; the town plays on.
+        if (day >= DUEL_DAYS && !reportShown) {
+          reportShown = true;
+          const log = agent?.decisions() ?? [];
+          const stats = (id: string) => ({
+            decisions: log.filter((e) => e.businessId === id).length,
+            missed: log.filter((e) => e.businessId === id && e.fallback).length,
+          });
+          const overlay = document.createElement("div");
+          overlay.className = "rc-overlay";
+          overlay.innerHTML = reportCardHTML({ ...a, ...stats(a.id) }, { ...b, ...stats(b.id) }, day);
+          document.querySelector(".stage")?.appendChild(overlay);
+          overlay.querySelector("#rcDismiss")?.addEventListener("click", () => overlay.remove());
+        }
+      }
+    }
   }
   for (const card of thoughtCam.poll(agent?.decisions() ?? [], world)) {
     const node = document.createElement("div");

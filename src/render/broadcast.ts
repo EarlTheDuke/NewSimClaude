@@ -405,6 +405,79 @@ export function bannerHTML(e: DramaEvent): string {
   return `<div class="bn bn-s${e.severity} bn-${e.kind}"><span class="bn-day">DAY ${e.day}</span>${escapeHtml(e.headline)}</div>`;
 }
 
+// ── The Eval Bar + match framing (R4 wave 5) ─────────────────────────────────────────────
+
+/**
+ * The chess-broadcast eval bar: a win probability from the score gap plus momentum (the
+ * trend is information — a firm $100 behind but climbing fast is not losing 90/10). Pure
+ * presentation arithmetic: logistic over (gap + 0.6×momentum-difference), scaled so a ~$250
+ * combined edge reads as roughly 75/25. Symmetric by construction: P(A) + P(B) = 1.
+ */
+export function winProbability(a: FirmCard, b: FirmCard): number {
+  if (!a.active && b.active) return 0.02; // a bankrupt player has lost, near-certainly
+  if (a.active && !b.active) return 0.98;
+  const edge = a.score - b.score + 0.6 * (a.momentum - b.momentum);
+  return 1 / (1 + Math.exp(-edge / 250));
+}
+
+/** The eval bar as HTML: two names, a split bar, the live percentage. */
+export function evalBarHTML(a: FirmCard, b: FirmCard): string {
+  const p = winProbability(a, b);
+  const pct = Math.round(p * 100);
+  return (
+    `<div class="ev-wrap">` +
+    `<span class="ev-name${p >= 0.5 ? " ev-lead" : ""}">${escapeHtml(a.name)}</span>` +
+    `<div class="ev-bar"><div class="ev-fill" style="width:${pct}%"></div><span class="ev-pct">${pct}% — ${100 - pct}%</span></div>` +
+    `<span class="ev-name${p < 0.5 ? " ev-lead" : ""}">${escapeHtml(b.name)}</span>` +
+    `</div>`
+  );
+}
+
+/** The pre-match tale of the tape (rendered once at the opening bell of a duel watch). */
+export function taleOfTheTapeHTML(
+  a: { label: string; seat: string },
+  b: { label: string; seat: string },
+  seed: number,
+  matchDays: number,
+): string {
+  return (
+    `<div class="tape">` +
+    `<div class="tape-side"><b>${escapeHtml(a.label)}</b><span>${escapeHtml(a.seat)}</span></div>` +
+    `<div class="tape-mid">VS<span>seed ${seed} · ${matchDays} days · growth-scored</span></div>` +
+    `<div class="tape-side"><b>${escapeHtml(b.label)}</b><span>${escapeHtml(b.seat)}</span></div>` +
+    `</div>`
+  );
+}
+
+/**
+ * The post-match report card, auto-written from the watch (shown once when the match length
+ * is reached; the town keeps living afterwards — this is the broadcast's full-time whistle,
+ * not a sim event). Spectator-grade: single game, seat bias included; duelCli home-and-away
+ * remains the scored instrument.
+ */
+export function reportCardHTML(
+  a: FirmCard & { decisions: number; missed: number },
+  b: FirmCard & { decisions: number; missed: number },
+  days: number,
+): string {
+  const winner = !a.active && b.active ? b : !b.active && a.active ? a : a.score >= b.score ? a : b;
+  const margin = Math.abs(a.score - b.score);
+  const row = (c: FirmCard & { decisions: number; missed: number }): string =>
+    `<div class="rc-row${c.id === winner.id ? " rc-win" : ""}"><b>${escapeHtml(c.name)}</b>` +
+    `<span>${money(c.score)}</span>` +
+    `<span>${c.decisions} moves${c.missed > 0 ? ` · ${c.missed} missed` : ""}</span>` +
+    `<span>${c.active ? `${c.staff}👤 staffed` : "BANKRUPT"}</span></div>`;
+  return (
+    `<div class="rc-card">` +
+    `<div class="rc-head">FULL TIME — DAY ${days}</div>` +
+    `<div class="rc-verdict">${escapeHtml(winner.name)} WINS by ${money(margin).replace("+", "")}</div>` +
+    row(a) +
+    row(b) +
+    `<button class="rc-dismiss" id="rcDismiss">continue watching</button>` +
+    `</div>`
+  );
+}
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }

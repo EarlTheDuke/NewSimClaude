@@ -6,8 +6,11 @@
 > (the map at 800px CSS / 1.5× backing store — picking unaffected, all pointer math
 > normalizes; supply-chain COIN GLIDES: the nightly B2B settlement sends coins from each
 > consumer firm to its producer via the industry registry's consumes/produces chain) ·
-> 🔨 Wave 5 next (eval bar + match framing) · Wave 6 queued. *(Deferred to follow-ups: a full
-> palette/ground-texture art pass; canvas-renderer parity for juice — R2 waiver applies.)*
+> ✅ Wave 5 (the EVAL BAR — logistic win probability over score gap + momentum, bankruptcy
+> decisive, symmetric by construction; tale-of-the-tape at the opening bell; day-end tower
+> pulse beat; the FULL-TIME report card at the 90-day match length, dismissible, town plays
+> on) · 🔨 Wave 6 next (the director). *(Deferred to follow-ups: a full palette/ground-texture
+> art pass; canvas-renderer parity for juice — R2 waiver applies.)*
 
 *Created 2026-06-10, user-greenlit ("let's do all 1–6 over time… jump directly into this build").
 The R4 program follows R3 (street-level visuals) and shares its constitution:*

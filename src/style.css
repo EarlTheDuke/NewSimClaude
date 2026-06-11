@@ -142,6 +142,99 @@ button.active {
 .tw-warn { color: #d29922; }
 .tw-dead { color: #f85149; letter-spacing: 0.08em; }
 
+/* ── R4 wave 5: the eval bar + match framing ──────────────────────────────────── */
+.tape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 16px;
+}
+.tape:empty { display: none; }
+.tape-side { display: flex; flex-direction: column; align-items: center; }
+.tape-side b { font-size: 14px; }
+.tape-side span { font-size: 10px; color: var(--muted); }
+.tape-mid { font-size: 16px; font-weight: 800; color: var(--accent); display: flex; flex-direction: column; align-items: center; }
+.tape-mid span { font-size: 9px; font-weight: 400; color: var(--muted); letter-spacing: 0.06em; }
+
+.ev-wrap { display: flex; align-items: center; gap: 10px; }
+#evalbar:empty { display: none; }
+.ev-name { font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.ev-name.ev-lead { color: var(--text); }
+.ev-bar {
+  position: relative;
+  flex: 1;
+  height: 14px;
+  background: #3d1d22;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.ev-fill { height: 100%; background: #1f6feb; transition: width 0.8s ease; }
+.ev-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.tw-pulse { animation: tw-beat 1s ease-out; }
+@keyframes tw-beat {
+  0% { box-shadow: 0 0 0 0 rgba(88, 166, 255, 0.5); }
+  100% { box-shadow: 0 0 0 12px rgba(88, 166, 255, 0); }
+}
+
+.rc-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 14, 0.72);
+  z-index: 9;
+}
+.rc-card {
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 22px 26px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+  text-align: center;
+  min-width: 360px;
+}
+.rc-head { font-size: 11px; letter-spacing: 0.2em; color: var(--muted); }
+.rc-verdict { font-size: 18px; font-weight: 800; margin: 8px 0 14px; }
+.rc-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 12px;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+  align-items: center;
+  text-align: left;
+}
+.rc-row.rc-win { background: #13233a; border-radius: 6px; }
+.rc-dismiss {
+  margin-top: 14px;
+  background: #1f6feb;
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 16px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 /* ── R4 wave 3: the Drama Booth banners ───────────────────────────────────────── */
 #banners {
   min-height: 0;
