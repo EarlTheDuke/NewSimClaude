@@ -205,6 +205,29 @@ export function formatMeleeRound(r: MeleeRoundResult): string {
         `${s.fellBack ? `  [${s.fellBack} fellback]` : ""}${s.bankruptcies ? `  💀×${s.bankruptcies}` : ""}`,
     );
   });
+  // Duplicate-model rosters (e.g. 3×nemotron vs 3×qwen — the one-resident-local-model pattern
+  // for single-GPU boxes): aggregate the numbered slots by base model for the headline.
+  const byModel = new Map<string, { total: number; slots: number; fellBack: number; bankruptcies: number }>();
+  for (const s of r.standings) {
+    const base = s.label.replace(/#\d+$/, "");
+    const m = byModel.get(base) ?? { total: 0, slots: 0, fellBack: 0, bankruptcies: 0 };
+    m.total += s.total;
+    m.slots++;
+    m.fellBack += s.fellBack;
+    m.bankruptcies += s.bankruptcies;
+    byModel.set(base, m);
+  }
+  if (byModel.size < r.standings.length) {
+    lines.push(`  BY MODEL (slot totals summed — each model played every seat slots× times):`);
+    [...byModel.entries()]
+      .sort((a, b) => b[1].total - a[1].total)
+      .forEach(([base, m], i) => {
+        lines.push(
+          `    ${i + 1}. ${base} ×${m.slots}  ${money(m.total)}` +
+            `${m.fellBack ? `  [${m.fellBack} fellback]` : ""}${m.bankruptcies ? `  💀×${m.bankruptcies}` : ""}`,
+        );
+      });
+  }
   lines.push(`  PER-SEAT MATRIX (game: seat → score):`);
   for (const sr of r.seatResults) {
     lines.push(
