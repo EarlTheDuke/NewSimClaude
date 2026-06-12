@@ -42,7 +42,10 @@ function factoryFor(spec: string): { label: string; make: ProviderFactory } {
     const apiKey = env("OPENWEBUI_API_KEY");
     // --nothink: local reasoning models can take minutes per decision thinking out loud;
     // qwen's /no_think switch trades deliberation for tractable wall-clock. A different
-    // contestant mode — the label says so.
+    // contestant mode — the label says so. The token cap stays ROOMY even here: models that
+    // IGNORE the /no_think switch (nemotron) reason invisibly and a tight cap starves the
+    // answer — finish_reason=length with empty content, 56/60 turns lost to the rules
+    // fallback in the first title fight. Models that honor the switch stop early anyway.
     const noThink = process.argv.includes("--nothink");
     return {
       label: noThink ? `${model}-nothink` : model,
@@ -52,7 +55,7 @@ function factoryFor(spec: string): { label: string; make: ProviderFactory } {
           model,
           apiKey,
           timeoutMs: 300_000, // a busy single-GPU box queues requests; be patient
-          ...(noThink ? { promptSuffix: " /no_think", maxTokens: 512 } : {}),
+          ...(noThink ? { promptSuffix: " /no_think", maxTokens: 4096 } : {}),
         }),
     };
   }
