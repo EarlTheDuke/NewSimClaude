@@ -123,6 +123,15 @@ observation fixes would level this; re-measure after.*
 
 ## FINDINGS — fixes and improvements for the sim & benchmark
 
+> **✅ ALL SIX SHIPPED (2026-06-12, user-greenlit "do all of them"):** F1 duel scenario v2
+> (rules-minded residents — the wage front is REAL now; v1 results stand as their own era) ·
+> F2 `spendLocked` in the observation + the cash-shield bylaw in the briefing · F3
+> `balancedDiners` (both seats open 1/1 with the surplus worker released as a FREE AGENT the
+> two CEOs must compete for on day one) · F4 `pnl.unitsSold` + `dayUnitsSold`/`dayGrossMargin`
+> in the observation and prompt · F5 the runbook encoded in duelCli's header · F6 PRICE WAR /
+> TRUCE drama banners (regime-change detection, no spam on continuation). 552 tests green;
+> default city byte-identical; the mirror-match fairness proof holds under scenario v2.
+
 ### F1 (headline, verified in code) — **duels have NO labour market: every wage move was inert**
 `createCity` defaults `agenticResidentIds` to **none**, and the duel scenario never sets it —
 so residents NEVER review jobs in any duel played to date. Job-switching is impossible;

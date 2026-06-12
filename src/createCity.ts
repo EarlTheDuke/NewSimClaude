@@ -193,6 +193,13 @@ export interface CitySimOptions extends CityOptions {
    */
   luxuryImportShare?: number;
   /**
+   * Benchmark F3 — equalize the two diners' GENESIS staffing (1/1 instead of the round-robin's
+   * 2/1) so both duel seats carry skill signal instead of one being a structural drain.
+   * Requires {@link secondDiner}; geometry stays asymmetric (the home-and-away swap cancels
+   * it). Default off ⇒ byte-identical.
+   */
+  balancedDiners?: boolean;
+  /**
    * Monetary policy (Initiative C / C4b) — THE DELIBERATE RELAXATION of strict conservation
    * (user-greenlit 2026-06-09). When true (with `includeAuthority`, a rate, and a cap), the
    * {@link MonetarySystem} mints `min(rate × supply, cap)` daily through the audited
@@ -250,6 +257,26 @@ export function createCity(options: CitySimOptions = {}): {
   ];
   resetIndustries(registryIndustries, options.extraResources);
   const world = buildCity(sim.rng, options);
+
+  // Benchmark F3 — balancedDiners: with the rival diner present, the seeded staffing
+  // round-robin hands The Corner Diner 2 staff and Riverside 1, which makes one duel seat a
+  // structural drain (every pilot bleeds there) — half of every match measured the map, not
+  // the mind. This genesis-only rebalance releases Corner's surplus staff into UNEMPLOYMENT
+  // until both diners hold the same crew (1/1) — and the freed worker becomes a FREE AGENT
+  // the two CEOs must compete for on day one (with F1's resident agency, the rules mind takes
+  // the best hiring offer — the fairest possible opening for a wage-war scenario). Geometry
+  // remains the residual difference, cancelled by the home-and-away swap. Deterministic (no
+  // RNG, last-listed picks), occupancy-only (no cash moves), default OFF ⇒ byte-identical.
+  if (options.secondDiner && options.balancedDiners) {
+    const corner = world.getBusiness("biz_diner");
+    const riverside = world.getBusiness("biz_diner_2");
+    while (corner && riverside && corner.employeeIds.length > riverside.employeeIds.length) {
+      const freedId = corner.employeeIds[corner.employeeIds.length - 1]!;
+      corner.employeeIds = corner.employeeIds.filter((id) => id !== freedId);
+      const freed = world.getResident(freedId);
+      if (freed) freed.jobId = "";
+    }
+  }
 
   // Constructed up front so the EventSystem can hold a market reference; it is
   // still *registered* (run) at its normal position below. Initiative B slice 1:

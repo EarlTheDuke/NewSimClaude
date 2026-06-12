@@ -100,6 +100,7 @@ export class EconomySystem implements System {
       if (paid <= 0) break; // can't afford the next one; stays hungry, brain will retry
       if (k === 0) resident.needs.hunger = 100; // one meal sates hunger; the rest are splurge
       diner.pnl.revenue += paid;
+      diner.pnl.unitsSold = (diner.pnl.unitsSold ?? 0) + 1; // F4 — real unit economics for the CEO
       diner.inventory = Math.max(0, diner.inventory - 1);
       if (diner.inventory === 0) break; // shelves empty — later visitors get fewer
     }
@@ -132,6 +133,7 @@ export class EconomySystem implements System {
       const paid = this.world.transfer(resident.id, venue.id, cost);
       if (paid <= 0) break; // out of cash for the next unit
       venue.pnl.revenue += paid;
+      venue.pnl.unitsSold = (venue.pnl.unitsSold ?? 0) + 1; // F4 — real unit economics for the CEO
       if (venue.inventory > 0) venue.inventory -= 1;
       if (venue.inventory === 0) break; // shelves empty
     }

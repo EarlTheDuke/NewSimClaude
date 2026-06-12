@@ -135,6 +135,27 @@ describe("broadcast (R4 wave 1+2) — read-only presentation over the world", ()
     expect(reportCardHTML(broke, b, 90)).toContain("B Diner WINS");
   });
 
+  it("the drama booth (F6): price wars and truces banner on regime CHANGES only", () => {
+    const { world } = createCity({ seed: 9, secondDiner: true });
+    const drama = new DramaDetector(["biz_diner", "biz_diner_2"]);
+    const a = world.getBusiness("biz_diner")!;
+    const b = world.getBusiness("biz_diner_2")!;
+    a.price = 18;
+    b.price = 18;
+    drama.sampleDay(world, 0); // anchor at parity
+    expect(drama.sampleDay(world, 1)).toEqual([]); // parity continues — no news
+
+    b.price = 16; // an 11% undercut from parity → WAR
+    const war = drama.sampleDay(world, 2);
+    expect(war.some((e) => e.kind === "pricewar" && e.headline.includes("Riverside"))).toBe(true);
+    expect(drama.sampleDay(world, 3)).toEqual([]); // the war CONTINUING is not fresh news
+
+    b.price = 18; // back to parity → TRUCE
+    const truce = drama.sampleDay(world, 4);
+    expect(truce.some((e) => e.kind === "truce")).toBe(true);
+    expect(truce.find((e) => e.kind === "truce")!.severity).toBe(1);
+  });
+
   it("the drama booth: regime banners fire once (press on, first sail)", () => {
     const { sim, world } = createCity({
       seed: 9,

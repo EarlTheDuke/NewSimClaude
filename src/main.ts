@@ -186,7 +186,12 @@ const { sim, world, market, macro, agent, residentAgent, events, god, population
         // Two agentic firms only; the rest of the town runs its deterministic life.
         seed: 9,
         brain,
-        residentBrain,
+        // SCENARIO v2 (benchmark F1+F3): rules-minded residents make the wage war REAL (v1's
+        // wage levers were inert — the phantom war), and balanced diners start both seats
+        // at 1/1 staffing so each game carries skill signal. Mirrors src/bench/duel.ts.
+        residentBrain: "rules",
+        agenticResidentIds: "all",
+        balancedDiners: true,
         agenticBusinessIds: ["biz_diner", "biz_diner_2"],
         secondDiner: true,
         disasters: false,

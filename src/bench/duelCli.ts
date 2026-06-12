@@ -16,6 +16,21 @@
  *
  * Each game constructs FRESH provider instances (the memory ledgers never leak between
  * games). Sync-vs-sync matches are fully deterministic and replayable.
+ *
+ * THE RUNBOOK (benchmark F5 — every rule learned the hard way; the full story lives in
+ * BENCHMARK-REPORT-2026-06-11.md):
+ *  1. Scored matches get a QUIET box — close spectator tabs first; a tab closed mid-
+ *     generation leaves zombie generations Ollama finishes anyway, jamming the queue.
+ *  2. Probe a new model with a MATCH-SIZED prompt before seating it (a one-liner probe
+ *     missed the suffocation that voided the first title fight).
+ *  3. Keep token caps roomy: switch-honoring models stop early; switch-ignoring models
+ *     (nemotron) think invisibly and need room to think AND answer.
+ *  4. The [N fellback] counter is the integrity gate: >3 missed turns in a game ⇒ void, re-run.
+ *  5. One seed is not a result — run a 3–5 seed series before believing a margin.
+ *
+ * SCENARIO v2 (F1+F3, 2026-06-12): residents run on the rules mind (the wage front is REAL —
+ * v1's wage levers were inert, the "phantom war") and the diners start staffing-balanced.
+ * v1 results are their own era; don't compare margins across scenario versions.
  */
 import { runHomeAndAway, formatHomeAndAway, DUEL_DAYS, type ProviderFactory } from "./duel";
 import { ClaudeDecisionProvider } from "../ai/ClaudeDecisionProvider";

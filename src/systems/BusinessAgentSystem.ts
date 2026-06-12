@@ -379,6 +379,12 @@ export class BusinessAgentSystem implements System {
     const dayFinancing = dayBorrowed - dayDebtService;
     const dayProfit = biz.cash - prevCash - dayFinancing; // operating cash change, financing excluded
     const dayRent = dayRevenue - dayWages - dayDistributed - dayProfit;
+    // F4 — real unit economics: units over the counter for retail kinds, so a mind needn't
+    // infer volume from price-divided revenue across price changes.
+    const dayUnitsSold =
+      ARCHETYPES[biz.kind].sellsToResidents && biz.pnl.unitsSold !== undefined
+        ? biz.pnl.unitsSold - (prevPnl.unitsSold ?? 0)
+        : undefined;
 
     // What the competing storefronts of this kind charge, averaged. Undefined
     // when this business is the only one of its kind (the pre-11b norm), so the
@@ -425,6 +431,15 @@ export class BusinessAgentSystem implements System {
       understaffed: biz.employeeIds.length < desiredHeadcount(biz.kind),
       rivalWage, // Initiative B slice 2 — the strongest rival wage (undefined ⇒ feature off / no rival)
       dayRevenue,
+      // F4 — unit economics; gross margin only when both pieces are known (approximate: big-
+      // ticket non-inventory sales book revenue without units, see the type's doc).
+      dayUnitsSold,
+      dayGrossMargin:
+        dayUnitsSold !== undefined && unitCost !== undefined
+          ? dayRevenue - dayUnitsSold * unitCost
+          : undefined,
+      // F2 — the cash shield made visible: spending levers no-op below the reserve.
+      spendLocked: biz.cash < BUSINESS_RESERVE ? true : undefined,
       dayWages,
       dayRent,
       dayProfit,

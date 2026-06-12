@@ -83,6 +83,24 @@ export interface BusinessObservation {
   rivalWage?: number;
   /** Revenue booked during the day that just ended. */
   dayRevenue: number;
+  /**
+   * Retail units sold over the counter during the day that just ended (benchmark F4) —
+   * real unit economics, so a mind needn't infer volume from price-divided revenue.
+   * Undefined for kinds that don't retail.
+   */
+  dayUnitsSold?: number;
+  /**
+   * Approximate gross margin for the day (F4): `dayRevenue − dayUnitsSold × unitCost`.
+   * Approximate because big-ticket non-inventory sales (vehicles/luxuries) book revenue
+   * without units. Undefined when {@link dayUnitsSold} or unit cost is unknown.
+   */
+  dayGrossMargin?: number;
+  /**
+   * TRUE while cash sits below the working reserve, where the cash shield clamps `invest`
+   * and `brand` to ZERO (benchmark F2) — surfaced so a mind never burns turns on spending
+   * levers that silently no-op. Wage, price, and payout levers still work.
+   */
+  spendLocked?: boolean;
   /** Wages paid to staff during the day that just ended — labour cost only; the profit payout is {@link dayDistributed}. */
   dayWages: number;
   /** Rent + cost-of-goods paid during the day that just ended. */

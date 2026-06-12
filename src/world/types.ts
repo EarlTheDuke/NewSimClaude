@@ -177,6 +177,15 @@ export interface Business {
 
 export interface ProfitAndLoss {
   revenue: number;
+  /**
+   * Cumulative RETAIL units sold over the counter (benchmark F4) — incremented wherever a
+   * unit leaves inventory against revenue, so the CEO observation can report real unit
+   * economics (`dayUnitsSold`, `dayGrossMargin`) instead of leaving models to infer them from
+   * price-divided revenue. Big-ticket non-inventory sales (vehicles, luxuries) are
+   * deliberately NOT counted. Optional ⇒ absent on older saves (read as 0); pure bookkeeping
+   * of sales that already moved via World.transfer — conservation untouched.
+   */
+  unitsSold?: number;
   /** Wages paid to staff (labour cost only). Profit payouts live in {@link distributed}. */
   wagesPaid: number;
   rentCollected: number;

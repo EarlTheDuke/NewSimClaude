@@ -292,6 +292,8 @@ button.active {
 .bn-press { background: #241a2d; border-color: #b18ee866; }
 .bn-record { border-color: #d2992266; }
 .bn-trade { border-color: #58d6ff66; }
+.bn-pricewar { background: #2d1a14; border-color: #ff9e5866; box-shadow: 0 3px 16px rgba(255, 158, 88, 0.15); }
+.bn-truce { border-color: #7ee78766; }
 
 /* ── R4 wave 2: the Thought Cam ───────────────────────────────────────────────── */
 #thoughtcam {

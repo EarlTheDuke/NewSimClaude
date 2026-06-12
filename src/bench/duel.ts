@@ -114,6 +114,15 @@ export async function runDuel(config: DuelConfig): Promise<DuelResult> {
     includeAuthority: false,
     // The duel's second front: rivals see each other's wages and may poach staff.
     labourCompetition: true,
+    // SCENARIO v2 (benchmark F1+F3, 2026-06-12): v1 shipped with NO resident agency — wage
+    // levers were inert cost in every v1 match (the "phantom war"; see
+    // BENCHMARK-REPORT-2026-06-11.md). v2 seats every working-age resident on the rules mind,
+    // so the wage front is REAL: under-bid your crew against a hiring rival and they walk.
+    // balancedDiners (F3) starts both seats at 1/1 staffing so each game carries skill
+    // signal. v1 results stand as their own scenario version.
+    residentBrain: "rules",
+    agenticResidentIds: "all",
+    balancedDiners: true,
   });
 
   const home = world.getBusiness(HOME_SEAT)!;

@@ -87,6 +87,26 @@ describe("ClaudeDecisionProvider (modernized — the LM-as-CEO mind)", () => {
     expect(msg).toMatch(/competitor|going rate/i); // pricing signals
   });
 
+  it("F2+F4: warns when spending is locked, and reports real unit economics", async () => {
+    const { client, captured } = stub({ reason: "hold" });
+    const provider = new ClaudeDecisionProvider({ client });
+    await provider.decide({
+      observation: obs({ spendLocked: true, dayUnitsSold: 14, dayGrossMargin: 140 }),
+      limits: DEFAULT_LIMITS,
+    });
+    const msg = captured().messages[0].content as string;
+    expect(msg).toMatch(/SPENDING LOCKED/); // the cash shield made visible
+    expect(msg).toMatch(/14 units sold/);
+    expect(msg).toMatch(/gross margin 140/);
+    // a healthy firm's message carries no lock warning
+    const healthy = stub({ reason: "hold" });
+    await new ClaudeDecisionProvider({ client: healthy.client }).decide({
+      observation: obs(),
+      limits: DEFAULT_LIMITS,
+    });
+    expect(healthy.captured().messages[0].content as string).not.toMatch(/SPENDING LOCKED/);
+  });
+
   it("drops levers the model omits, keeping the reason", async () => {
     const { client } = stub({ setPrice: 28, reason: "just price" });
     const provider = new ClaudeDecisionProvider({ client });

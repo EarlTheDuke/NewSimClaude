@@ -41,7 +41,9 @@ export function defaultBriefing(objective: string): string {
     "- Equipment: invest converts cash into capacity 1:1; only the part above the common " +
     "baseline counts toward your worth, and it wears out about 1%/day.\n" +
     "- Marketing (brand): spending builds brand equity that raises what customers will pay, " +
-    "with diminishing returns and daily decay.\n\n" +
+    "with diminishing returns and daily decay.\n" +
+    "- The cash shield: while cash is below your working reserve, invest and marketing are " +
+    "clamped to ZERO (the observation says SPENDING LOCKED when this is in force).\n\n" +
     "WHAT YOU DO NOT KNOW (and must learn from your books): how many customers buy at a given " +
     "price, what rivals will do, how the town's wages and prices will move. Your own recent " +
     "mornings — observations, choices, and outcomes — are provided as YOUR LEDGER. Use it.\n\n" +
@@ -67,7 +69,14 @@ export function observationText(o: DecisionRequest["observation"]): string {
   }
   if (o.brand !== undefined) lines.push(`Brand equity ${round(o.brand)} — marketing spend lifts it, growing how much customers will pay and buy.`);
   const distNote = o.dayDistributed !== undefined ? `, distributed ${round(o.dayDistributed)}` : "";
-  lines.push(`Yesterday: revenue ${round(o.dayRevenue)}, wages ${round(o.dayWages)}, rent/COGS ${round(o.dayRent)}${distNote}, net cash ${round(o.dayProfit)}.`);
+  const unitsNote =
+    o.dayUnitsSold !== undefined
+      ? `, ${o.dayUnitsSold} units sold${o.dayGrossMargin !== undefined ? ` (gross margin ${round(o.dayGrossMargin)})` : ""}`
+      : "";
+  lines.push(`Yesterday: revenue ${round(o.dayRevenue)}${unitsNote}, wages ${round(o.dayWages)}, rent/COGS ${round(o.dayRent)}${distNote}, net cash ${round(o.dayProfit)}.`);
+  if (o.spendLocked) {
+    lines.push(`SPENDING LOCKED: cash is below your working reserve — invest and marketing will be clamped to zero until cash recovers (price, wage, and payout still work).`);
+  }
   if (o.payoutRate !== undefined && o.payoutRate < 1) {
     lines.push(`You currently retain ${Math.round((1 - o.payoutRate) * 100)}% of your surplus as working capital (paying out the rest).`);
   }

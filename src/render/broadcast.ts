@@ -276,7 +276,7 @@ export function thoughtCardHTML(c: ThoughtCard): string {
 
 /** A broadcast-worthy moment. Severity 2 interrupts (kill-feed banner); 1 is a small banner. */
 export interface DramaEvent {
-  kind: "bankrupt" | "founded" | "poach" | "hire" | "press" | "trade" | "record";
+  kind: "bankrupt" | "founded" | "poach" | "hire" | "press" | "trade" | "record" | "pricewar" | "truce";
   severity: 1 | 2;
   day: number;
   headline: string;
@@ -297,6 +297,8 @@ export class DramaDetector {
   private pressSeen = false;
   private tradeSeen = false;
   private revenueRecord = 0;
+  /** F6 — relative price gap per same-kind player pair, for war/truce regime detection. */
+  private readonly prevPriceGap = new Map<string, number>();
   private primed = false;
 
   constructor(private readonly playerIds: readonly string[]) {}
@@ -372,6 +374,42 @@ export class DramaDetector {
         });
       }
       this.prevJobs.set(r.id, { jobId: r.jobId, name: r.name });
+    }
+
+    // Benchmark F6 — the price war on camera: every match's most strategic story is two
+    // same-kind player firms converging on a price (the truce) or breaking apart (the war).
+    // Watch each same-kind player pair's relative price gap and banner the regime CHANGES.
+    for (let i = 0; i < this.playerIds.length; i++) {
+      for (let j = i + 1; j < this.playerIds.length; j++) {
+        const a = world.getBusiness(this.playerIds[i]!);
+        const b = world.getBusiness(this.playerIds[j]!);
+        if (!a || !b || a.kind !== b.kind || !a.active || !b.active) continue;
+        const key = `${a.id}|${b.id}`;
+        const gap = Math.abs(a.price - b.price) / Math.max(a.price, b.price, 1e-9);
+        const prevGap = this.prevPriceGap.get(key);
+        if (this.primed && prevGap !== undefined) {
+          if (prevGap < 0.02 && gap > 0.05) {
+            const cheaper = a.price < b.price ? a : b;
+            const other = cheaper === a ? b : a;
+            out.push({
+              kind: "pricewar",
+              severity: 2,
+              day,
+              headline: `⚔️ PRICE WAR — ${cheaper.name} undercuts ${other.name} ($${r2(cheaper.price)} vs $${r2(other.price)})`,
+              subjectId: cheaper.id,
+            });
+          } else if (prevGap > 0.05 && gap < 0.02) {
+            out.push({
+              kind: "truce",
+              severity: 1,
+              day,
+              headline: `🤝 TRUCE — ${a.name} and ${b.name} settle at matched prices ($${r2(a.price)})`,
+              subjectId: a.id,
+            });
+          }
+        }
+        this.prevPriceGap.set(key, gap);
+      }
     }
 
     // One-time regime banners: the press's first dollar, the port's first export sale.
@@ -504,6 +542,10 @@ export function reportCardHTML(
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function r2(n: number): number {
+  return round2(n);
 }
 
 function escapeHtml(s: string): string {
