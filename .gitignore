@@ -14,5 +14,9 @@ play.command.json
 # Claude-as-CEO interactive harness action list (src/bench/play.ts; regenerated per play)
 play-actions.json
 
+# Claude-in-the-loop duel protocol files (src/bench/ClaudeFileProvider.ts; per-match artifacts)
+claude-duel-obs.json
+claude-duel-actions.json
+
 # Personal Claude Code permission overrides (machine-local; never commit)
 .claude/settings.local.json

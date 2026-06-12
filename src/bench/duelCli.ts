@@ -21,14 +21,20 @@ import { runHomeAndAway, formatHomeAndAway, DUEL_DAYS, type ProviderFactory } fr
 import { ClaudeDecisionProvider } from "../ai/ClaudeDecisionProvider";
 import { OpenAICompatProvider } from "../ai/OpenAICompatProvider";
 import { RuleBasedProvider } from "../ai/RuleBasedProvider";
+import { ClaudeFileProvider } from "./ClaudeFileProvider";
 
 function env(name: string): string | undefined {
   const viteEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
   return viteEnv?.[`VITE_${name}`] ?? process.env[`VITE_${name}`] ?? process.env[name];
 }
 
+let claudeGames = 0;
 function factoryFor(spec: string): { label: string; make: ProviderFactory } {
   if (spec === "rules") return { label: "rules", make: () => new RuleBasedProvider() };
+  if (spec === "claudefile") {
+    // The conversation-Claude plays live via the file protocol (see ClaudeFileProvider).
+    return { label: "claude-fable-5", make: () => new ClaudeFileProvider(`g${++claudeGames}`) };
+  }
   if (spec === "claude" || spec.startsWith("claude:")) {
     const model = spec.includes(":") ? spec.slice("claude:".length) : undefined;
     const label = model ?? "claude";
