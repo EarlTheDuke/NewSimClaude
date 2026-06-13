@@ -118,23 +118,30 @@ describe("endpoint serialization (the melee fix)", () => {
     return { fetchImpl, peak: () => peak };
   }
 
-  it("serializes concurrent calls to the SAME backend (baseUrl+model) — never >1 in flight", async () => {
+  it("serializeEndpoint:true serializes the SAME backend — never >1 in flight (the local-GPU fix)", async () => {
     const { fetchImpl, peak } = concurrencyStub(40);
-    const mk = () => new OpenAICompatProvider({ baseUrl: "http://box/api", model: "qwen", fetchImpl });
+    const mk = () => new OpenAICompatProvider({ baseUrl: "http://box/api", model: "qwen", serializeEndpoint: true, fetchImpl });
     // Three same-model slots fire at once (the melee's three qwen seats).
     await Promise.all([mk(), mk(), mk()].map((p) => p.decide({ observation: obs(), limits: DEFAULT_LIMITS })));
     expect(peak()).toBe(1); // the gate held — no dogpile on the single GPU
   });
 
-  it("lets DIFFERENT models on the same front door run in parallel (duels unaffected)", async () => {
+  it("default (serializeEndpoint off) stays concurrent — the external endpoint isn't throttled", async () => {
+    const { fetchImpl, peak } = concurrencyStub(40);
+    const mk = () => new OpenAICompatProvider({ baseUrl: "http://box/api", model: "nemotron", fetchImpl });
+    await Promise.all([mk(), mk(), mk()].map((p) => p.decide({ observation: obs(), limits: DEFAULT_LIMITS })));
+    expect(peak()).toBe(3); // concurrent by default — nemotron's trio runs in parallel, round stays fast
+  });
+
+  it("serialized backends don't block a DIFFERENT model on the same front door", async () => {
     const { fetchImpl, peak } = concurrencyStub(40);
     const a = new OpenAICompatProvider({ baseUrl: "http://box/api", model: "nemotron", fetchImpl });
-    const b = new OpenAICompatProvider({ baseUrl: "http://box/api", model: "qwen", fetchImpl });
+    const b = new OpenAICompatProvider({ baseUrl: "http://box/api", model: "qwen", serializeEndpoint: true, fetchImpl });
     await Promise.all([
       a.decide({ observation: obs(), limits: DEFAULT_LIMITS }),
       b.decide({ observation: obs(), limits: DEFAULT_LIMITS }),
     ]);
-    expect(peak()).toBe(2); // distinct backends → still concurrent
+    expect(peak()).toBe(2); // distinct keys → still concurrent
   });
 });
 

@@ -21,7 +21,7 @@ function env(name: string): string | undefined {
   return viteEnv?.[`VITE_${name}`] ?? process.env[`VITE_${name}`] ?? process.env[name];
 }
 
-function playerFor(spec: string, noThink: boolean): MeleePlayer {
+function playerFor(spec: string, noThink: boolean, serialize: string | undefined): MeleePlayer {
   if (spec === "rules") return { label: "rules", make: () => new RuleBasedProvider() };
   if (spec === "claude" || spec.startsWith("claude:")) {
     const model = spec.includes(":") ? spec.slice("claude:".length) : undefined;
@@ -33,6 +33,10 @@ function playerFor(spec: string, noThink: boolean): MeleePlayer {
     const model = spec.includes(":") ? spec.slice("openwebui:".length) : env("OPENWEBUI_MODEL");
     if (!model) throw new Error("meleeCli: pass openwebui:<model> or set VITE_OPENWEBUI_MODEL in .env.");
     const apiKey = env("OPENWEBUI_API_KEY");
+    // --serialize <substring>: the contended single-GPU local model (e.g. "qwen") serializes
+    // its same-model slots so they don't dogpile the box; an external endpoint (nemotron) is
+    // left concurrent so its trio runs in parallel and the round stays fast.
+    const serializeEndpoint = serialize !== undefined && model.includes(serialize);
     return {
       label: noThink ? `${model}-nothink` : model,
       make: () =>
@@ -41,6 +45,7 @@ function playerFor(spec: string, noThink: boolean): MeleePlayer {
           model,
           apiKey,
           timeoutMs: 300_000,
+          serializeEndpoint,
           ...(noThink ? { promptSuffix: " /no_think", maxTokens: 4096 } : {}),
         }),
     };
@@ -56,8 +61,12 @@ function arg(name: string, fallback: string): string {
 
 async function main(): Promise<void> {
   const noThink = process.argv.includes("--nothink");
+  // --serialize <substring>: serialize same-model slots whose model id contains the substring
+  // (the contended single-GPU local model, e.g. "qwen"); others stay concurrent.
+  const serialize = arg("serialize", "");
+  const serializeArg = serialize.length > 0 ? serialize : undefined;
   const specs = arg("models", "rules,rules,rules,rules,rules,rules").split(",").map((s) => s.trim());
-  const players = specs.map((s) => playerFor(s, noThink));
+  const players = specs.map((s) => playerFor(s, noThink, serializeArg));
   // Duplicate labels get numbered so each roster slot's seat portfolio stays distinguishable.
   const seen = new Map<string, number>();
   for (const p of players) {

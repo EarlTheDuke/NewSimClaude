@@ -47,6 +47,15 @@ export interface OpenAICompatOptions {
    * label the match accordingly (e.g. `qwen3.5:35b-nothink`).
    */
   promptSuffix?: string;
+  /**
+   * Serialize this backend (melee fix, 2026-06-12): when true, calls sharing this provider's
+   * (baseUrl + model) key queue client-side so only ONE is ever in flight to that backend —
+   * essential for a single-GPU LOCAL model when the melee fires its 3 same-model slots at
+   * once (otherwise they dogpile and time out). Default FALSE ⇒ concurrent, the original
+   * behaviour: leave it off for an external endpoint that handles concurrency fine (e.g.
+   * nemotron), so its trio runs in parallel and the round stays fast.
+   */
+  serializeEndpoint?: boolean;
   /** Inject a fetch stub for tests. */
   fetchImpl?: FetchLike;
 }
@@ -62,7 +71,9 @@ const DEFAULTS = {
  * Per-backend request queue (melee fix): chains calls sharing a key so at most one is in
  * flight to a given (baseUrl + model) backend at a time. A prior call's error never blocks
  * the next (the chain swallows rejections). Module-level so every provider instance for the
- * same backend — the melee's three same-model slots — shares one queue.
+ * same backend — the melee's three same-model slots — shares one queue. OPT-IN per provider
+ * (serializeEndpoint): a contended single-GPU local model needs it; an external endpoint that
+ * handles concurrency does NOT (serializing it just triples its per-day latency for nothing).
  */
 const endpointQueues = new Map<string, Promise<unknown>>();
 async function withEndpointLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
@@ -105,20 +116,22 @@ export class OpenAICompatProvider implements DecisionProvider {
     this.briefing = options.briefing ?? defaultBriefing(options.objective ?? DEFAULT_OBJECTIVE);
     this.ledger = new CeoLedger(options.memoryTurns ?? DEFAULTS.memoryTurns);
     this.promptSuffix = options.promptSuffix ?? "";
+    this.serializeEndpoint = options.serializeEndpoint ?? false;
   }
 
   private readonly promptSuffix: string;
+  private readonly serializeEndpoint: boolean;
 
   async decide(req: DecisionRequest): Promise<BusinessDecision> {
-    // ENDPOINT SERIALIZATION (melee fix, 2026-06-12): the 6-firm melee fires every firm's
-    // decision concurrently, so N slots of the SAME model dogpile one backend GPU at once —
-    // which made qwen on the single-GPU tinybox time out on >50% of its turns (rules-covered,
-    // benchmark-invalidating), while nemotron on its own external endpoint stayed clean. We
-    // queue requests per (baseUrl + model) client-side so only one is ever in flight to a
-    // given backend, and each gets its FULL timeout from the moment it actually starts (queue
-    // wait doesn't count). Different models on the same Open WebUI front door (nemotron vs
-    // qwen) keep distinct keys ⇒ still parallel ⇒ duels are unaffected.
-    return withEndpointLock(`${this.opts.baseUrl}::${this.opts.model}`, async () => {
+    // ENDPOINT SERIALIZATION (melee fix, 2026-06-12) — OPT-IN: the 6-firm melee fires every
+    // firm's decision concurrently, so N slots of the SAME model dogpile one backend GPU at
+    // once, which made the single-GPU tinybox qwen time out on >50% of its turns (rules-
+    // covered, benchmark-invalidating). When serializeEndpoint is set we queue per (baseUrl +
+    // model) so only one call is in flight to that backend, each getting its FULL timeout from
+    // when it actually starts. Left OFF for an external endpoint that handles concurrency
+    // (nemotron) so its trio runs in parallel and the round stays fast. Off by default ⇒
+    // concurrent, the original behaviour (duels use distinct models ⇒ unaffected either way).
+    const run = async (): Promise<BusinessDecision> => {
       const started = Date.now();
       const controller = typeof AbortController !== "undefined" ? new AbortController() : undefined;
       const timer = setTimeout(() => controller?.abort(), this.opts.timeoutMs);
@@ -129,7 +142,10 @@ export class OpenAICompatProvider implements DecisionProvider {
       } finally {
         clearTimeout(timer);
       }
-    });
+    };
+    return this.serializeEndpoint
+      ? withEndpointLock(`${this.opts.baseUrl}::${this.opts.model}`, run)
+      : run();
   }
 
   private async call(req: DecisionRequest, signal?: AbortSignal): Promise<BusinessDecision> {
