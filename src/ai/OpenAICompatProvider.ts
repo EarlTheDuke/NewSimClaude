@@ -58,6 +58,27 @@ const DEFAULTS = {
   memoryTurns: 12,
 };
 
+/**
+ * Per-backend request queue (melee fix): chains calls sharing a key so at most one is in
+ * flight to a given (baseUrl + model) backend at a time. A prior call's error never blocks
+ * the next (the chain swallows rejections). Module-level so every provider instance for the
+ * same backend — the melee's three same-model slots — shares one queue.
+ */
+const endpointQueues = new Map<string, Promise<unknown>>();
+async function withEndpointLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = endpointQueues.get(key) ?? Promise.resolve();
+  const turn = prev.then(fn, fn); // run fn whether the previous call resolved or rejected
+  // Keep the chain alive but never let a rejection propagate to the next waiter.
+  endpointQueues.set(
+    key,
+    turn.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return turn;
+}
+
 export class OpenAICompatProvider implements DecisionProvider {
   readonly id: string;
   private readonly fetchImpl: FetchLike;
@@ -89,16 +110,26 @@ export class OpenAICompatProvider implements DecisionProvider {
   private readonly promptSuffix: string;
 
   async decide(req: DecisionRequest): Promise<BusinessDecision> {
-    const started = Date.now();
-    const controller = typeof AbortController !== "undefined" ? new AbortController() : undefined;
-    const timer = setTimeout(() => controller?.abort(), this.opts.timeoutMs);
-    try {
-      const decision = await this.call(req, controller?.signal);
-      decision.usage = { ...decision.usage, latencyMs: Date.now() - started };
-      return decision;
-    } finally {
-      clearTimeout(timer);
-    }
+    // ENDPOINT SERIALIZATION (melee fix, 2026-06-12): the 6-firm melee fires every firm's
+    // decision concurrently, so N slots of the SAME model dogpile one backend GPU at once —
+    // which made qwen on the single-GPU tinybox time out on >50% of its turns (rules-covered,
+    // benchmark-invalidating), while nemotron on its own external endpoint stayed clean. We
+    // queue requests per (baseUrl + model) client-side so only one is ever in flight to a
+    // given backend, and each gets its FULL timeout from the moment it actually starts (queue
+    // wait doesn't count). Different models on the same Open WebUI front door (nemotron vs
+    // qwen) keep distinct keys ⇒ still parallel ⇒ duels are unaffected.
+    return withEndpointLock(`${this.opts.baseUrl}::${this.opts.model}`, async () => {
+      const started = Date.now();
+      const controller = typeof AbortController !== "undefined" ? new AbortController() : undefined;
+      const timer = setTimeout(() => controller?.abort(), this.opts.timeoutMs);
+      try {
+        const decision = await this.call(req, controller?.signal);
+        decision.usage = { ...decision.usage, latencyMs: Date.now() - started };
+        return decision;
+      } finally {
+        clearTimeout(timer);
+      }
+    });
   }
 
   private async call(req: DecisionRequest, signal?: AbortSignal): Promise<BusinessDecision> {

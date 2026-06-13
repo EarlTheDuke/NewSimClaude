@@ -98,6 +98,46 @@ describe("OpenAICompatProvider — the local/third-party adapter (first live due
   });
 });
 
+describe("endpoint serialization (the melee fix)", () => {
+  /** A stub that tracks peak concurrent in-flight calls and tags the model it saw. */
+  function concurrencyStub(delayMs: number) {
+    let inFlight = 0;
+    let peak = 0;
+    const fetchImpl: FetchLike = async (_url, init) => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, delayMs));
+      inFlight--;
+      const model = JSON.parse(init.body).model as string;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: `{"reason":"${model}"}` } }], usage: {} }),
+      };
+    };
+    return { fetchImpl, peak: () => peak };
+  }
+
+  it("serializes concurrent calls to the SAME backend (baseUrl+model) — never >1 in flight", async () => {
+    const { fetchImpl, peak } = concurrencyStub(40);
+    const mk = () => new OpenAICompatProvider({ baseUrl: "http://box/api", model: "qwen", fetchImpl });
+    // Three same-model slots fire at once (the melee's three qwen seats).
+    await Promise.all([mk(), mk(), mk()].map((p) => p.decide({ observation: obs(), limits: DEFAULT_LIMITS })));
+    expect(peak()).toBe(1); // the gate held — no dogpile on the single GPU
+  });
+
+  it("lets DIFFERENT models on the same front door run in parallel (duels unaffected)", async () => {
+    const { fetchImpl, peak } = concurrencyStub(40);
+    const a = new OpenAICompatProvider({ baseUrl: "http://box/api", model: "nemotron", fetchImpl });
+    const b = new OpenAICompatProvider({ baseUrl: "http://box/api", model: "qwen", fetchImpl });
+    await Promise.all([
+      a.decide({ observation: obs(), limits: DEFAULT_LIMITS }),
+      b.decide({ observation: obs(), limits: DEFAULT_LIMITS }),
+    ]);
+    expect(peak()).toBe(2); // distinct backends → still concurrent
+  });
+});
+
 describe("extractJsonObject — tolerant JSON fishing", () => {
   it("takes the LAST balanced object and survives strings with braces", () => {
     expect(extractJsonObject('first {"a": 1} then {"b": "curly } inside", "c": 2}')).toEqual({
